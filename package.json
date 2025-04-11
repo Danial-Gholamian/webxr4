@@ -1,0 +1,31 @@
+{
+  "name": "webxr4",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Danial-Gholamian/webxr4.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Danial-Gholamian/webxr4/issues"
+  },
+  "homepage": "https://danial-gholamian.github.io/webxr4/",
+  "dependencies": {
+    "3d-force-graph": "^1.77.0",
+    "three": "^0.175.0"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "vite": "^6.2.6"
+  }
+}
