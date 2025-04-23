@@ -1,9 +1,18 @@
+import fs from 'fs'
+import path from 'path'
+
 export default {
   base: '/webxr4/',
   build: {
     outDir: 'docs'
   },
   server: {
-    open: true
+    open: true,
+    host: '0.0.0.0',
+    port: 5173,
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, 'localhost-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, 'localhost.pem'))
+    }
   }
-};
+}
