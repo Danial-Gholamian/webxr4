@@ -10,10 +10,14 @@ import {
   setupGraphSwitchButtons,
   updateLaserPointer
 } from './vrSetup.js';
+import { detectHover, markHoverCacheDirty } from './hover.js'; // Import the necessary functions
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
+// For better performance.
+const nodeMeshMap = new Map();
+const linkMeshMap = new Map();
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -41,6 +45,10 @@ graphData.nodes.forEach(node => {
   directLinksMap.set(node.id, []);
 });
 
+function requestGraphUpdateAndMarkHoverCacheDirty(mode, nodeId) {
+  requestGraphUpdate(mode, nodeId);
+  markHoverCacheDirty(); // Tell the hover system to update its cache
+}
 graphData.links.forEach(link => {
   const srcId = typeof link.source === 'object' ? link.source.id : link.source;
   const tgtId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -186,42 +194,56 @@ function requestGraphUpdate(mode, nodeId) {
   graphUpdateNodeId = nodeId;
   graphUpdateNeeded = true;
 }
+
 function highlightSubgraph(nodeId, mode = 'SUBGRAPH') {
   const selectedIds = new Set();
 
-  if (mode === 'SUBGRAPH') {
-    const neighbors = adjacency.get(nodeId) || new Set();
-    selectedIds.add(nodeId);
-    neighbors.forEach(n => selectedIds.add(n));
-  } else if (mode === 'DIRECT') {
-    selectedIds.add(nodeId);
-    (directLinksMap.get(nodeId) || []).forEach(link => {
-      selectedIds.add(link.source);
-      selectedIds.add(link.target);
-    });
-  }
+  // Add selected node and neighbors
+  selectedIds.add(nodeId);
+  (directLinksMap.get(nodeId) || []).forEach(link => {
+    selectedIds.add(link.source);
+    selectedIds.add(link.target);
+  });
+
+  console.log(`Selected Node: ${nodeId}`);
+  console.log(`Selected IDs Set:`, selectedIds);
 
   Graph.scene().traverse(obj => {
-    if (obj.__data) {
+    if (obj.__data && obj.__data.id !== undefined) {
       const id = obj.__data.id;
       const isSelected = selectedIds.has(id);
+
+      // DEBUG each node
+      if (id === nodeId) {
+        console.log(`NODE ${id} -> isSelected: ${isSelected}, material opacity before: ${obj.material?.opacity}`);
+      }
+      if (id === '1753') {
+        console.log('1753 object:', obj, 'type:', obj.type, 'material:', obj.material);
+      }
+
       if (obj.material?.opacity !== undefined) {
         obj.material.transparent = true;
         obj.material.opacity = isSelected ? 1.0 : 0.05;
+
+        // DEBUG after setting
+        if (id === nodeId) {
+          console.log(`NODE ${id} -> material opacity after: ${obj.material.opacity}`);
+        }
       }
     }
 
-    if (obj.isLine) {
-      const srcId = obj.__data?.source?.id || obj.__data?.source;
-      const tgtId = obj.__data?.target?.id || obj.__data?.target;
-      const isVisible = selectedIds.has(srcId) && selectedIds.has(tgtId);
+    if (obj.__data && obj.__data.source !== undefined && obj.__data.target !== undefined) {
+      const link = obj.__data;
+      const isLinkSelected = (link.source === nodeId || link.target === nodeId);
+
       if (obj.material?.opacity !== undefined) {
         obj.material.transparent = true;
-        obj.material.opacity = isVisible ? 1.0 : 0.02;
+        obj.material.opacity = isLinkSelected ? 1.0 : 0.05;
       }
     }
   });
 }
+
 
 
 
@@ -249,12 +271,22 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
 
   if (inVR && xrFrame) {
-    handleJoystickInput(xrFrame, camera, cameraGroup);
-    updateLaserPointer(controller1);
-    updateLaserPointer(controller2);
-    pollGraphSwitchButtons();
+    handleJoystickInput(xrFrame, camera, cameraGroup); // Handle movement/rotation
+
+    // Call hover detection for both controllers, passing the graph scene
+    if (GraphRef.current?.scene) { // Ensure graph scene exists
+      detectHover(controller1, GraphRef.current.scene());
+      detectHover(controller2, GraphRef.current.scene());
+    }
+
+    pollGraphSwitchButtons(); // Handle button presses
+
+    // REMOVE calls to updateLaserPointer
+    // updateLaserPointer(controller1); <--- REMOVE
+    // updateLaserPointer(controller2); <--- REMOVE
+
   } else {
-    controls.update();
+    controls.update(); // OrbitControls update for non-VR
   }
 
   renderer.render(scene, camera);
