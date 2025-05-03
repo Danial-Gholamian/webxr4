@@ -7,8 +7,9 @@ import {
   setupController,
   handleJoystickInput,
   setupVRNodeSelection,
-  setupGraphSwitchButtons,
-  updateLaserPointer
+  updateLaserPointer,
+  handleXButtonInput,
+  setupGraphSwitchButtons
 } from './vrSetup.js';
 import { detectHover, markHoverCacheDirty } from './hover.js'; // Import the necessary functions
 
@@ -49,6 +50,7 @@ function requestGraphUpdateAndMarkHoverCacheDirty(mode, nodeId) {
   requestGraphUpdate(mode, nodeId);
   markHoverCacheDirty(); // Tell the hover system to update its cache
 }
+
 graphData.links.forEach(link => {
   const srcId = typeof link.source === 'object' ? link.source.id : link.source;
   const tgtId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -60,44 +62,6 @@ graphData.links.forEach(link => {
   if (srcId !== tgtId) directLinksMap.get(tgtId).push(storedLink);
 });
 
-// Subgraph helper: selected + neighbors
-// function getSubgraphOptimized(selectedId) {
-//   const neighbors = adjacency.get(selectedId) || new Set();
-//   const nodeIds = new Set([selectedId, ...neighbors]);
-//   const subNodes = Array.from(nodeIds).map(id => nodeMap.get(id)).filter(Boolean);
-//   const subLinks = new Set();
-
-//   (directLinksMap.get(selectedId) || []).forEach(link => {
-//     if (nodeIds.has(link.source) && nodeIds.has(link.target)) {
-//       subLinks.add(JSON.stringify(link));
-//     }
-//   });
-
-//   neighbors.forEach(nId => {
-//     (directLinksMap.get(nId) || []).forEach(link => {
-//       if (link.source !== selectedId && link.target !== selectedId &&
-//           nodeIds.has(link.source) && nodeIds.has(link.target)) {
-//         subLinks.add(JSON.stringify(link));
-//       }
-//     });
-//   });
-
-//   return { nodes: subNodes, links: Array.from(subLinks).map(str => JSON.parse(str)) };
-// }
-
-// Subgraph helper: selected + direct edges
-// function getDirectEdgesOnlyOptimized(selectedId) {
-//   const nodeIds = new Set([selectedId]);
-//   const subLinks = [];
-
-//   (directLinksMap.get(selectedId) || []).forEach(link => {
-//     subLinks.push(link);
-//     nodeIds.add(link.source === selectedId ? link.target : link.source);
-//   });
-
-//   const subNodes = Array.from(nodeIds).map(id => nodeMap.get(id)).filter(Boolean);
-//   return { nodes: subNodes, links: subLinks };
-// }
 
 // Create graph
 const Graph = ForceGraph3D()(document.body)
@@ -139,8 +103,21 @@ resetBtn.style.cursor = 'pointer';
 document.body.appendChild(resetBtn);
 
 resetBtn.addEventListener('click', () => {
-  Graph.graphData(graphData); // Completely reset to original data
+  Graph.graphData(graphData); // Reset to original data
+
+  // Restore visibility of all links
+  Graph.scene().traverse(obj => {
+    if (
+      obj.__data &&
+      obj.__data.source !== undefined &&
+      obj.__data.target !== undefined
+    ) {
+      obj.visible = true;
+    }
+  });
+
 });
+
 
 
 
@@ -195,63 +172,57 @@ function requestGraphUpdate(mode, nodeId) {
   graphUpdateNeeded = true;
 }
 
-function highlightSubgraph(nodeId, mode = 'SUBGRAPH') {
-  const selectedIds = new Set();
+// In the adjacency and directLinksMap setup:
+graphData.nodes.forEach(node => {
+  const idStr = String(node.id); // Convert node.id to string
+  adjacency.set(idStr, new Set());
+  directLinksMap.set(idStr, []);
+});
 
-  // Add selected node and neighbors
-  selectedIds.add(nodeId);
-  (directLinksMap.get(nodeId) || []).forEach(link => {
-    selectedIds.add(link.source);
-    selectedIds.add(link.target);
-  });
+graphData.links.forEach(link => {
+  // Convert source and target to strings
+  const srcId = String(typeof link.source === 'object' ? link.source.id : link.source);
+  const tgtId = String(typeof link.target === 'object' ? link.target.id : link.target);
 
-  console.log(`Selected Node: ${nodeId}`);
-  console.log(`Selected IDs Set:`, selectedIds);
+  adjacency.get(srcId).add(tgtId);
+  adjacency.get(tgtId).add(srcId);
+
+  const storedLink = { source: srcId, target: tgtId };
+  directLinksMap.get(srcId).push(storedLink);
+  if (srcId !== tgtId) directLinksMap.get(tgtId).push(storedLink);
+});
+
+// In highlightSubgraph function:
+function highlightSubgraph(nodeId) {
+  const clickedId = String(nodeId); // Ensure clickedId is a string
+
+  const neighbourIds = new Set([
+    ...(adjacency.get(clickedId) ? Array.from(adjacency.get(clickedId)) : [])
+  ]);
+  const selectedIds = new Set([clickedId, ...neighbourIds]);
 
   Graph.scene().traverse(obj => {
-    if (obj.__data && obj.__data.id !== undefined) {
-      const id = obj.__data.id;
-      const isSelected = selectedIds.has(id);
-
-      // DEBUG each node
-      if (id === nodeId) {
-        console.log(`NODE ${id} -> isSelected: ${isSelected}, material opacity before: ${obj.material?.opacity}`);
-      }
-      if (id === '1753') {
-        console.log('1753 object:', obj, 'type:', obj.type, 'material:', obj.material);
-      }
-
-      if (obj.material?.opacity !== undefined) {
-        obj.material.transparent = true;
-        obj.material.opacity = isSelected ? 1.0 : 0.05;
-
-        // DEBUG after setting
-        if (id === nodeId) {
-          console.log(`NODE ${id} -> material opacity after: ${obj.material.opacity}`);
-        }
-      }
+    if (obj.__data?.id !== undefined) {
+      const objId = String(obj.__data.id); // Convert to string for comparison
+      const isSelected = selectedIds.has(objId);
+      // Rest of the node styling...
     }
 
-    if (obj.__data && obj.__data.source !== undefined && obj.__data.target !== undefined) {
-      const link = obj.__data;
-      const isLinkSelected = (link.source === nodeId || link.target === nodeId);
-
-      if (obj.material?.opacity !== undefined) {
-        obj.material.transparent = true;
-        obj.material.opacity = isLinkSelected ? 1.0 : 0.05;
-      }
+    if (obj.__data?.source !== undefined && obj.__data?.target !== undefined) {
+      const s = String(obj.__data.source?.id ?? obj.__data.source);
+      const t = String(obj.__data.target?.id ?? obj.__data.target);
+      obj.visible = (s === clickedId || t === clickedId);
     }
   });
 }
 
 
 
-
 renderer.setAnimationLoop((timestamp, xrFrame) => {
+  // --- 1. Handle pending graph updates ---
   if (graphUpdateNeeded) {
     switch (graphUpdateMode) {
       case 'FULL':
-        // Reset visibility for all nodes and links
         Graph.scene().traverse(obj => {
           if (obj.material && obj.material.opacity !== undefined) {
             obj.material.transparent = false;
@@ -259,6 +230,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
           }
         });
         break;
+
       case 'SUBGRAPH':
       case 'DIRECT':
         highlightSubgraph(graphUpdateNodeId, graphUpdateMode);
@@ -270,24 +242,42 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     graphUpdateNodeId = null;
   }
 
-  if (inVR && xrFrame) {
-    handleJoystickInput(xrFrame, camera, cameraGroup); // Handle movement/rotation
-
-    // Call hover detection for both controllers, passing the graph scene
-    if (GraphRef.current?.scene) { // Ensure graph scene exists
-      detectHover(controller1, GraphRef.current.scene());
-      detectHover(controller2, GraphRef.current.scene());
+  // --- 2. Always make labels face the camera ---
+  Graph.scene().traverse(obj => {
+    if (obj.userData?.labelSprite) {
+      obj.userData.labelSprite.lookAt(camera.position);
     }
+  });
 
-    pollGraphSwitchButtons(); // Handle button presses
+  // --- 3. VR / non-VR update logic ---
+  if (inVR && xrFrame) {
+    handleJoystickInput(xrFrame, camera, cameraGroup);
 
-    // REMOVE calls to updateLaserPointer
-    // updateLaserPointer(controller1); <--- REMOVE
-    // updateLaserPointer(controller2); <--- REMOVE
+    // — Reset view on X-button press (with haptics) —
+    handleXButtonInput(xrFrame, () => {
+      resetBtn.click();
+      console.log('🔄 View reset via X button');
+      
+      [controller1, controller2].forEach(c => {
+        const gp = c.userData.inputSource?.gamepad;
+        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
+        if (h?.pulse) {
+          h.pulse(0.8, 100);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(100);
+        }
+      });
+    });
 
-  } else {
-    controls.update(); // OrbitControls update for non-VR
+    detectHover(controller1, GraphRef.current.scene());
+    detectHover(controller2, GraphRef.current.scene());
+    pollGraphSwitchButtons();
+
+  }  else {
+    controls.update(); // OrbitControls update for desktop
   }
 
+  // --- 4. Final render ---
   renderer.render(scene, camera);
 });
+

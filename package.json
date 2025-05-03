@@ -22,7 +22,8 @@
   "dependencies": {
     "3d-force-graph": "^1.77.0",
     "chart.js": "^4.4.8",
-    "three": "^0.175.0"
+    "three": "^0.175.0",
+    "troika-three-text": "^0.52.4"
   },
   "devDependencies": {
     "gh-pages": "^6.3.0",

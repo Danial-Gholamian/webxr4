@@ -12,100 +12,146 @@ let cacheNeedsUpdate = true;
 
 export function markHoverCacheDirty() {
   cacheNeedsUpdate = true;
+  
 }
+function createLabelFromNodeData(nodeData) {
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  const fontSize = 28;
+  const padding = 10;
+
+  const lines = Object.entries(nodeData)
+    .filter(([key, _]) => key !== '__link')
+    .map(([key, value]) => `${key}: ${value}`);
+
+  context.font = `${fontSize}px Arial`;
+  const textWidth = Math.max(...lines.map(line => context.measureText(line).width));
+  const width = textWidth + padding * 2;
+  const height = fontSize * lines.length + padding * 2;
+
+  canvas.width = width;
+  canvas.height = height;
+
+  // Background (rounded rectangle)
+  context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  const radius = 12;
+  context.beginPath();
+  context.moveTo(radius, 0);
+  context.lineTo(width - radius, 0);
+  context.quadraticCurveTo(width, 0, width, radius);
+  context.lineTo(width, height - radius);
+  context.quadraticCurveTo(width, height, width - radius, height);
+  context.lineTo(radius, height);
+  context.quadraticCurveTo(0, height, 0, height - radius);
+  context.lineTo(0, radius);
+  context.quadraticCurveTo(0, 0, radius, 0);
+  context.closePath();
+  context.fill();
+
+  // Text
+  context.fillStyle = 'white';
+  lines.forEach((line, i) => {
+    context.fillText(line, padding, padding + fontSize * (i + 0.8));
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const sprite = new THREE.Sprite(material);
+
+  // Wider and shorter label
+  const aspectRatio = width / height;
+  sprite.scale.set(2.5 * aspectRatio, 2.5, 1);
+
+  return sprite;
+}
+
 
 // Modified detectHover
 export function detectHover(controller, graphScene) {
   // --- 1. Clear previous hover state ---
   while (intersected.length) {
     const obj = intersected.pop();
-    // Check if material exists and has emissive property
+
     if (obj.material?.emissive) {
-        obj.material.emissive.setRGB(0, 0, 0); // Reset emissive color
+      obj.material.emissive.setRGB(0, 0, 0); // Reset emissive color
     }
-     if (obj.userData) {
-        delete obj.userData.isHovered; // Remove hovered flag
-     }
+
+    if (obj.userData?.labelSprite) {
+      obj.remove(obj.userData.labelSprite);
+      obj.userData.labelSprite.material.map.dispose();
+      obj.userData.labelSprite.material.dispose();
+      delete obj.userData.labelSprite;
+    }
+
+    if (obj.userData) {
+      delete obj.userData.isHovered;
+    }
   }
-  controller.userData.hoveredObject = null; // Clear controller's hovered object reference
+
+  controller.userData.hoveredObject = null;
 
   // --- 2. Raycasting Setup ---
-  if (!controller || !graphScene) return; // Guard clause
+  if (!controller || !graphScene) return;
 
   tempMatrix.identity().extractRotation(controller.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-  raycaster.far = 10; // Max distance for hover detection
+  raycaster.far = 10;
 
-  // --- 3. Get Target Objects (Graph Nodes) ---
-  // Basic caching: Re-traverse only if graph data changed significantly
+  // --- 3. Update node mesh cache if needed ---
   if (cacheNeedsUpdate) {
     nodeMeshesCache = [];
     graphScene.traverse(obj => {
-      // Check if it's a mesh AND has node data associated by the library
       if (obj instanceof THREE.Mesh && obj.__data && obj.__data.id !== undefined) {
         nodeMeshesCache.push(obj);
       }
     });
-    cacheNeedsUpdate = false; // Reset flag until next graph update
-     console.log(`Updated node mesh cache: ${nodeMeshesCache.length} nodes found.`);
+    cacheNeedsUpdate = false;
+    console.log(`Updated node mesh cache: ${nodeMeshesCache.length} nodes found.`);
   }
 
-   if (nodeMeshesCache.length === 0) {
-       // console.warn("detectHover: No node meshes found in cache to intersect with.");
-       return; // Nothing to intersect
-   }
+  if (nodeMeshesCache.length === 0) return;
 
-
-  // --- 4. Perform Intersection ---
-  // Intersect specifically with the cached node meshes, non-recursively
+  // --- 4. Intersect with nodes ---
   const intersections = raycaster.intersectObjects(nodeMeshesCache, false);
-  const line = controller.userData.laser; // Get the laser line associated with the controller
+  const line = controller.userData.laser;
 
-  // --- 5. Handle Intersections ---
   if (intersections.length > 0) {
-    // Hit detected
-    const intersection = intersections[0]; // Closest hit
+    const intersection = intersections[0];
     const hitObject = intersection.object;
 
-    // Set laser length to hit distance
     if (line) line.scale.z = intersection.distance;
 
-    // Check if it's a mesh (it should be based on our collection logic)
     if (hitObject instanceof THREE.Mesh) {
-      hitObject.userData.isHovered = true; // Mark object as hovered
-      controller.userData.hoveredObject = hitObject; // Store reference on controller
-      intersected.push(hitObject); // Add to list for highlighting/cleanup
+      hitObject.userData.isHovered = true;
+      controller.userData.hoveredObject = hitObject;
+      intersected.push(hitObject);
 
-      // --- Visual Feedback (Example: Emissive color) ---
       if (hitObject.material?.emissive) {
-          hitObject.material.emissive.setHex(0xff0000); // Highlight the object
+        hitObject.material.emissive.setHex(0xff0000);
       }
 
+      if (!hitObject.userData.labelSprite && hitObject.__data) {
+        const label = createLabelFromNodeData(hitObject.__data);
+        label.position.set(0, 1.5, 0); // Adjust height above node
+        hitObject.add(label);
+        hitObject.userData.labelSprite = label;
+      }
 
-      // --- Haptic Feedback ---
+      // Haptic feedback
       try {
         const inputSource = controller.userData.inputSource;
-        if (inputSource && inputSource.gamepad && Array.isArray(inputSource.gamepad.hapticActuators) && inputSource.gamepad.hapticActuators.length > 0) {
-          const actuator = inputSource.gamepad.hapticActuators[0];
-           if (actuator && typeof actuator.pulse === 'function') {
-             actuator.pulse(0.8, 50); // Short, strong pulse (Intensity 0.0-1.0, Duration ms)
-           } else {
-             console.warn("Haptic actuator found, but pulse method is missing or not a function.");
-           }
-        } else {
-           console.warn("No valid haptic actuators found for this controller.");
+        const actuator = inputSource?.gamepad?.hapticActuators?.[0];
+        if (actuator?.pulse) {
+          actuator.pulse(0.8, 50);
         }
-      } catch (error) {
-        console.error("Error during haptic feedback:", error);
+      } catch (err) {
+        console.warn("Haptic feedback error:", err);
       }
     }
 
   } else {
-    // No hit
-    if (line) line.scale.z = raycaster.far; // Reset laser to max length
+    if (line) line.scale.z = raycaster.far;
     controller.userData.hoveredObject = null;
   }
 }
-
-// Removed setupInteractiveGroup as it wasn't used for the graph

@@ -7,6 +7,7 @@ const movementSpeed = 0.5;
 const rotationSpeed = 0.03;
 const deadZone = 0.1;
 const laserDistance = 10;
+const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
 
 // --- 1. Controller Setup (with laser + teleport) ---
 function setupController(controller, index, renderer, cameraGroup) {
@@ -203,6 +204,33 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
   return pollGamepadButtons;
 }
 
+/**
+ * Polls the left controller’s gamepad each frame and calls onXPress()
+ * exactly once per button-down event.
+ */
+function handleXButtonInput(xrFrame, onXPress) {
+  if (!xrFrame || typeof onXPress !== 'function') return;
+
+  // 1) find the left-hand gamepad
+  let isPressed = false;
+  for (const source of xrFrame.session.inputSources) {
+    if (source.handedness === 'left' && source.gamepad) {
+      const btns = source.gamepad.buttons;
+      if (btns.length > xButtonIndex && btns[xButtonIndex].pressed) {
+        isPressed = true;
+        break;
+      }
+    }
+  }
+
+  // 2) edge-detect: fire only when going from up → down
+  if (isPressed && !handleXButtonInput._wasPressed) {
+    onXPress();
+  }
+  handleXButtonInput._wasPressed = isPressed;
+}
+handleXButtonInput._wasPressed = false;
+
 
 
 // --- Laser Reset (Optional) ---
@@ -217,6 +245,7 @@ export {
   setupController,
   teleportFromController,
   handleJoystickInput,
+  handleXButtonInput,
   setupVRNodeSelection,
   setupGraphSwitchButtons,
   updateLaserPointer
