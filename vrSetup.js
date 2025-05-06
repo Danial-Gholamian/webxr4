@@ -6,7 +6,7 @@ import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerM
 const movementSpeed = 0.5;
 const rotationSpeed = 0.03;
 const deadZone = 0.1;
-const laserDistance = 10;
+const laserDistance = 100;
 const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
 
 // --- 1. Controller Setup (with laser + teleport) ---
@@ -44,7 +44,9 @@ function teleportFromController(controller, cameraGroup, teleportDistance = 5) {
   controller.getWorldDirection(direction);
   direction.y = 0;
   direction.normalize();
-
+  
+  // Add this line to reverse direction
+  direction.multiplyScalar(-1); 
   controller.getWorldPosition(position);
   const target = position.clone().add(direction.multiplyScalar(teleportDistance));
 
@@ -107,7 +109,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     matrix.identity().extractRotation(controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
-    raycaster.far = 10;
+    raycaster.far = 100;
 
     const nodes = [];
     GraphRef.current.scene().traverse(obj => {
@@ -163,7 +165,7 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
       matrix.identity().extractRotation(controller.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
-      raycaster.far = 10;
+      raycaster.far = 100;
 
       const nodes = [];
       GraphRef.current.scene().traverse(obj => {
