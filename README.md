@@ -120,3 +120,6 @@ Then your site will be live at:
 https://your-username.github.io/webxr4/
 ```
 
+Q2: "How can I improve hover label performance?"
+A: Implement object pooling for labels and throttle raycaster updates (e.g., check every 3rd frame).
+<!-- A lable must be readable in front of me , instead of far away inside the node. -->

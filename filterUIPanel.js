@@ -1,93 +1,81 @@
 // filterUIPanel.js
 import * as THREE from 'three';
-import { Text } from 'troika-three-text'; // Import the Text class
+import { Text } from 'troika-three-text';
 
-// --- Configuration ---
-const panelWidth = 0.3;  // Width of the panel in meters
-const panelHeight = 0.4; // Height of the panel
-const panelPadding = 0.02; // Padding inside the panel
-const textColor = 0xFFFFFF;
-const backgroundColor = 0x222222;
-const backgroundOpacity = 0.85;
-const elementSpacing = 0.05; // Vertical spacing between UI elements
+// --- Constants ---
+const PANEL_SCALE = 0.3;       // 30% of view width
+const PANEL_MARGIN = 0.1;      // 10% margin from bottom
+const FONT_SIZE = 0.05;        // 5cm in VR units
+const ROW_SPACING = 0.12;      // 12cm between rows
 
-/**
- * Creates the filter UI panel group.
- * @param {object} options - Configuration options (e.g., { availableGroups: ['A', 'B'] })
- * @returns {THREE.Group} The created UI panel group, initially hidden.
- */
-export function createFilterPanel(options = {}) {
+export function createFilterPanel(options = { groupColors: [], camera: null }) {
+    const uiPanel = new THREE.Group();
+    uiPanel.name = "FilterUIPanel";
+    
+    // --- Screen-Aligned Positioning ---
+    const aspect = window.innerWidth / window.innerHeight;
+    uiPanel.position.set(0, -0.3, -0.8);
+    uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
 
-    const uiPanelGroup = new THREE.Group();
-    uiPanelGroup.name = "FilterUIPanel"; // Helpful for debugging
-    uiPanelGroup.visible = false; // Start hidden
-
-    // --- Positioning relative to the controller (Needs Tweaking!) ---
-    // Example: Slightly above and forward, tilted back
-    uiPanelGroup.position.set(0, 0.15, -0.1);
-    uiPanelGroup.rotation.x = -Math.PI / 5; // Approx 36 degrees back
-
-
-    // --- Panel Background ---
-    const panelGeometry = new THREE.PlaneGeometry(panelWidth, panelHeight);
-    const panelMaterial = new THREE.MeshBasicMaterial({
-        color: backgroundColor,
-        opacity: backgroundOpacity,
+    // --- Background (Fix depth issues) ---
+    const bgGeometry = new THREE.PlaneGeometry(1.5, 0.8);
+    const bgMaterial = new THREE.MeshBasicMaterial({
+        color: 0x222222,
         transparent: true,
+        opacity: 0.9,
+        depthTest: false,  // Add this
+        depthWrite: false, // Add this
         side: THREE.DoubleSide
     });
-    const panelBackground = new THREE.Mesh(panelGeometry, panelMaterial);
-    panelBackground.name = "uiPanelBackground";
-    // Background is at the group's local 0,0,0
-    uiPanelGroup.add(panelBackground);
-
-
-    // --- UI Elements (To be added) ---
-    let currentY = panelHeight / 2 - panelPadding; // Start position for elements (top)
+    const background = new THREE.Mesh(bgGeometry, bgMaterial);
+    background.renderOrder = 1;  // Ensure it draws on top
+    uiPanel.add(background);
 
     // --- Title ---
-    const titleText = new Text();
-    titleText.text = "Filters";
-    titleText.fontSize = 0.025;
-    titleText.color = textColor;
-    titleText.anchorX = 'center';
-    titleText.anchorY = 'top';
-    // Position slightly in front of background (Z=0.001) to avoid z-fighting
-    titleText.position.set(0, currentY, 0.001);
-    titleText.sync(); // Important for Troika Text
-    uiPanelGroup.add(titleText);
+    const title = new Text();
+    title.text = "Group Legend";
+    title.fontSize = FONT_SIZE;
+    title.color = 0xFFFFFF;
+    title.anchorX = 'center';
+    title.position.set(0, 0.35, 0.01);
+    title.sync();
+    uiPanel.add(title);
 
-    currentY -= elementSpacing; // Move down for next element
+    // --- Dynamic Group Labels ---
+    options.groupColors.forEach((group, index) => {
+        const yPos = 0.2 - (index * ROW_SPACING);
+        
+        // Color indicator
+        const dot = new THREE.Mesh(
+            new THREE.SphereGeometry(0.02),
+            new THREE.MeshBasicMaterial({ 
+                color: group.color,
+                depthTest: false  // Add this
+            })
+        );
+        dot.position.set(-0.4, yPos, 0.01);
+        dot.renderOrder = 2;  // Higher than background
+        uiPanel.add(dot);
 
+        // Group name
+        const label = new Text();
+        label.text = group.name;
+        label.fontSize = FONT_SIZE;
+        label.color = 0xFFFFFF;
+        label.anchorX = 'left';
+        label.position.set(-0.35, yPos - 0.015, 0.01);
+        label.sync();
+        uiPanel.add(label);
+    });
 
-    // --- Placeholder for Group Filters ---
-    console.log("Placeholder: Add Group Filter checkboxes here.");
-    // Example: You would loop through options.availableGroups
-    // and create Text labels and interactive Checkbox Meshes here,
-    // adjusting 'currentY' for each one.
+    // --- Always face camera ---
+    uiPanel.userData.update = () => {
+        if (options.camera) {
+            uiPanel.quaternion.copy(options.camera.quaternion);
+        }
+    };
 
-
-    // --- Placeholder for other filters ---
-    currentY -= elementSpacing * 2; // Add more space
-    const otherFilterText = new Text();
-    otherFilterText.text = "Other Filters (TBD)";
-    otherFilterText.fontSize = 0.02;
-    otherFilterText.color = 0xAAAAAA;
-    otherFilterText.anchorX = 'center';
-    otherFilterText.anchorY = 'top';
-    otherFilterText.position.set(0, currentY, 0.001);
-    otherFilterText.sync();
-    uiPanelGroup.add(otherFilterText);
-
-
-    // --- Return the main group ---
-    // The calling code will add this to the controller
-    return uiPanelGroup;
+    return uiPanel;
 }
 
-// Optional: Helper function example (can be defined here or imported)
-function createCheckbox(/*...*/) {
-    // ... implementation ...
-}
-
-console.log(`filterUIPanel.js loaded (Current time: ${new Date().toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}).`);
+console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeString()}`);

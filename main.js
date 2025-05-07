@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { scaleOrdinal } from 'd3-scale';
+import { schemeCategory10 } from 'd3-scale-chromatic';
 import ForceGraph3D from '3d-force-graph';
 import graphData from './graph-data.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -12,6 +14,7 @@ import {
   setupGraphSwitchButtons
 } from './vrSetup.js';
 import { detectHover, markHoverCacheDirty } from './hover.js'; // Import the necessary functions
+import { createFilterPanel } from './filterUIPanel.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -77,6 +80,25 @@ const Graph = ForceGraph3D()(document.body)
   });
   
   const GraphRef = { current: Graph };
+
+
+const colorScale = scaleOrdinal(schemeCategory10)
+  .domain([...new Set(graphData.nodes.map(n => n.group))]);
+
+const groups = [...new Set(graphData.nodes.map(n => n.group))]
+  .map(group => ({
+    name: String(group),
+    color: colorScale(group)
+  }));
+
+// 2. Create panel with REAL group colors
+const uiPanel = createFilterPanel({ 
+  groupColors: groups,
+  camera: camera 
+});
+
+// 3. Add to camera group for VR visibility
+cameraGroup.add(uiPanel);
 
   setupController(controller1, 0, renderer, cameraGroup);
   setupController(controller2, 1, renderer, cameraGroup);
@@ -249,6 +271,19 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     }
   });
 
+  if (uiPanel) {
+    // Position relative to camera
+    const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
+    const worldPosition = new THREE.Vector3()
+        .copy(camera.position)
+        .add(panelOffset.applyQuaternion(camera.quaternion));
+    
+    uiPanel.position.copy(worldPosition);
+    
+    // Force update if using XR
+    if (inVR) uiPanel.userData.update?.();
+}
+
   // --- 3. VR / non-VR update logic ---
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
@@ -268,6 +303,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         }
       });
     });
+
 
     detectHover(controller1, GraphRef.current.scene());
     detectHover(controller2, GraphRef.current.scene());
