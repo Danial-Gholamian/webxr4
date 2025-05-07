@@ -70,6 +70,7 @@ graphData.links.forEach(link => {
 const Graph = ForceGraph3D()(document.body)
   .graphData(graphData)
   .nodeAutoColorBy('group')
+  .nodeColor(d => colorScale(d.group))
   .nodeLabel(node => node.label || node.id)
   .onNodeClick((node, event) => {
     if (inVR || event?.shiftKey) {
@@ -155,11 +156,11 @@ renderer.xr.addEventListener('sessionstart', () => {
   session.inputSources.forEach(source => {
     if (source.handedness === 'left') {
       controller1.userData.inputSource = source;
-      console.log('🆗 Left inputSource assigned');
+      console.log(' Left inputSource assigned');
     }
     if (source.handedness === 'right') {
       controller2.userData.inputSource = source;
-      console.log('🆗 Right inputSource assigned');
+      console.log(' Right inputSource assigned');
     }
   });
 
@@ -168,11 +169,11 @@ renderer.xr.addEventListener('sessionstart', () => {
     session.inputSources.forEach(source => {
       if (source.handedness === 'left') {
         controller1.userData.inputSource = source;
-        console.log('🔁 Left inputSource updated');
+        console.log(' Left inputSource updated');
       }
       if (source.handedness === 'right') {
         controller2.userData.inputSource = source;
-        console.log('🔁 Right inputSource updated');
+        console.log(' Right inputSource updated');
       }
     });
   });
@@ -291,7 +292,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     // — Reset view on X-button press (with haptics) —
     handleXButtonInput(xrFrame, () => {
       resetBtn.click();
-      console.log('🔄 View reset via X button');
+      console.log(' View reset via X button');
       
       [controller1, controller2].forEach(c => {
         const gp = c.userData.inputSource?.gamepad;

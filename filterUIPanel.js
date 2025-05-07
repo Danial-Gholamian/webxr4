@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 
-// --- Constants ---
+
 const PANEL_SCALE = 0.3;       // 30% of view width
 const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const FONT_SIZE = 0.05;        // 5cm in VR units
@@ -12,28 +12,28 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
     const uiPanel = new THREE.Group();
     uiPanel.name = "FilterUIPanel";
     
-    // --- Screen-Aligned Positioning ---
+
     const aspect = window.innerWidth / window.innerHeight;
     uiPanel.position.set(0, -0.3, -0.8);
     uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
 
-    // --- Background (Fix depth issues) ---
-    const bgGeometry = new THREE.PlaneGeometry(1.5, 0.8);
-    const bgMaterial = new THREE.MeshBasicMaterial({
-        color: 0x222222,
-        transparent: true,
-        opacity: 0.9,
-        depthTest: false,  // Add this
-        depthWrite: false, // Add this
-        side: THREE.DoubleSide
-    });
-    const background = new THREE.Mesh(bgGeometry, bgMaterial);
-    background.renderOrder = 1;  // Ensure it draws on top
-    uiPanel.add(background);
+
+    // const bgGeometry = new THREE.PlaneGeometry(1.5, 0.8);
+    // const bgMaterial = new THREE.MeshBasicMaterial({
+    //     color: 0x222222,
+    //     transparent: true,
+    //     opacity: 0.9,
+    //     depthTest: false,  // Add this
+    //     depthWrite: false, // Add this
+    //     side: THREE.DoubleSide
+    // });
+    // const background = new THREE.Mesh(bgGeometry, bgMaterial);
+    // background.renderOrder = 1;  // Ensure it draws on top
+    // uiPanel.add(background);
 
     // --- Title ---
     const title = new Text();
-    title.text = "Group Legend";
+    title.text = "Group TEP 📚";
     title.fontSize = FONT_SIZE;
     title.color = 0xFFFFFF;
     title.anchorX = 'center';
