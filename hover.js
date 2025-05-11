@@ -1,96 +1,78 @@
-// hover.js
 import * as THREE from 'three';
+import { Text } from 'troika-three-text';
 
-const intersected = []; // Keep track of currently hovered
+const intersected = [];
 const tempMatrix = new THREE.Matrix4();
-const raycaster = new THREE.Raycaster(); // Reuse raycaster
+const raycaster = new THREE.Raycaster();
+const tempVector = new THREE.Vector3();
 
-// Store node meshes temporarily to avoid traversing every frame if scene doesn't change structurally
-// This is a simple cache; more robust caching might be needed if nodes are added/removed.
 let nodeMeshesCache = [];
 let cacheNeedsUpdate = true;
 
+export let labelContainer = null;
+
+export function initLabels(cameraParent) {
+  labelContainer = new THREE.Group();
+  labelContainer.name = "NodeLabelContainer";
+  cameraParent.add(labelContainer);
+}
+
 export function markHoverCacheDirty() {
   cacheNeedsUpdate = true;
-  
 }
+
 function createLabelFromNodeData(nodeData) {
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  const fontSize = 28;
-  const padding = 10;
+  const label = new Text();
+  label.text = nodeData.label || nodeData.id;
+  label.fontSize = 0.15;
+  label.color = 0xffffff;
+  label.anchorX = 'center';
+  label.anchorY = 'middle';
+  label.outlineColor = 0x000000;
+  label.outlineWidth = 0.005;
+  label.depthTest = false;
+  label.renderOrder = 999;
+  label.sync();
 
-  const lines = Object.entries(nodeData)
-    .filter(([key, _]) => key !== '__link')
-    .map(([key, value]) => `${key}: ${value}`);
+  const bg = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 0.4),
+    new THREE.MeshBasicMaterial({
+      color: 0x222222,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false
+    })
+  );
+  bg.renderOrder = 998;
+  label.add(bg);
 
-  context.font = `${fontSize}px Arial`;
-  const textWidth = Math.max(...lines.map(line => context.measureText(line).width));
-  const width = textWidth + padding * 2;
-  const height = fontSize * lines.length + padding * 2;
-
-  canvas.width = width;
-  canvas.height = height;
-
-  // Background (rounded rectangle)
-  context.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  const radius = 12;
-  context.beginPath();
-  context.moveTo(radius, 0);
-  context.lineTo(width - radius, 0);
-  context.quadraticCurveTo(width, 0, width, radius);
-  context.lineTo(width, height - radius);
-  context.quadraticCurveTo(width, height, width - radius, height);
-  context.lineTo(radius, height);
-  context.quadraticCurveTo(0, height, 0, height - radius);
-  context.lineTo(0, radius);
-  context.quadraticCurveTo(0, 0, radius, 0);
-  context.closePath();
-  context.fill();
-
-  // Text
-  context.fillStyle = 'white';
-  lines.forEach((line, i) => {
-    context.fillText(line, padding, padding + fontSize * (i + 0.8));
-  });
-
-  const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
-  const sprite = new THREE.Sprite(material);
-
-  // Wider and shorter label
-  const aspectRatio = width / height;
-  sprite.scale.set(2.5 * aspectRatio, 2.5, 1);
-
-  return sprite;
+  return label;
 }
+let lastHoveredNodeId = null;
+let currentHoveredNodeId = null;
 
-
-// Modified detectHover
-export function detectHover(controller, graphScene) {
-  // --- 1. Clear previous hover state ---
+export function detectHover(controller, graphScene, camera) {
   while (intersected.length) {
     const obj = intersected.pop();
 
-    if (obj.material?.emissive) {
-      obj.material.emissive.setRGB(0, 0, 0); // Reset emissive color
+    if (obj.userData.originalMaterial) {
+      obj.material = obj.userData.originalMaterial;
+      delete obj.userData.originalMaterial;
     }
 
-    if (obj.userData?.labelSprite) {
-      obj.remove(obj.userData.labelSprite);
-      obj.userData.labelSprite.material.map.dispose();
-      obj.userData.labelSprite.material.dispose();
-      delete obj.userData.labelSprite;
+    if (obj.userData.label) {
+      labelContainer.remove(obj.userData.label);
+      obj.userData.label.children.forEach(child => {
+        if (child.material?.map) child.material.map.dispose();
+        if (child.material) child.material.dispose();
+      });
+      obj.userData.label = null;
     }
 
-    if (obj.userData) {
-      delete obj.userData.isHovered;
-    }
+    delete obj.userData.isHovered;
   }
 
   controller.userData.hoveredObject = null;
-
-  // --- 2. Raycasting Setup ---
   if (!controller || !graphScene) return;
 
   tempMatrix.identity().extractRotation(controller.matrixWorld);
@@ -98,21 +80,19 @@ export function detectHover(controller, graphScene) {
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
   raycaster.far = 100;
 
-  // --- 3. Update node mesh cache if needed ---
   if (cacheNeedsUpdate) {
     nodeMeshesCache = [];
     graphScene.traverse(obj => {
-      if (obj instanceof THREE.Mesh && obj.__data && obj.__data.id !== undefined) {
+      if (obj instanceof THREE.Mesh && obj.__data?.id !== undefined) {
+        obj.__data.id = String(obj.__data.id);
         nodeMeshesCache.push(obj);
       }
     });
     cacheNeedsUpdate = false;
-    console.log(`Updated node mesh cache: ${nodeMeshesCache.length} nodes found.`);
   }
 
   if (nodeMeshesCache.length === 0) return;
 
-  // --- 4. Intersect with nodes ---
   const intersections = raycaster.intersectObjects(nodeMeshesCache, false);
   const line = controller.userData.laser;
 
@@ -123,35 +103,69 @@ export function detectHover(controller, graphScene) {
     if (line) line.scale.z = intersection.distance;
 
     if (hitObject instanceof THREE.Mesh) {
+      const currentNodeId = String(hitObject.__data?.id || '');
+
+      if (currentNodeId !== lastHoveredNodeId) {
+        console.log("🔍 Hovered node:", hitObject.__data);
+        try {
+          const inputSource = controller.userData.inputSource;
+          const actuator = inputSource?.gamepad?.hapticActuators?.[0];
+          actuator?.pulse?.(0.8, 50);
+          console.log(`✅ Haptics triggered for new node: ${currentNodeId}`);
+        } catch (err) {
+          console.warn("Haptic feedback error:", err);
+        }
+        lastHoveredNodeId = currentNodeId;
+      }
+
       hitObject.userData.isHovered = true;
       controller.userData.hoveredObject = hitObject;
       intersected.push(hitObject);
+
+      if (!hitObject.userData.originalMaterial) {
+        hitObject.userData.originalMaterial = hitObject.material;
+        hitObject.material = hitObject.material.clone();
+      }
 
       if (hitObject.material?.emissive) {
         hitObject.material.emissive.setHex(0xff0000);
       }
 
-      if (!hitObject.userData.labelSprite && hitObject.__data) {
+      if (!hitObject.userData.label && hitObject.__data) {
         const label = createLabelFromNodeData(hitObject.__data);
-        label.position.set(0, 1.5, 0); // Adjust height above node
-        hitObject.add(label);
-        hitObject.userData.labelSprite = label;
-      }
+        label.userData.sourceNode = hitObject;
+        hitObject.userData.label = label;
+        labelContainer.add(label);
 
-      // Haptic feedback
-      try {
-        const inputSource = controller.userData.inputSource;
-        const actuator = inputSource?.gamepad?.hapticActuators?.[0];
-        if (actuator?.pulse) {
-          actuator.pulse(0.8, 50);
-        }
-      } catch (err) {
-        console.warn("Haptic feedback error:", err);
+        hitObject.getWorldPosition(tempVector);
+        label.position.copy(tempVector);
+        label.position.y += 0.5;
+        label.lookAt(camera.position);
       }
     }
-
   } else {
+    lastHoveredNodeId = null;
     if (line) line.scale.z = raycaster.far;
     controller.userData.hoveredObject = null;
   }
 }
+
+
+export function updateLabels(camera) {
+  if (!labelContainer) return;
+  labelContainer.children.forEach(label => {
+    const sourceNode = label.userData?.sourceNode;
+    if (sourceNode) {
+      sourceNode.getWorldPosition(tempVector);
+      label.position.copy(tempVector);
+      label.position.y += 0.5;
+      label.lookAt(camera.position);
+    }
+  });
+}
+
+// setupController,
+// handleJoystickInput,
+// setupVRNodeSelection,
+// handleXButtonInput,
+// setupGraphSwitchButtons,

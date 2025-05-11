@@ -8,6 +8,7 @@ const rotationSpeed = 0.03;
 const deadZone = 0.1;
 const laserDistance = 100;
 const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
+const yButtonIndex = 5; // xr-standard index for y (left) / b (right)
 
 // --- 1. Controller Setup (with laser + teleport) ---
 function setupController(controller, index, renderer, cameraGroup) {
@@ -138,26 +139,20 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
 function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate) {
   function checkButtonPress(controller, handedness) {
     const inputSource = controller.userData.inputSource;
-    console.log(`[${handedness}] HERE inputSource:`, inputSource);
 
     const gamepad = inputSource?.gamepad;
     if (!gamepad) {
-      console.warn(` HERE [${handedness}] No gamepad available`);
       return;
     }
 
     if (!gamepad.buttons || gamepad.buttons.length === 0) {
-      console.warn(` HERE [${handedness}] No buttons on gamepad`);
       return;
     }
-
-    console.log(`HERE [${handedness}] Gamepad buttons state:`, gamepad.buttons);
 
     const buttonIndex = 0; // A (right) or X (left)
     const button = gamepad.buttons[buttonIndex];
 
     if (button?.pressed) {
-      console.log(`HERE [${handedness}] Button ${buttonIndex} is PRESSED`);
 
       const raycaster = new THREE.Raycaster();
       const matrix = new THREE.Matrix4();
@@ -173,11 +168,9 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
       });
 
       const intersections = raycaster.intersectObjects(nodes, false);
-      console.log(`HERE [${handedness}] Raycast found ${intersections.length} intersections`);
 
       if (intersections.length > 0) {
         const nodeId = intersections[0].object.__data.id;
-        console.log(`HERE  [${handedness}] Button ${buttonIndex} selected node: ${nodeId}`);
         requestGraphUpdate('DIRECT', nodeId);
       } else {
         console.warn(`HERE  [${handedness}] Button ${buttonIndex} pressed but hit nothing`);
@@ -185,18 +178,16 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
     }
   }
 
+  
   function pollGamepadButtons() {
-    console.log('HERE pollGamepadButtons is running');
 
     if (controller1.userData.inputSource) {
-      console.log('HERE Left controller inputSource exists');
       checkButtonPress(controller1, 'left');
     } else {
       console.warn('HERE Left controller inputSource missing');
     }
 
     if (controller2.userData.inputSource) {
-      console.log('🔍HERE Right controller inputSource exists');
       checkButtonPress(controller2, 'right');
     } else {
       console.warn('HERE Right controller inputSource missing');
@@ -205,6 +196,7 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
 
   return pollGamepadButtons;
 }
+
 
 /**
  * Polls the left controller’s gamepad each frame and calls onXPress()
@@ -232,6 +224,7 @@ function handleXButtonInput(xrFrame, onXPress) {
   handleXButtonInput._wasPressed = isPressed;
 }
 handleXButtonInput._wasPressed = false;
+
 
 
 

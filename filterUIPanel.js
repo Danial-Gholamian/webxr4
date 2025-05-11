@@ -18,18 +18,6 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
     uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
 
 
-    // const bgGeometry = new THREE.PlaneGeometry(1.5, 0.8);
-    // const bgMaterial = new THREE.MeshBasicMaterial({
-    //     color: 0x222222,
-    //     transparent: true,
-    //     opacity: 0.9,
-    //     depthTest: false,  // Add this
-    //     depthWrite: false, // Add this
-    //     side: THREE.DoubleSide
-    // });
-    // const background = new THREE.Mesh(bgGeometry, bgMaterial);
-    // background.renderOrder = 1;  // Ensure it draws on top
-    // uiPanel.add(background);
 
     // --- Title ---
     const title = new Text();
