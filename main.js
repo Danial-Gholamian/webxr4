@@ -19,17 +19,20 @@ import {
 import { detectHover, markHoverCacheDirty, initLabels, updateLabels } from './hover.js';
 import { createFilterPanel } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
+import { broadcastAvatar, broadcastNodeSelection, setScene } from './network.js';
 
+//
 // ========================
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
-
+setScene(scene);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
+let lastBroadcast = 0;
 
 // ========================
 // Controls and VR Setup
@@ -85,8 +88,12 @@ const Graph = ForceGraph3D()(document.body)
   .onNodeClick((node, event) => {
     if (inVR || event?.shiftKey) {
       highlightSubgraph(node.id, 'DIRECT');
+      broadcastNodeSelection(node.id, 'DIRECT');
+
     } else {
-      highlightSubgraph(node.id, 'SUBGRAPH');
+      highlightSubgraph(node.id, 'DIREKT');
+      broadcastNodeSelection(node.id, 'DIRECT');
+
     }
   });
 
@@ -127,7 +134,7 @@ function requestGraphUpdate(mode, nodeId) {
 
 
 
-function highlightSubgraph(nodeId) {
+export function highlightSubgraph(nodeId) {
   const clickedId = String(nodeId);
   const neighbourIds = new Set(adjacency.get(clickedId) || []);
   const selectedIds = new Set([clickedId, ...neighbourIds]);
@@ -236,6 +243,12 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
+
+    if (timestamp - lastBroadcast > 33) {
+      broadcastAvatar(camera, controller1, controller2);
+      lastBroadcast = timestamp;
+    }
+
     handleXButtonInput(xrFrame, () => {
       resetBtn.click();
       [controller1, controller2].forEach(c => {

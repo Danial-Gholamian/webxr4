@@ -113,7 +113,7 @@ export class PathFinder {
       }
     }
   }
-
+//chan
   reset() {
     this.selectedNodes = [];
     this.Graph.graphData(this.Graph.graphData()); // Force refresh
