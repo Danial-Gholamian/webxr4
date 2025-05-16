@@ -19,7 +19,7 @@ import {
 import { detectHover, markHoverCacheDirty, initLabels, updateLabels } from './hover.js';
 import { createFilterPanel } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene } from './network.js';
+import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset } from './network.js';
 
 //
 // ========================
@@ -88,11 +88,14 @@ const Graph = ForceGraph3D()(document.body)
   .onNodeClick((node, event) => {
     if (inVR || event?.shiftKey) {
       highlightSubgraph(node.id, 'DIRECT');
+      console.log("I was highlighted in if")
       broadcastNodeSelection(node.id, 'DIRECT');
 
     } else {
-      highlightSubgraph(node.id, 'DIREKT');
+      highlightSubgraph(node.id, 'DIRECT');
       broadcastNodeSelection(node.id, 'DIRECT');
+      console.log("I was highlighted in else")
+
 
     }
   });
@@ -136,19 +139,39 @@ function requestGraphUpdate(mode, nodeId) {
 
 export function highlightSubgraph(nodeId) {
   const clickedId = String(nodeId);
-  const neighbourIds = new Set(adjacency.get(clickedId) || []);
+  const neighbourIds = new Set(
+    Array.from(adjacency.get(clickedId) || []).map(String)
+  );
   const selectedIds = new Set([clickedId, ...neighbourIds]);
 
   Graph.scene().traverse(obj => {
+    // Node handling only (edges remain unchanged)
     if (obj.__data?.id !== undefined) {
-      const objId = String(obj.__data.id);
+      const objId = String(obj.__data.id); // Ensure string conversion
       const isSelected = selectedIds.has(objId);
-      // optional: obj.material.opacity = isSelected ? 1 : 0.1
+
+      if (obj.material) {
+        // Clone material to prevent shared instances
+        if (!obj.userData.originalMaterial) {
+          obj.userData.originalMaterial = obj.material;
+          obj.material = obj.material.clone();
+        }
+
+        obj.material.transparent = true;
+        obj.material.opacity = isSelected ? 1.0 : 0.1;
+        obj.material.needsUpdate = true;
+      }
     }
+
+    // Existing edge handling remains unchanged
     if (obj.__data?.source && obj.__data?.target) {
       const s = String(obj.__data.source?.id ?? obj.__data.source);
       const t = String(obj.__data.target?.id ?? obj.__data.target);
       obj.visible = (s === clickedId || t === clickedId);
+      obj.material.color.setRGB(1,1,1);
+      obj.material.transparent = true;
+      obj.material.opacity = 1.0;
+      obj.material.emissive?.setRGB(0.5, 0.5, 0.5);
     }
   });
 }
@@ -163,14 +186,39 @@ Object.assign(resetBtn.style, {
 document.body.appendChild(resetBtn);
 
 resetBtn.addEventListener('click', () => {
-  Graph.graphData(graphData);
-  pathFinder.reset();
+  resetGraph();
+  broadcastGraphReset();
+});
+
+export function resetGraph() {
   Graph.scene().traverse(obj => {
-    if (obj.__data?.source !== undefined && obj.__data?.target !== undefined) {
+    // Reset nodes
+    if (obj.__data?.id !== undefined) {
+      // Restore material if it was cloned
+      if (obj.userData.originalMaterial) {
+        // obj.material.dispose(); // optional: only if you're memory conscious
+        obj.material = obj.userData.originalMaterial;
+        delete obj.userData.originalMaterial;
+      } else {
+        obj.material.opacity = 1.0;
+        obj.material.transparent = false;
+      }
+    }
+
+    // Reset edges
+    if (obj.__data?.source && obj.__data?.target) {
       obj.visible = true;
+      obj.material.color.setRGB(1, 1, 1);        // ← this was overridden in filter
+      obj.material.opacity = 1.0;
+      obj.material.transparent = false;
+      obj.material.emissive?.setRGB(0, 0, 0);    // ← reset edge glow
     }
   });
-});
+
+  Graph.refresh();
+}
+
+
 
 // ========================
 // XR Session Event Handling
@@ -220,6 +268,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       case 'SUBGRAPH':
       case 'DIRECT':
         highlightSubgraph(graphUpdateNodeId);
+        broadcastNodeSelection(graphUpdateNodeId);
         break;
     }
     graphUpdateNeeded = false;
@@ -244,10 +293,10 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
 
-    if (timestamp - lastBroadcast > 33) {
-      broadcastAvatar(camera, controller1, controller2);
-      lastBroadcast = timestamp;
-    }
+    // if (timestamp - lastBroadcast > 33) {
+    //   broadcastAvatar(camera, controller1, controller2); // this is horrible and need to be stoped.
+    //   lastBroadcast = timestamp;
+    // }
 
     handleXButtonInput(xrFrame, () => {
       resetBtn.click();
