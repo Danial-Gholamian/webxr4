@@ -194,29 +194,35 @@ export function resetGraph() {
   Graph.scene().traverse(obj => {
     // Reset nodes
     if (obj.__data?.id !== undefined) {
-      // Restore material if it was cloned
       if (obj.userData.originalMaterial) {
-        // obj.material.dispose(); // optional: only if you're memory conscious
         obj.material = obj.userData.originalMaterial;
+        obj.material.needsUpdate = true;
         delete obj.userData.originalMaterial;
       } else {
         obj.material.opacity = 1.0;
         obj.material.transparent = false;
+        obj.material.needsUpdate = true;
       }
     }
 
     // Reset edges
     if (obj.__data?.source && obj.__data?.target) {
       obj.visible = true;
-      obj.material.color.setRGB(1, 1, 1);        // ← this was overridden in filter
+      obj.material.color.setRGB(1, 1, 1);
       obj.material.opacity = 1.0;
       obj.material.transparent = false;
-      obj.material.emissive?.setRGB(0, 0, 0);    // ← reset edge glow
+      if (obj.material.emissive) {
+        obj.material.emissive.setRGB(0, 0, 0);
+      }
+      obj.material.needsUpdate = true;
     }
   });
 
-  Graph.refresh();
+  Graph.graphData(Graph.graphData());
+
+  Graph.d3ReheatSimulation();
 }
+
 
 
 
