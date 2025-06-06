@@ -1,76 +1,66 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 
-const intersected = [];
+
 const tempMatrix = new THREE.Matrix4();
 const raycaster = new THREE.Raycaster();
-const tempVector = new THREE.Vector3();
+
+
+export let hoverLabel = null;  
 
 let nodeMeshesCache = [];
 let cacheNeedsUpdate = true;
 
 export let labelContainer = null;
 
-export function initLabels(cameraParent) {
-  labelContainer = new THREE.Group();
-  labelContainer.name = "NodeLabelContainer";
-  cameraParent.add(labelContainer);
+const PULSE_COOLDOWN = 500; // ms – one pulse every half-second max
+const PANEL_SCALE = 0.3;       // 30% of view width
+const PANEL_MARGIN = 0.1;      // 10% margin from bottom
+const FONT_SIZE = 0.05;        // 5cm in VR units
+const ROW_SPACING = 0.12;      // 12cm between rows
+
+export function initLabels(nodeId, camera) {
+  const panel = new THREE.Group();
+  panel.name = 'NodeIDBillboard';
+
+  const aspect = window.innerWidth / window.innerHeight;
+  panel.position.set(0, -0.3, -0.8); // In front of and below camera
+  panel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
+
+  const idLabel = new Text();
+  idLabel.text = `Node ${nodeId}`;
+  idLabel.fontSize = FONT_SIZE;
+  idLabel.color = 0xffffff;
+  idLabel.anchorX = 'top';
+  idLabel.anchorY = 'middle';
+  idLabel.position.set(0, 0, 0.01);
+  idLabel.sync(() => {
+    if (idLabel.mesh) {
+      idLabel.mesh.renderOrder = 999;
+      idLabel.mesh.material.depthTest = false;
+    }
+  });
+
+
+  panel.add(idLabel);
+
+  camera.add(panel);  // ✅ Attach directly to camera
 }
+
 
 export function markHoverCacheDirty() {
   cacheNeedsUpdate = true;
 }
 
-function createLabelFromNodeData(nodeData) {
-  const label = new Text();
-  label.text = nodeData.label || nodeData.id;
-  label.fontSize = 0.15;
-  label.color = 0xffffff;
-  label.anchorX = 'center';
-  label.anchorY = 'middle';
-  label.outlineColor = 0x000000;
-  label.outlineWidth = 0.005;
-  label.depthTest = false;
-  label.renderOrder = 999;
-  label.sync();
 
-  const bg = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.2, 0.4),
-    new THREE.MeshBasicMaterial({
-      color: 0x222222,
-      transparent: true,
-      opacity: 0.95,
-      depthTest: false
-    })
-  );
-  bg.renderOrder = 998;
-  label.add(bg);
+export function detectHover(controller, graphScene, camera, cameraGroup) {
 
-  return label;
-}
-let lastHoveredNodeId = null;
-let currentHoveredNodeId = null;
-
-export function detectHover(controller, graphScene, camera) {
-  while (intersected.length) {
-    const obj = intersected.pop();
-
-    if (obj.userData.originalMaterial) {
-      obj.material = obj.userData.originalMaterial;
-      delete obj.userData.originalMaterial;
-    }
-
-    if (obj.userData.label) {
-      labelContainer.remove(obj.userData.label);
-      obj.userData.label.children.forEach(child => {
-        if (child.material?.map) child.material.map.dispose();
-        if (child.material) child.material.dispose();
-      });
-      obj.userData.label = null;
-    }
-
-    delete obj.userData.isHovered;
+  if (controller.userData.lastHoveredObject === undefined) {
+  controller.userData.lastHoveredObject = null;
+  controller.userData.lastHoveredNodeId = null;
+  controller.userData.lastPulseTime     = 0;   // timestamp for haptic cooldown
   }
+
 
   controller.userData.hoveredObject = null;
   if (!controller || !graphScene) return;
@@ -95,74 +85,73 @@ export function detectHover(controller, graphScene, camera) {
 
   const intersections = raycaster.intersectObjects(nodeMeshesCache, false);
   const line = controller.userData.laser;
+if (intersections.length > 0) {
+  const hit = intersections[0].object;
+  if (line) line.scale.z = intersections[0].distance;
 
-  if (intersections.length > 0) {
-    const intersection = intersections[0];
-    const hitObject = intersection.object;
-
-    if (line) line.scale.z = intersection.distance;
-
-    if (hitObject instanceof THREE.Mesh) {
-      const currentNodeId = String(hitObject.__data?.id || '');
-
-      if (currentNodeId !== lastHoveredNodeId) {
-        console.log("🔍 Hovered node:", hitObject.__data);
-        try {
-          const inputSource = controller.userData.inputSource;
-          const actuator = inputSource?.gamepad?.hapticActuators?.[0];
-          actuator?.pulse?.(0.8, 50);
-          console.log(`✅ Haptics triggered for new node: ${currentNodeId}`);
-        } catch (err) {
-          console.warn("Haptic feedback error:", err);
-        }
-        lastHoveredNodeId = currentNodeId;
-      }
-
-      hitObject.userData.isHovered = true;
-      controller.userData.hoveredObject = hitObject;
-      intersected.push(hitObject);
-
-      if (!hitObject.userData.originalMaterial) {
-        hitObject.userData.originalMaterial = hitObject.material;
-        hitObject.material = hitObject.material.clone();
-      }
-
-      if (hitObject.material?.emissive) {
-        hitObject.material.emissive.setHex(0xff0000);
-      }
-
-      if (!hitObject.userData.label && hitObject.__data) {
-        const label = createLabelFromNodeData(hitObject.__data);
-        label.userData.sourceNode = hitObject;
-        hitObject.userData.label = label;
-        labelContainer.add(label);
-
-        hitObject.getWorldPosition(tempVector);
-        label.position.copy(tempVector);
-        label.position.y += 0.5;
-        label.lookAt(camera.position);
-      }
-    }
-  } else {
-    lastHoveredNodeId = null;
-    if (line) line.scale.z = raycaster.far;
-    controller.userData.hoveredObject = null;
+  /* restore previous mesh if cursor moved */
+  const prev = controller.userData.lastHoveredObject;
+  if (hit !== prev && prev && prev.userData.originalMaterial) {
+    prev.material = prev.userData.originalMaterial;
+    delete prev.userData.originalMaterial;
   }
+
+  /* highlight current mesh */
+  if (!hit.userData.originalMaterial) {
+    hit.userData.originalMaterial = hit.material;
+    hit.material = hit.material.clone();
+  }
+  if (hit.material.emissive === undefined)
+    hit.material.emissive = new THREE.Color();
+    hit.material.emissive.copy(hit.material.color);
+    hit.material.emissiveIntensity = 0.8;
+
+  /* haptic pulse once per entry, with cooldown */
+  const nodeId = String(hit.__data.id);
+  console.log('hit.__data $', nodeId)
+
+  const now    = performance.now();
+  if (nodeId !== controller.userData.lastHoveredNodeId &&
+      now - controller.userData.lastPulseTime > PULSE_COOLDOWN) {
+    controller.userData.inputSource?.gamepad
+             ?.hapticActuators?.[0]?.pulse?.(0.8, 40);
+    controller.userData.lastPulseTime = now;
+  }
+
+  if (nodeId !== controller.userData.lastHoveredNodeId) {
+  // remove previous label
+  const oldPanel = camera.getObjectByName('NodeIDBillboard');
+  if (oldPanel) camera.remove(oldPanel);
+
+  initLabels(nodeId, camera);  // ← only pass camera now
+
+  }
+
+
+
+
+
+  controller.userData.lastHoveredObject = hit;
+  controller.userData.lastHoveredNodeId = nodeId;
+
+} else {
+  /* no hit → restore and hide */
+  const prev = controller.userData.lastHoveredObject;
+  if (prev && prev.userData.originalMaterial) {
+    prev.material = prev.userData.originalMaterial;
+    delete prev.userData.originalMaterial;
+  }
+  controller.userData.lastHoveredObject = null;
+  controller.userData.lastHoveredNodeId = null;
+  const oldPanel = camera.getObjectByName('NodeIDBillboard');
+  if (oldPanel) camera.remove(oldPanel);
+
 }
 
 
-export function updateLabels(camera) {
-  if (!labelContainer) return;
-  labelContainer.children.forEach(label => {
-    const sourceNode = label.userData?.sourceNode;
-    if (sourceNode) {
-      sourceNode.getWorldPosition(tempVector);
-      label.position.copy(tempVector);
-      label.position.y += 0.5;
-      label.lookAt(camera.position);
-    }
-  });
 }
+
+
 
 // setupController,
 // handleJoystickInput,

@@ -16,7 +16,7 @@ import {
   setupGraphSwitchButtons,
   
 } from './vrSetup.js';
-import { detectHover, markHoverCacheDirty, initLabels, updateLabels } from './hover.js';
+import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset } from './network.js';
@@ -123,8 +123,8 @@ const groups = [...new Set(graphData.nodes.map(n => n.group))].map(group => ({
   color: colorScale(group)
 }));
 const uiPanel = createFilterPanel({ groupColors: groups, camera });
-cameraGroup.add(uiPanel);
-initLabels(scene);
+cameraGroup.add(uiPanel); // ui panel buttom center
+// initLabels(cameraGroup, camera); // info label for hover
 
 // ========================
 // Graph Interaction + Reset
@@ -174,6 +174,7 @@ export function highlightSubgraph(nodeId) {
       obj.material.emissive?.setRGB(0.5, 0.5, 0.5);
     }
   });
+  markHoverCacheDirty();
 }
 
 const resetBtn = document.createElement('button');
@@ -342,18 +343,22 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     graphUpdateNodeId = null;
   }
 
-  Graph.scene().traverse(obj => {
-    if (obj.userData?.labelSprite) {
-      obj.userData.labelSprite.lookAt(camera.position);
-    }
-  });
-  updateLabels(camera);
+  // Graph.scene().traverse(obj => {
+  //   if (obj.userData?.labelSprite) {
+  //     obj.userData.labelSprite.lookAt(camera.position);
+  //   }
+  // });
+  // updateLabels(camera);
 
   if (uiPanel) {
     const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
     const worldPosition = new THREE.Vector3().copy(camera.position).add(panelOffset.applyQuaternion(camera.quaternion));
     uiPanel.position.copy(worldPosition);
     if (inVR) uiPanel.userData.update?.();
+  }
+
+  if (hoverLabel && hoverLabel.visible) {
+    hoverLabel.userData.update?.();
   }
 
   if (inVR && xrFrame) {
@@ -376,8 +381,8 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         }
       });
     });
-    detectHover(controller1, GraphRef.current.scene(), camera);
-    detectHover(controller2, GraphRef.current.scene(), camera);
+    detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
+    detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
     pollGraphSwitchButtons();
   } else {
     controls.update();
