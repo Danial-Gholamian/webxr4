@@ -224,6 +224,64 @@ export function resetGraph() {
 }
 
 
+// ========================
+// Auto Highlight Cycle
+// ========================
+let autoHighlightInterval;
+let autoHighlightEnabled = false;
+
+function startAutoHighlightCycle() {
+  if (autoHighlightEnabled) return;
+  autoHighlightEnabled = true;
+  
+  // Get valid node IDs within the specified range
+  const validNodeIds = graphData.nodes
+    .map(node => node.id)
+    .filter(id => id >= 1426 && id <= 1922);
+  
+  if (validNodeIds.length === 0) {
+    console.warn('No nodes found in the range [1426, 1922]');
+    return;
+  }
+
+  let currentHighlightedNode = null;
+  
+  autoHighlightInterval = setInterval(() => {
+    // Reset previous highlight
+    if (currentHighlightedNode !== null) {
+      resetGraph(); // <--- Reset at the start of the interval
+    }
+    
+    // Select new random node
+    const randomIndex = Math.floor(Math.random() * validNodeIds.length);
+    currentHighlightedNode = validNodeIds[randomIndex];
+    
+    // Highlight new node after 10s
+    setTimeout(() => {
+      highlightSubgraph(currentHighlightedNode);
+      console.log(`Auto-highlighting node: ${currentHighlightedNode}`);
+    }, 10000);
+  }, 20000); // Full cycle (reset + highlight) every 20s
+
+  // Start first highlight after initial 10s
+  setTimeout(() => {
+    const randomIndex = Math.floor(Math.random() * validNodeIds.length);
+    currentHighlightedNode = validNodeIds[randomIndex];
+    highlightSubgraph(currentHighlightedNode);
+    console.log(`Auto-highlighting started. First node: ${currentHighlightedNode}`);
+  }, 10000);
+}
+
+function stopAutoHighlightCycle() {
+  if (!autoHighlightEnabled) return;
+  autoHighlightEnabled = false;
+  clearInterval(autoHighlightInterval);
+  resetGraph();
+  console.log('Auto-highlighting stopped');
+}
+// ========================
+// Auto Highlight Cycle (Animation Loop Version)
+// ========================
 
 
 // ========================
@@ -234,6 +292,7 @@ let inVR = false;
 renderer.xr.addEventListener('sessionstart', () => {
   inVR = true;
   const session = renderer.xr.getSession();
+  startAutoHighlightCycle(); // Test 
   session.inputSources.forEach(source => {
     if (source.handedness === 'left') controller1.userData.inputSource = source;
     if (source.handedness === 'right') controller2.userData.inputSource = source;
@@ -247,6 +306,7 @@ renderer.xr.addEventListener('sessionstart', () => {
 });
 
 renderer.xr.addEventListener('sessionend', () => {
+  stopAutoHighlightCycle(); // Test
   inVR = false;
 });
 
