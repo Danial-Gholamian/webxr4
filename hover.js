@@ -12,39 +12,51 @@ let nodeMeshesCache = [];
 let cacheNeedsUpdate = true;
 
 export let labelContainer = null;
-
+const justGIT = 1;
 const PULSE_COOLDOWN = 500; // ms – one pulse every half-second max
 const PANEL_SCALE = 0.3;       // 30% of view width
 const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const FONT_SIZE = 0.05;        // 5cm in VR units
 const ROW_SPACING = 0.12;      // 12cm between rows
 
-export function initLabels(nodeId, camera) {
+export function initLabels(nodeId, camera, cameraGroup) {
+  // Remove existing panel if any
+  const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
+  if (oldPanel) cameraGroup.remove(oldPanel);
+
   const panel = new THREE.Group();
   panel.name = 'NodeIDBillboard';
 
-  const aspect = window.innerWidth / window.innerHeight;
-  panel.position.set(0, -0.3, -0.8); // In front of and below camera
-  panel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
-
+  // Create text label
   const idLabel = new Text();
   idLabel.text = `Node ${nodeId}`;
   idLabel.fontSize = FONT_SIZE;
   idLabel.color = 0xffffff;
-  idLabel.anchorX = 'top';
+  idLabel.anchorX = 'center';
   idLabel.anchorY = 'middle';
   idLabel.position.set(0, 0, 0.01);
+  
+  // Critical rendering settings (same as working uiPanel)
   idLabel.sync(() => {
     if (idLabel.mesh) {
       idLabel.mesh.renderOrder = 999;
       idLabel.mesh.material.depthTest = false;
+      idLabel.mesh.material.depthWrite = false;
     }
   });
 
-
   panel.add(idLabel);
+  cameraGroup.add(panel);
 
-  camera.add(panel);  // ✅ Attach directly to camera
+  // Add update function matching uiPanel's pattern
+  panel.userData.update = () => {
+    const panelOffset = new THREE.Vector3(0, -0.3, -0.8); // Same position as uiPanel
+    const worldPosition = new THREE.Vector3()
+      .copy(camera.position)
+      .add(panelOffset.applyQuaternion(camera.quaternion));
+    panel.position.copy(worldPosition);
+    panel.quaternion.copy(camera.quaternion); // Always face camera
+  };
 }
 
 
@@ -120,15 +132,12 @@ if (intersections.length > 0) {
 
   if (nodeId !== controller.userData.lastHoveredNodeId) {
   // remove previous label
-  const oldPanel = camera.getObjectByName('NodeIDBillboard');
-  if (oldPanel) camera.remove(oldPanel);
+    const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
+    if (oldPanel) cameraGroup.remove(oldPanel);
 
-  initLabels(nodeId, camera);  // ← only pass camera now
+    initLabels(nodeId, camera, cameraGroup);
 
   }
-
-
-
 
 
   controller.userData.lastHoveredObject = hit;
@@ -143,8 +152,8 @@ if (intersections.length > 0) {
   }
   controller.userData.lastHoveredObject = null;
   controller.userData.lastHoveredNodeId = null;
-  const oldPanel = camera.getObjectByName('NodeIDBillboard');
-  if (oldPanel) camera.remove(oldPanel);
+    const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
+    if (oldPanel) cameraGroup.remove(oldPanel);
 
 }
 

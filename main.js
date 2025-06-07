@@ -19,7 +19,7 @@ import {
 import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset } from './network.js';
+import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation } from './network.js';
 
 //
 // ========================
@@ -32,8 +32,8 @@ setScene(scene);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
-let lastBroadcast = 0;
 
+let lastAvatarBroadcastTime = 0;
 // ========================
 // Controls and VR Setup
 // ========================
@@ -49,6 +49,12 @@ const controller2 = renderer.xr.getController(1);
 
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
+
+let lastCameraPosition = new THREE.Vector3();
+let lastLeft = new THREE.Vector3();
+let lastRight = new THREE.Vector3();
+const POSITION_EPSILON = 0.001; // ~1mm threshold
+
 
 // ========================
 // Graph Data and Maps
@@ -228,58 +234,58 @@ export function resetGraph() {
 // ========================
 // Auto Highlight Cycle
 // ========================
-let autoHighlightInterval;
-let autoHighlightEnabled = false;
+// let autoHighlightInterval;
+// let autoHighlightEnabled = false;
 
-function startAutoHighlightCycle() {
-  if (autoHighlightEnabled) return;
-  autoHighlightEnabled = true;
+// function startAutoHighlightCycle() {
+//   if (autoHighlightEnabled) return;
+//   autoHighlightEnabled = true;
   
-  // Get valid node IDs within the specified range
-  const validNodeIds = graphData.nodes
-    .map(node => node.id)
-    .filter(id => id >= 1426 && id <= 1922);
+//   // Get valid node IDs within the specified range
+//   const validNodeIds = graphData.nodes
+//     .map(node => node.id)
+//     .filter(id => id >= 1426 && id <= 1922);
   
-  if (validNodeIds.length === 0) {
-    console.warn('No nodes found in the range [1426, 1922]');
-    return;
-  }
+//   if (validNodeIds.length === 0) {
+//     console.warn('No nodes found in the range [1426, 1922]');
+//     return;
+//   }
 
-  let currentHighlightedNode = null;
+//   let currentHighlightedNode = null;
   
-  autoHighlightInterval = setInterval(() => {
-    // Reset previous highlight
-    if (currentHighlightedNode !== null) {
-      resetGraph(); // <--- Reset at the start of the interval
-    }
+//   autoHighlightInterval = setInterval(() => {
+//     // Reset previous highlight
+//     if (currentHighlightedNode !== null) {
+//       resetGraph(); // <--- Reset at the start of the interval
+//     }
     
-    // Select new random node
-    const randomIndex = Math.floor(Math.random() * validNodeIds.length);
-    currentHighlightedNode = validNodeIds[randomIndex];
+//     // Select new random node
+//     const randomIndex = Math.floor(Math.random() * validNodeIds.length);
+//     currentHighlightedNode = validNodeIds[randomIndex];
     
-    // Highlight new node after 10s
-    setTimeout(() => {
-      highlightSubgraph(currentHighlightedNode);
-      console.log(`Auto-highlighting node: ${currentHighlightedNode}`);
-    }, 10000);
-  }, 20000); // Full cycle (reset + highlight) every 20s
+//     // Highlight new node after 10s
+//     setTimeout(() => {
+//       highlightSubgraph(currentHighlightedNode);
+//       console.log(`Auto-highlighting node: ${currentHighlightedNode}`);
+//     }, 10000);
+//   }, 20000); // Full cycle (reset + highlight) every 20s
 
-  // Start first highlight after initial 10s
-  setTimeout(() => {
-    const randomIndex = Math.floor(Math.random() * validNodeIds.length);
-    currentHighlightedNode = validNodeIds[randomIndex];
-    highlightSubgraph(currentHighlightedNode);
-    console.log(`Auto-highlighting started. First node: ${currentHighlightedNode}`);
-  }, 10000);
-}
+//   // Start first highlight after initial 10s
+//   setTimeout(() => {
+//     const randomIndex = Math.floor(Math.random() * validNodeIds.length);
+//     currentHighlightedNode = validNodeIds[randomIndex];
+//     highlightSubgraph(currentHighlightedNode);
+//     console.log(`Auto-highlighting started. First node: ${currentHighlightedNode}`);
+//   }, 10000);
+// }
 
-function stopAutoHighlightCycle() {
-  if (!autoHighlightEnabled) return;
-  autoHighlightEnabled = false;
-  clearInterval(autoHighlightInterval);
-  resetGraph();
-  console.log('Auto-highlighting stopped');
-}
+// function stopAutoHighlightCycle() {
+//   if (!autoHighlightEnabled) return;
+//   autoHighlightEnabled = false;
+//   clearInterval(autoHighlightInterval);
+//   resetGraph();
+//   console.log('Auto-highlighting stopped');
+// }
 // ========================
 // Auto Highlight Cycle (Animation Loop Version)
 // ========================
@@ -317,6 +323,10 @@ renderer.xr.addEventListener('sessionend', () => {
 let graphUpdateNeeded = false;
 let graphUpdateMode = null;
 let graphUpdateNodeId = null;
+let lastTime;
+lastCameraPosition.copy(camera.position);
+lastLeft.copy(controller1.position);
+lastRight.copy(controller2.position);
 
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
 setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate);
@@ -357,17 +367,30 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     if (inVR) uiPanel.userData.update?.();
   }
 
-  if (hoverLabel && hoverLabel.visible) {
-    hoverLabel.userData.update?.();
+  const hoverPanel = cameraGroup.getObjectByName('NodeIDBillboard');
+  if (hoverPanel) {
+    const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
+    const worldPosition = new THREE.Vector3()
+      .copy(camera.position)
+      .add(panelOffset.applyQuaternion(camera.quaternion));
+    hoverPanel.position.copy(worldPosition);
+    if (inVR) hoverPanel.userData.update?.();
   }
 
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
 
-    // if (timestamp - lastBroadcast > 33) {
-    //   broadcastAvatar(camera, controller1, controller2); // this is horrible and need to be stoped.
-    //   lastBroadcast = timestamp;
-    // }
+    // Inside animation loop
+    const deltaTime = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+
+    if (timestamp - lastAvatarBroadcastTime > 1000) { // 1000ms = 1s
+      broadcastAvatar(camera, controller1, controller2);
+      lastAvatarBroadcastTime = timestamp;
+    }
+
+    avatarInterpolation.update(userAvatars, deltaTime);
+
 
     handleXButtonInput(xrFrame, () => {
       resetBtn.click();
