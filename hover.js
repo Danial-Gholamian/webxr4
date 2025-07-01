@@ -19,7 +19,7 @@ const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const FONT_SIZE = 0.05;        // 5cm in VR units
 const ROW_SPACING = 0.12;      // 12cm between rows
 
-export function initLabels(nodeId, camera, cameraGroup) {
+export function initLabels(nodeId, groupNum, camera, cameraGroup) {
   // Remove existing panel if any
   const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
   if (oldPanel) cameraGroup.remove(oldPanel);
@@ -29,7 +29,7 @@ export function initLabels(nodeId, camera, cameraGroup) {
 
   // Create text label
   const idLabel = new Text();
-  idLabel.text = `Node ${nodeId}`;
+  idLabel.text = `Node ${nodeId}\nGroup: ${groupNum}`;
   idLabel.fontSize = FONT_SIZE;
   idLabel.color = 0xffffff;
   idLabel.anchorX = 'center';
@@ -90,6 +90,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
         nodeMeshesCache.push(obj);
       }
     });
+
     cacheNeedsUpdate = false;
   }
 
@@ -101,32 +102,66 @@ if (intersections.length > 0) {
   const hit = intersections[0].object;
   if (line) line.scale.z = intersections[0].distance;
 
-  /* restore previous mesh if cursor moved */
-  const prev = controller.userData.lastHoveredObject;
-  if (hit !== prev && prev && prev.userData.originalMaterial) {
-    prev.material = prev.userData.originalMaterial;
-    delete prev.userData.originalMaterial;
-  }
 
+  /* restore previous mesh if cursor moved */
+const prev = controller.userData.lastHoveredObject;
+if (prev && prev !== hit && prev.material.__originalEmissive !== undefined) {
+  prev.material.emissive.copy(prev.material.__originalEmissive);
+  prev.material.emissiveIntensity = prev.material.__originalEmissiveIntensity;
+  delete prev.material.__originalEmissive;
+  delete prev.material.__originalEmissiveIntensity;
+}
   /* highlight current mesh */
-  if (!hit.userData.originalMaterial) {
-    hit.userData.originalMaterial = hit.material;
-    hit.material = hit.material.clone();
-  }
-  if (hit.material.emissive === undefined)
-    hit.material.emissive = new THREE.Color();
-    hit.material.emissive.copy(hit.material.color);
-    hit.material.emissiveIntensity = 0.8;
+// Clone material if it's shared
+if (!hit.userData.wasClonedForHover) {
+  hit.userData.originalMaterial = hit.material;
+  hit.material = hit.material.clone();
+  hit.userData.wasClonedForHover = true;
+}
+
+// Preserve current emissive state
+if (!hit.material.__originalEmissive) {
+  hit.material.__originalEmissive = hit.material.emissive.clone();
+  hit.material.__originalEmissiveIntensity = hit.material.emissiveIntensity;
+
+  hit.material.emissive = hit.material.color.clone();
+  hit.material.emissiveIntensity = 0.8;
+}
+
 
   /* haptic pulse once per entry, with cooldown */
   const nodeId = String(hit.__data.id);
-  console.log('hit.__data $', nodeId)
-
-  const now    = performance.now();
+  const groupNum = String(hit.__data.group);
+  // console.log('hit.__data $', nodeId)
+  // console.log('hit.__data $', groupNum)
+  const now = performance.now();
   if (nodeId !== controller.userData.lastHoveredNodeId &&
       now - controller.userData.lastPulseTime > PULSE_COOLDOWN) {
-    controller.userData.inputSource?.gamepad
-             ?.hapticActuators?.[0]?.pulse?.(0.8, 40);
+      
+    const inputSource = controller.userData.inputSource;
+    if (inputSource && inputSource.gamepad) {
+      const gamepad = inputSource.gamepad;
+      
+      // Try different haptic actuator patterns
+      const actuators = gamepad.hapticActuators || (gamepad.vibrationActuator ? [gamepad.vibrationActuator] : []);
+      
+      if (actuators.length > 0) {
+        const actuator = actuators[0];
+        
+        if (actuator.pulse) {
+          actuator.pulse(0.8, 40);
+        } 
+        else if (actuator.playEffect) {
+          actuator.playEffect('dual-rumble', {
+            startDelay: 0,
+            duration: 40,
+            weakMagnitude: 0.8,
+            strongMagnitude: 0.8
+          });
+        }
+      }
+    }
+    
     controller.userData.lastPulseTime = now;
   }
 
@@ -135,7 +170,7 @@ if (intersections.length > 0) {
     const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
     if (oldPanel) cameraGroup.remove(oldPanel);
 
-    initLabels(nodeId, camera, cameraGroup);
+    initLabels(nodeId, groupNum, camera, cameraGroup);
 
   }
 
@@ -146,10 +181,21 @@ if (intersections.length > 0) {
 } else {
   /* no hit → restore and hide */
   const prev = controller.userData.lastHoveredObject;
-  if (prev && prev.userData.originalMaterial) {
-    prev.material = prev.userData.originalMaterial;
-    delete prev.userData.originalMaterial;
+  if (prev && prev.material.__originalEmissive !== undefined) {
+    prev.material.emissive.copy(prev.material.__originalEmissive);
+    prev.material.emissiveIntensity = prev.material.__originalEmissiveIntensity;
+    delete prev.material.__originalEmissive;
+    delete prev.material.__originalEmissiveIntensity;
+
+    // Restore original material if we cloned it
+    if (prev.userData.wasClonedForHover && prev.userData.originalMaterial) {
+      prev.material.dispose?.();
+      prev.material = prev.userData.originalMaterial;
+      delete prev.userData.originalMaterial;
+      delete prev.userData.wasClonedForHover;
+    }
   }
+
   controller.userData.lastHoveredObject = null;
   controller.userData.lastHoveredNodeId = null;
     const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');

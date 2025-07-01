@@ -1,6 +1,9 @@
 //vrSetup.js
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
+import { schoolPeriods } from './periodDefs';
+import { highlightPeriod } from './main.js';
+import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 
 // --- Constants ---
 const movementSpeed = 0.5;
@@ -10,6 +13,7 @@ const laserDistance = 100;
 const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
 const yButtonIndex = 5; // xr-standard index for y (left) / b (right)
 
+let currentPeriodIndex = 0;
 // --- 1. Controller Setup (with laser + teleport) ---
 function setupController(controller, index, renderer, cameraGroup) {
   const controllerGrip = renderer.xr.getControllerGrip(index);
@@ -32,9 +36,25 @@ function setupController(controller, index, renderer, cameraGroup) {
   controller.userData.laser = laser;
   cameraGroup.add(controller);
 
-  controller.addEventListener('squeezestart', () => teleportFromController(controller, cameraGroup));
+  controller.addEventListener('squeezestart', () => {
+    if (index === 0) {
+      // Left controller → go back
+      cyclePeriod(-1);
+      squeezeLefttPrevPeriod();
+    } else if (index === 1) {
+      // Right controller → go forward
+      cyclePeriod(1);
+      squeezeRightNextPeriod();
+    }
+  });
+}
 
-  console.log(`Controller ${index} setup complete.`);
+// --- 1.2 Changing time slices ---
+function cyclePeriod(delta) {
+  currentPeriodIndex = (currentPeriodIndex + delta + schoolPeriods.length) % schoolPeriods.length;
+  const period = schoolPeriods[currentPeriodIndex];
+  highlightPeriod(period);
+  console.log(`Period changed to: ${period}`);
 }
 
 // --- 2. Teleport Movement ---
@@ -183,15 +203,11 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
 
     if (controller1.userData.inputSource) {
       checkButtonPress(controller1, 'left');
-    } else {
-      console.warn('HERE Left controller inputSource missing');
-    }
+    } 
 
     if (controller2.userData.inputSource) {
       checkButtonPress(controller2, 'right');
-    } else {
-      console.warn('HERE Right controller inputSource missing');
-    }
+    } 
   }
 
   return pollGamepadButtons;

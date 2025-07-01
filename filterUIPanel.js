@@ -7,7 +7,14 @@ const PANEL_SCALE = 0.3;       // 30% of view width
 const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const FONT_SIZE = 0.05;        // 5cm in VR units
 const ROW_SPACING = 0.12;      // 12cm between rows
+let periodTitle = null;
 
+export function updatePeroidLabel(peroidname) {
+    if (periodTitle) {
+        periodTitle.text = `Time of the day: ${peroidname || 'Default'} 📚`;
+        periodTitle.sync();
+    }
+}
 export function createFilterPanel(options = { groupColors: [], camera: null }) {
     const uiPanel = new THREE.Group();
     uiPanel.name = "FilterUIPanel";
@@ -20,29 +27,31 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 
 
     // --- Title ---
-    const title = new Text();
-    title.text = "Group TEP 📚";
-    title.fontSize = FONT_SIZE;
-    title.color = 0xFFFFFF;
-    title.anchorX = 'center';
-    title.position.set(0, 0.35, 0.01);
-    title.sync();
-    uiPanel.add(title);
+    periodTitle = new Text();
+    periodTitle.text = "Time of the day:  Default 📚";  // default state
+    periodTitle.fontSize = FONT_SIZE;
+    periodTitle.color = 0xFFFFFF;
+    periodTitle.anchorX = 'center';
+    periodTitle.position.set(0, 0.35, 0.01);
+    periodTitle.sync();
+    uiPanel.add(periodTitle);
+
 
     // --- Dynamic Group Labels ---
+// In createFilterPanel function
     options.groupColors.forEach((group, index) => {
         const yPos = 0.2 - (index * ROW_SPACING);
         
-        // Color indicator
+        // Color indicator (dot)
         const dot = new THREE.Mesh(
             new THREE.SphereGeometry(0.02),
             new THREE.MeshBasicMaterial({ 
                 color: group.color,
-                depthTest: false  // Add this
+                depthTest: false
             })
         );
         dot.position.set(-0.4, yPos, 0.01);
-        dot.renderOrder = 2;  // Higher than background
+        dot.renderOrder = 2;
         uiPanel.add(dot);
 
         // Group name
@@ -51,7 +60,8 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
         label.fontSize = FONT_SIZE;
         label.color = 0xFFFFFF;
         label.anchorX = 'left';
-        label.position.set(-0.35, yPos - 0.015, 0.01);
+        label.anchorY = 'middle'; // Add this to vertically center text
+        label.position.set(-0.35, yPos, 0.01); // Remove the -0.015 offset
         label.sync();
         uiPanel.add(label);
     });
@@ -65,5 +75,6 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 
     return uiPanel;
 }
+
 
 console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeString()}`);
