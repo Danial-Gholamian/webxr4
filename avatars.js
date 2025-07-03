@@ -1,13 +1,28 @@
 // avatars.js
 import * as THREE from 'three';
+import { Text } from 'troika-three-text';
 
-export function createAvatar(material) {
-  material ??= new THREE.MeshBasicMaterial({ color: 0x00ffff, opacity: 0.5, transparent: true});
+export function createAvatar(material, name = '') {
+  material ??= new THREE.MeshBasicMaterial({ color: 0x00ffff, opacity: 0.5, transparent: true });
+
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.1), material);
   const left = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), material);
   const right = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), material);
-  return {head, left, right};
+
+  const nameLabel = new Text();
+  nameLabel.text = name;
+  nameLabel.fontSize = 0.04;
+  nameLabel.anchorX = 'center';
+  nameLabel.anchorY = 'bottom';
+  nameLabel.color = 0xffffaa;
+  nameLabel.position.set(0, 0.25, 0);
+  nameLabel.sync();
+
+  head.add(nameLabel); // attach label to head
+
+  return { head, left, right, nameLabel };
 }
+
 
 export function updateLocalAvatar(avatar, camera , controller1, controller2) {
   avatar.head.position.copy(camera.position);

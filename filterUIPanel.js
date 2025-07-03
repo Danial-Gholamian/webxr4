@@ -1,6 +1,8 @@
 // filterUIPanel.js
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
+import { knownUsers } from './network.js';
+
 
 
 const PANEL_SCALE = 0.3;       // 30% of view width
@@ -24,6 +26,9 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
     uiPanel.position.set(0, -0.3, -0.8);
     uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
 
+  const userListGroup = new THREE.Group();
+  userListGroup.position.set(0.2, 0.15, 0.01); // Right side of panel
+  uiPanel.add(userListGroup);
 
 
     // --- Title ---
@@ -68,11 +73,33 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 
     // --- Always face camera ---
     uiPanel.userData.update = () => {
-        if (options.camera) {
-            uiPanel.quaternion.copy(options.camera.quaternion);
-        }
+      
+      if (options.camera) {
+        uiPanel.quaternion.copy(options.camera.quaternion);
+      }
     };
 
+      uiPanel.userData.refreshUsers = (selfId) => {
+    // Clear previous labels
+    while (userListGroup.children.length > 0) {
+      userListGroup.remove(userListGroup.children[0]);
+    }
+
+    // Add updated labels
+    const entries = Object.entries(knownUsers);
+    entries.forEach(([id, name], index) => {
+      const userLabel = new Text();
+      userLabel.text = id === selfId ? `${name} (you)` : name;
+      userLabel.fontSize = FONT_SIZE * 0.8;
+      userLabel.color = 0xffffaa;
+      userLabel.anchorX = 'left';
+      userLabel.anchorY = 'middle';
+      userLabel.position.set(0, -index * ROW_SPACING * 0.6, 0);
+      userLabel.sync();
+      userListGroup.add(userLabel);
+    });
+
+  };
     return uiPanel;
 }
 

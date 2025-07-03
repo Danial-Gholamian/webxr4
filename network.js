@@ -4,13 +4,12 @@ import * as THREE from 'three';
 import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVATAR_UPDATE_INTERVAL } from './main.js';
 import { schoolPeriods } from './periodDefs';
 import { createAvatar } from './avatars.js';
+import { myUsername } from './main.js';
+import { uiPanel } from './main.js';
 
 const ROTATION_COMPRESSION_FACTOR = 1000;
+export const knownUsers = {}; // { socketId: name }
 
-// Test
-let lastEmitLogTime = 0;
-let lastReceiveLogTimes = {};  // { socketId: timestamp }
-//
 
 export const socket = io('https://webxr4-server.fly.dev', {
   transports: ['websocket']  // Force WebSocket, skip long-polling (prevents 400 errors)
@@ -48,18 +47,21 @@ export function setScene(s) {
 
 socket.on('connect', () => {
   console.log('Connected as', socket.id);
+  socket.emit('user-join', { id: socket.id, name: myUsername });
 });
 
 socket.on('user-update', ({ id, head, left, right, headRot, leftRot, rightRot }) => {
-  console.log('[RECEIVE] user-update', id, head, left, right);
+    const username = knownUsers[id] || id;
+    console.log(`[RECEIVE] user-update from ${username}`, head);
   
   // Skip self
   if (id === socket.id) return;
 
   if (!userAvatars[id]) {
-    const avatar = createAvatar();
+    const avatar = createAvatar(null, knownUsers[id] || '');
     userAvatars[id] = {
       ...avatar,
+      name: knownUsers[id],
       targetPosition: {
         head: new THREE.Vector3(),
         left: new THREE.Vector3(),
@@ -191,3 +193,28 @@ socket.on('period-change', (period) => {
     setCurrentPeriodIndex(index, false);
   }
 });
+
+socket.on('user-list', (userArray) => {
+  console.log('[RECEIVE] user-list', userArray);
+
+
+  Object.keys(knownUsers).forEach(k => delete knownUsers[k]);
+
+  userArray.forEach(({ id, name }) => {
+    knownUsers[id] = name;
+  });
+  
+  Object.values(userAvatars).forEach(avatar => {
+  if (avatar.nameLabel) {
+    avatar.nameLabel.sync();
+  }
+  });
+
+  if (uiPanel?.userData?.refreshUsers) {
+    uiPanel.userData.refreshUsers(socket.id);
+  }
+
+
+});
+
+

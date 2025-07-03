@@ -1,3 +1,7 @@
+// main.js
+export const myUsername = prompt("Enter your name:") || "Anonymous";
+
+
 // ========================
 // Imports and Setup
 // ========================
@@ -130,7 +134,7 @@ const groups = [...new Set(graphData.nodes.map(n => n.group))].map(group => ({
   name: String(group),
   color: colorScale(group)
 }));
-const uiPanel = createFilterPanel({ groupColors: groups, camera });
+export const uiPanel = createFilterPanel({ groupColors: groups, camera });
 cameraGroup.add(uiPanel); // ui panel buttom center
 // initLabels(cameraGroup, camera); // info label for hover
 
@@ -384,12 +388,22 @@ setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate);
 precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;
 // startPeriodPreviewCycle();
+
+
 renderer.setAnimationLoop((timestamp, xrFrame) => {
   scene.updateMatrixWorld(true);
-  
+
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
   avatarInterpolation.update(userAvatars, deltaTime);
+  // Make avatar name labels always face the camera
+  Object.values(userAvatars).forEach(({ head, nameLabel }) => {
+    if (nameLabel) {
+  
+      nameLabel.quaternion.copy(head.quaternion);
+    }
+  });
+
   if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL)  {
   broadcastAvatar(camera, controller1, controller2);
   lastBroadcast = timestamp;
@@ -415,12 +429,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     graphUpdateNodeId = null;
   }
 
-  // Graph.scene().traverse(obj => {
-  //   if (obj.userData?.labelSprite) {
-  //     obj.userData.labelSprite.lookAt(camera.position);
-  //   }
-  // });
-  // updateLabels(camera);
 
   if (uiPanel) {
     const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
@@ -445,9 +453,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
-    // Object.values(userAvatars).forEach(avatar => {
-    //   updateRemoteAvatar(avatar, avatar.targetPosition, avatar.targetQuaternion, 0.2 * deltaTime * 60);
-    // });
+
 
     handleXButtonInput(xrFrame, () => {
       resetBtn.click();
