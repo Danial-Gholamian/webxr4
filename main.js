@@ -400,7 +400,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   Object.values(userAvatars).forEach(({ head, nameLabel }) => {
     if (nameLabel) {
   
-      nameLabel.quaternion.copy(head.quaternion);
+      nameLabel.lookAt(camera.position);
     }
   });
 

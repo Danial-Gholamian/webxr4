@@ -1,16 +1,47 @@
 from collections import defaultdict
 
+
+# Time Period Mapping Strategy:
+# --------------------------------------
+# This program divides the full contact dataset into meaningful school-day periods
+# based on realistic Swedish high school scheduling.
+# Each timestamp represents 20 seconds. The dataset spans two separate days:
+# - Day 1: timestamps 0–1554
+# - Day 2: timestamps 4301–5845
+#
+# We manually define each period (arrival, class, break, lunch, etc.)
+# using timestamp ranges that reflect real durations:
+# - Each class lasts exactly 1 hour 30 minutes (270 timestamps)
+# - Breaks are 20 minutes (60 timestamps), lunch is 50 minutes (150 timestamps)
+# - Arrival is ~35 minutes (105 timestamps), with a short "afterclass" phase
+#
+# This schedule structure allows us to label each edge (contact) with the 
+# school period it occurred in, enabling time-aware network analysis.
+
+
 # Define school day periods in timestamp units
 SCHEDULE = {
-    "arrival": (0, 30),
-    "class1": (31, 120),
-    "break1": (121, 150),
-    "class2": (151, 240),
-    "lunch": (241, 330),
-    "class3": (331, 420),
-    "break2": (421, 450),
-    "afterclass": (451, 5845)
+    "arrival": (0, 104),
+    "class1": (105, 374),
+    "break1": (375, 434),
+    "class2": (435, 704),
+    "lunch": (705, 854),
+    "class3": (855, 1124),
+    "break2": (1125, 1184),
+    "class4": (1185, 1454),
+    "afterclass": (1455, 1554),
+
+    "arrival2": (4301, 4405),
+    "class1_2": (4406, 4675),
+    "break1_2": (4676, 4735),
+    "class2_2": (4736, 5005),
+    "lunch2": (5006, 5155),
+    "class3_2": (5156, 5425),
+    "break2_2": (5426, 5485),
+    "class4_2": (5486, 5755),
+    "afterclass2": (5756, 5845)
 }
+
 
 def get_timeslice(ts):
     for period, (start, end) in SCHEDULE.items():
@@ -101,3 +132,20 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Why we store all periods in a single line per edge:
+# --------------------------------------------------
+# Each edge (source-target pair) may appear multiple times throughout the dataset
+# during different periods (e.g., class1, break1, lunch, etc.).
+#
+# Instead of writing duplicate entries for the same edge per period,
+# we aggregate all the periods into a single array:
+#
+#   { source: '1835', target: '1847', periods: ['afterclass', 'break1', ..., 'lunch'] }
+#
+# This design is more efficient:
+# - It avoids redundancy (less file size, faster parsing)
+# - It preserves the full temporal footprint of the interaction
+# - It makes filtering by period easy in frontend code (e.g., edge['periods'].includes("class2"))
+#
+# It’s a compact, one-line-per-edge structure optimized for time-aware network visualizations.
