@@ -9,7 +9,12 @@ const PANEL_SCALE = 0.3;       // 30% of view width
 const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const FONT_SIZE = 0.05;        // 5cm in VR units
 const ROW_SPACING = 0.12;      // 12cm between rows
+const panelSize = new THREE.Vector3();
 let periodTitle = null;
+
+const PANEL_LERP_FACTOR = 0.2;
+
+
 
 export function updatePeroidLabel(peroidname) {
     if (periodTitle) {
@@ -26,9 +31,26 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
     uiPanel.position.set(0, -0.3, -0.8);
     uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
 
-  const userListGroup = new THREE.Group();
-  userListGroup.position.set(0.2, 0.15, 0.01); // Right side of panel
-  uiPanel.add(userListGroup);
+    const userListGroup = new THREE.Group();
+    userListGroup.position.set(0.2, 0.15, 0.01); // Right side of panel
+    uiPanel.add(userListGroup);
+
+
+  const bgPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 1.2),
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false
+    })
+  );
+
+    bgPlane.name = "uiPanelBackground";
+    bgPlane.position.set(0, 0, 0);
+    bgPlane.userData.isUIPanel = true;
+    uiPanel.userData.bgPlane = bgPlane; // store reference for later
+    uiPanel.add(bgPlane);
 
 
     // --- Title ---
@@ -43,8 +65,19 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 
 
     // --- Dynamic Group Labels ---
-// In createFilterPanel function
-    options.groupColors.forEach((group, index) => {
+
+    options.groupColors
+  .slice()
+  .sort((a, b) => {
+    const aStartsDigit = /^\d/.test(a.name);
+    const bStartsDigit = /^\d/.test(b.name);
+
+    if (aStartsDigit && !bStartsDigit) return -1;
+    if (!aStartsDigit && bStartsDigit) return 1;
+    return a.name.localeCompare(b.name, undefined, { numeric: true });
+  })
+  .forEach((group, index) => {
+
         const yPos = 0.2 - (index * ROW_SPACING);
         
         // Color indicator (dot)
@@ -71,13 +104,25 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
         uiPanel.add(label);
     });
 
+    uiPanel.traverse(child => {
+      if (child.material) {
+      child.userData.originalColor = child.material.color.clone();
+      }
+    });
+
+
     // --- Always face camera ---
-    uiPanel.userData.update = () => {
-      
+    uiPanel.rotateY(Math.PI); // Rotate 180° to face -Z direction
+    uiPanel.userData.update = (panelState) => {
       if (options.camera) {
         uiPanel.quaternion.copy(options.camera.quaternion);
       }
+
+      if (panelState === 'showing' || panelState === 'shown') {
+        uiPanel.lookAt(options.camera.position);
+      }
     };
+
 
       uiPanel.userData.refreshUsers = (selfId) => {
     // Clear previous labels
@@ -100,7 +145,103 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
     });
 
   };
+    uiPanel.userData.boundingBox = new THREE.Box3();
+    uiPanel.userData.boundingBox.setFromObject(uiPanel);
     return uiPanel;
+}
+
+export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, controller, scene, inVR }) {
+  if (!uiPanel) return;
+  
+  const bgPlane = uiPanel.userData.bgPlane;
+
+  const moveToCamera = () => {
+    const offset = new THREE.Vector3(0, 0.1, -0.8);
+    return offset.clone().applyQuaternion(camera.quaternion).add(camera.position);
+  };
+
+  const moveToController = () => {
+    const controllerWorldPos = new THREE.Vector3();
+    controller.getWorldPosition(controllerWorldPos);
+
+    const controllerQuat = new THREE.Quaternion();
+    controller.getWorldQuaternion(controllerQuat);
+
+    const offset = new THREE.Vector3(0, 0.05, -0.25).applyQuaternion(controllerQuat);
+    return controllerWorldPos.add(offset);
+  };
+
+  uiPanel.userData.panelState = panelState;
+
+  if (panelState === 'hidden') {
+    if (bgPlane) {
+      bgPlane.visible = true;
+      bgPlane.material.opacity = 0.3;     // nearly invisible but still raycastable
+      bgPlane.userData.isUIPanel = true;   // logic-level: not interactive
+    }
+
+    if (uiPanel.parent !== cameraGroup) {
+      scene.remove(uiPanel);
+      cameraGroup.add(uiPanel);
+    }
+
+    uiPanel.position.copy(moveToCamera());
+    if (inVR) uiPanel.userData.update?.(panelState);
+  }
+
+  else if (panelState === 'showing') {
+    if (bgPlane) {
+      bgPlane.material.opacity = 0.6;
+      bgPlane.userData.isUIPanel = true;
+    }
+
+    if (uiPanel.parent !== scene) {
+      cameraGroup.remove(uiPanel);
+      scene.add(uiPanel);
+    }
+
+    const targetPos = moveToController();
+    uiPanel.position.lerp(targetPos, PANEL_LERP_FACTOR);
+    if (uiPanel.position.distanceTo(targetPos) < 0.01) {
+      panelState = 'shown';
+    }
+
+    uiPanel.lookAt(camera.position);
+    if (inVR) uiPanel.userData.update?.(panelState);
+  }
+
+  else if (panelState === 'shown') {
+    if (bgPlane) {
+      bgPlane.material.opacity = 0.6;         // Keep visible
+      bgPlane.userData.isUIPanel = true;
+    }
+
+    uiPanel.position.copy(moveToController());
+    uiPanel.lookAt(camera.position);
+    if (inVR) uiPanel.userData.update?.(panelState);
+  }
+
+  else if (panelState === 'hiding') {
+    if (bgPlane) {
+      bgPlane.visible = false;                     
+      bgPlane.userData.isUIPanel = false;
+    }
+
+    if (uiPanel.parent !== cameraGroup) {
+      scene.remove(uiPanel);
+      cameraGroup.add(uiPanel);
+    }
+
+    const targetPos = moveToCamera();
+    uiPanel.position.lerp(targetPos, PANEL_LERP_FACTOR);
+    if (uiPanel.position.distanceTo(targetPos) < 0.01) {
+      panelState = 'hidden';
+    }
+
+    if (inVR) uiPanel.userData.update?.(panelState);
+  }
+
+  return panelState;
 }
 
 

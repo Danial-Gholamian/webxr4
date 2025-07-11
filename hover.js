@@ -1,9 +1,11 @@
+//hover.js
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 
 
 const tempMatrix = new THREE.Matrix4();
 const raycaster = new THREE.Raycaster();
+
 
 
 export let hoverLabel = null;  
@@ -66,11 +68,13 @@ export function markHoverCacheDirty() {
 
 
 export function detectHover(controller, graphScene, camera, cameraGroup) {
+  const interactables = [];
 
   if (controller.userData.lastHoveredObject === undefined) {
   controller.userData.lastHoveredObject = null;
   controller.userData.lastHoveredNodeId = null;
   controller.userData.lastPulseTime     = 0;   // timestamp for haptic cooldown
+  controller.userData.lastHoveredUIPanel = controller.userData.lastHoveredUIPanel || null;
   }
 
 
@@ -93,14 +97,48 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
     cacheNeedsUpdate = false;
   }
+  interactables.push(...nodeMeshesCache);
+let uiPanel = scene.getObjectByName('FilterUIPanel');
+if (!uiPanel) uiPanel = cameraGroup.getObjectByName('FilterUIPanel');  // ADD THIS
+
+if (uiPanel?.userData.bgPlane) {
+  interactables.push(uiPanel.userData.bgPlane);
+}
+
+
 
   if (nodeMeshesCache.length === 0) return;
 
-  const intersections = raycaster.intersectObjects(nodeMeshesCache, false);
+  // const intersections = raycaster.intersectObjects(nodeMeshesCache, false); Change this 
+  const intersections = raycaster.intersectObjects(interactables, false); // with this 
+
   const line = controller.userData.laser;
-if (intersections.length > 0) {
+  if (intersections.length > 0) {
   const hit = intersections[0].object;
+  if (hit.name === "uiPanelBackground") {
+      console.log(" Laser hit the UI panel background and I'm Danial");
+    hit.userData.isHovered = true;
+    if (controller.userData.lastHoveredUIPanel !== hit) {
+
+      if (controller.userData.lastHoveredUIPanel) {
+        controller.userData.lastHoveredUIPanel.material.color.set(0x000000);
+      }
+
+      hit.material.color.set(0x222266);
+      controller.userData.lastHoveredUIPanel = hit;
+    }
+
+  }
+
   if (line) line.scale.z = intersections[0].distance;
+
+  // Skip UI hits like bgPlane that don't have .__data.id
+  if (!hit.__data?.id) {
+    controller.userData.lastHoveredObject = null;
+    controller.userData.lastHoveredNodeId = null;
+    return;
+  }
+
 
 
   /* restore previous mesh if cursor moved */
@@ -180,6 +218,17 @@ if (!hit.material.__originalEmissive) {
 
 } else {
   /* no hit → restore and hide */
+
+  const uiPanel = scene.getObjectByName('FilterUIPanel') || 
+                  cameraGroup.getObjectByName('FilterUIPanel');
+
+  if (uiPanel?.userData?.bgPlane) {
+    const bg = uiPanel.userData.bgPlane;
+    bg.userData.isHovered = false;                  // reset hover flag
+    bg.material.color.set(0x000000);                // reset to default color
+    controller.userData.lastHoveredUIPanel = null;  // clear reference
+  }
+
   const prev = controller.userData.lastHoveredObject;
   if (prev && prev.material.__originalEmissive !== undefined) {
     prev.material.emissive.copy(prev.material.__originalEmissive);

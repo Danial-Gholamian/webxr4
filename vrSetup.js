@@ -12,6 +12,7 @@ const deadZone = 0.1;
 const laserDistance = 100;
 const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
 const yButtonIndex = 5; // xr-standard index for y (left) / b (right)
+const aButtonIndex = 4; // index 4 is A (right controller)
 
 let currentPeriodIndex = 0;
 // --- 1. Controller Setup (with laser + teleport) ---
@@ -117,7 +118,7 @@ function moveThumbstick(inputX, inputY, camera, cameraGroup, speed = movementSpe
 // --- 4. Trigger Selection ---
 let vrNodeSelectionInitialized = false;
 
-function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate) {
+function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup) {
   function onVRSelect(event) {
     const controller = event.target;
     console.log(` VR selectstart from ${controller === controller1 ? 'Left' : 'Right'} Controller`);
@@ -131,6 +132,21 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
     raycaster.far = 100;
+
+
+    // --------New for panel selection
+    const uiPanel = scene.getObjectByName('FilterUIPanel') || 
+                    cameraGroup.getObjectByName('FilterUIPanel');
+
+    if (uiPanel) {
+      const uiHits = raycaster.intersectObject(uiPanel, true); // recursive = true
+      if (uiHits.length > 0) {
+        console.log("Ray hit UI panel — blocking node selection.");
+        return;
+      }
+    }
+
+    // --------End for panel selcetion
 
     const nodes = [];
     GraphRef.current.scene().traverse(obj => {
@@ -250,6 +266,29 @@ function updateLaserPointer(controller) {
     controller.userData.laser.scale.z = laserDistance;
   }
 }
+
+export function handleAButtonInput(xrFrame, onAPress) {
+  if (!xrFrame || typeof onAPress !== 'function') return;
+
+  let isPressed = false;
+  for (const source of xrFrame.session.inputSources) {
+    if (source.handedness === 'right' && source.gamepad) {
+      const btns = source.gamepad.buttons;
+      if (btns.length > aButtonIndex && btns[aButtonIndex].pressed) {
+        isPressed = true;
+        break;
+      }
+    }
+  }
+
+  if (isPressed && !handleAButtonInput._wasPressed) {
+    onAPress();
+  }
+
+  handleAButtonInput._wasPressed = isPressed;
+}
+handleAButtonInput._wasPressed = false;
+
 
 // --- Exports ---
 export {

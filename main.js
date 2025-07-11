@@ -18,13 +18,24 @@ import {
   setupVRNodeSelection,
   handleXButtonInput,
   setupGraphSwitchButtons,
-  
+  handleAButtonInput
 } from './vrSetup.js';
 import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
-import { createFilterPanel, updatePeroidLabel } from './filterUIPanel.js';
+import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation } from './network.js';
 import { updateRemoteAvatar } from './avatars.js';
+
+// ========================
+//  Static Panel variables
+// ========================
+
+let panelState = 'showing'; // 'hidden', 'showing', 'shown', 'hiding'
+const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
+const PANEL_SHOWN_POS = new THREE.Vector3(0, 0, -1.2);
+const PANEL_LERP_FACTOR = 0.2;
+
+
 
 //
 // ========================
@@ -136,6 +147,7 @@ const groups = [...new Set(graphData.nodes.map(n => n.group))].map(group => ({
 }));
 export const uiPanel = createFilterPanel({ groupColors: groups, camera });
 cameraGroup.add(uiPanel); // ui panel buttom center
+uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
 
 // ========================
@@ -372,6 +384,14 @@ setInterval(() => {
   }
 }, 100);
 
+function togglePanel() {
+  console.log("console.log from togglePanel");
+  if (panelState === 'hidden' || panelState === 'hiding') {
+    panelState = 'showing';
+  } else if (panelState === 'shown' || panelState === 'showing') {
+    panelState = 'hiding';
+  }
+}
 
 
 // ========================
@@ -384,7 +404,7 @@ let graphUpdateNodeId = null;
 
 
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
-setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate);
+setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup);
 precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;
 // startPeriodPreviewCycle();
@@ -429,13 +449,32 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     graphUpdateNodeId = null;
   }
 
+  //Panel
+  // const uiPanel = scene.getObjectByName('FilterUIPanel') || 
+  //                 cameraGroup.getObjectByName('FilterUIPanel');
+  
+  panelState = updatePanelPosition({
+  uiPanel,
+  panelState,
+  camera,
+  cameraGroup,
+  controller: controller1,
+  scene,
+  inVR
+  });
+  uiPanel?.userData?.update?.(panelState);
 
-  if (uiPanel) {
-    const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
-    const worldPosition = new THREE.Vector3().copy(camera.position).add(panelOffset.applyQuaternion(camera.quaternion));
-    uiPanel.position.copy(worldPosition);
-    if (inVR) uiPanel.userData.update?.();
+  if (uiPanel?.userData?.bgPlane) {
+  const bg = uiPanel.userData.bgPlane;
+  
+  // Only update color if panel is interactive
+    if (bg.userData.isUIPanel) { 
+      const targetColor = bg.userData.isHovered ? 0x4444aa : 0x000000;
+      bg.material.color.lerp(new THREE.Color(targetColor), 0.1);
+    }
   }
+
+
 
   const hoverPanel = cameraGroup.getObjectByName('NodeIDBillboard');
   if (hoverPanel) {
@@ -467,6 +506,21 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         }
       });
     });
+
+    handleAButtonInput(xrFrame, () => {
+    togglePanel();
+    [controller1, controller2].forEach(c => {
+      const gp = c.userData.inputSource?.gamepad;
+      const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
+      if (h?.pulse) {
+        h.pulse(0.8, 100);
+      } else if (navigator.vibrate) {
+        navigator.vibrate(100);
+        }
+      });
+    });
+
+
     detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
     detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
     pollGraphSwitchButtons();

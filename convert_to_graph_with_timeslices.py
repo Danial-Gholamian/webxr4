@@ -3,7 +3,7 @@ from collections import defaultdict
 
 # Time Period Mapping Strategy:
 # --------------------------------------
-# This program divides the full contact dataset into meaningful school-day periods
+# This program divides the full contact dataset into meaningful school day periods
 # based on realistic Swedish high school scheduling.
 # Each timestamp represents 20 seconds. The dataset spans two separate days:
 # - Day 1: timestamps 0–1554
@@ -21,26 +21,27 @@ from collections import defaultdict
 
 # Define school day periods in timestamp units
 SCHEDULE = {
-    "arrival": (0, 104),
-    "class1": (105, 374),
-    "break1": (375, 434),
-    "class2": (435, 704),
-    "lunch": (705, 854),
-    "class3": (855, 1124),
-    "break2": (1125, 1184),
-    "class4": (1185, 1454),
-    "afterclass": (1455, 1554),
+    "arrival": (0, 104),         # ~35 minutes
+    "class1": (105, 374),        # 1 hour 30 minutes
+    "break1": (375, 434),        # 20 minutes
+    "class2": (435, 704),        # 1 hour 30 minutes
+    "lunch": (705, 854),         # 50 minutes
+    "class3": (855, 1124),       # 1 hour 30 minutes
+    "break2": (1125, 1184),      # 20 minutes
+    "class4": (1185, 1454),      # 1 hour 30 minutes
+    "afterclass": (1455, 1554),  # ~33 minutes
 
-    "arrival2": (4301, 4405),
-    "class1_2": (4406, 4675),
-    "break1_2": (4676, 4735),
-    "class2_2": (4736, 5005),
-    "lunch2": (5006, 5155),
-    "class3_2": (5156, 5425),
-    "break2_2": (5426, 5485),
-    "class4_2": (5486, 5755),
-    "afterclass2": (5756, 5845)
+    "arrival2": (4301, 4405),         # ~35 minutes
+    "class1_2": (4406, 4675),         # 1 hour 30 minutes
+    "break1_2": (4676, 4735),         # 20 minutes
+    "class2_2": (4736, 5005),         # 1 hour 30 minutes
+    "lunch2": (5006, 5155),           # 50 minutes
+    "class3_2": (5156, 5425),         # 1 hour 30 minutes
+    "break2_2": (5426, 5485),         # 20 minutes
+    "class4_2": (5486, 5755),         # 1 hour 30 minutes
+    "afterclass2": (5756, 5845)       # ~33 minutes
 }
+
 
 
 def get_timeslice(ts):
