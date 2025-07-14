@@ -135,14 +135,51 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
 
 
     // --------New for panel selection
-    const uiPanel = scene.getObjectByName('FilterUIPanel') || 
+    const uiPanel = scene.getObjectByName('FilterUIPanel') ||
                     cameraGroup.getObjectByName('FilterUIPanel');
 
     if (uiPanel) {
-      const uiHits = raycaster.intersectObject(uiPanel, true); // recursive = true
-      if (uiHits.length > 0) {
-        console.log("Ray hit UI panel — blocking node selection.");
-        return;
+      // 1) Try selecting a filter row
+      const rows = uiPanel.children.filter(o => o.userData.type === 'filter' || o.userData.type === 'extra');
+const rowHits = raycaster.intersectObjects(rows, false);
+
+if (rowHits.length) {
+  const rowObj = rowHits[0].object;
+  const { type, periodName, periodIndex } = rowObj.userData;
+
+  if (type === 'filter') {
+    currentPeriodIndex = periodIndex;
+    highlightPeriod(periodName);
+    console.log(` Selected FILTER row: ${periodName}`, rowObj);
+
+    // Optional: permanent highlight
+    if (rowObj.material) {
+      rowObj.material.color.set(0x3366ff);
+      rowObj.material.opacity = 0.5;
+    }
+
+  } else if (type === 'extra') {
+    console.log(` Selected EXTRA action for: ${periodName}`, rowObj);
+
+    if (rowObj.material) {
+      rowObj.material.color.set(0x00cc99);   // teal-green
+      rowObj.material.opacity = 0.4; ;
+    }
+  }
+
+  return; // Stop here — don't fall through to node selection
+}
+
+
+
+      // 2) Block any other hit on the panel background
+      const bgPlane = uiPanel.userData.bgPlane;
+      if (bgPlane) {
+        const bgHits = raycaster.intersectObject(bgPlane, false);
+        if (bgHits.length) {
+          // Hit the panel but not a row → do nothing
+          return;
+        }
       }
     }
 

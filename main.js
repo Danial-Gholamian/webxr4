@@ -23,7 +23,7 @@ import {
 import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation } from './network.js';
+import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel } from './network.js';
 import { updateRemoteAvatar } from './avatars.js';
 
 // ========================
@@ -160,6 +160,7 @@ function requestGraphUpdate(mode, nodeId) {
 }
 
 
+setUIPanel(uiPanel);
 
 export function highlightSubgraph(nodeId) {
   updatePeroidLabel('Default');

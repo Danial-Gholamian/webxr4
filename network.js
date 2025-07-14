@@ -5,11 +5,15 @@ import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVAT
 import { schoolPeriods } from './periodDefs';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
-import { uiPanel } from './main.js';
+// import { uiPanel } from './main.js';
 
 const ROTATION_COMPRESSION_FACTOR = 1000;
 export const knownUsers = {}; // { socketId: name }
 
+let _uiPanel = null;
+export function setUIPanel(panel) {
+  _uiPanel = panel;
+}
 
 export const socket = io('https://webxr4-server.fly.dev', {
   transports: ['websocket']  // Force WebSocket, skip long-polling (prevents 400 errors)
@@ -210,8 +214,8 @@ socket.on('user-list', (userArray) => {
   }
   });
 
-  if (uiPanel?.userData?.refreshUsers) {
-    uiPanel.userData.refreshUsers(socket.id);
+  if (_uiPanel?.userData?.refreshUsers) {
+    _uiPanel.userData.refreshUsers(socket.id);
   }
 
 

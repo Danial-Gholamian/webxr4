@@ -115,6 +115,15 @@ if (uiPanel?.userData.bgPlane) {
   const line = controller.userData.laser;
   if (intersections.length > 0) {
   const hit = intersections[0].object;
+    if (hit.userData.isFilterRow) {
+    hit.material.opacity = 0.3;
+    if (controller.userData.lastHoveredFilter &&
+        controller.userData.lastHoveredFilter !== hit) {
+      controller.userData.lastHoveredFilter.material.opacity = 0;
+    }
+    controller.userData.lastHoveredFilter = hit;
+    return; // swallow further hover logic
+    }
   if (hit.name === "uiPanelBackground") {
       console.log(" Laser hit the UI panel background and I'm Danial");
     hit.userData.isHovered = true;
@@ -217,6 +226,13 @@ if (!hit.material.__originalEmissive) {
   controller.userData.lastHoveredNodeId = nodeId;
 
 } else {
+
+      // ── NEW: clear filter-row hover on miss ───────────
+    if (controller.userData.lastHoveredFilter) {
+      controller.userData.lastHoveredFilter.material.opacity = 0;
+      controller.userData.lastHoveredFilter = null;
+    }
+    // ── end clear ─────────────────────────────────────
   /* no hit → restore and hide */
 
   const uiPanel = scene.getObjectByName('FilterUIPanel') || 

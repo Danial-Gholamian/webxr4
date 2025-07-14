@@ -37,7 +37,7 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 
 
   const bgPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.2, 1.2),
+    new THREE.PlaneGeometry(1.2, 1.8),
     new THREE.MeshBasicMaterial({
       color: 0x000000,
       transparent: true,
@@ -101,6 +101,62 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
         label.anchorY = 'middle'; // Add this to vertically center text
         label.position.set(-0.35, yPos, 0.01); // Remove the -0.015 offset
         label.sync();
+        // ── NEW: hit‐target plane for VR raycasts ───────────────────────────────
+const LEFT_SECTION_WIDTH = 0.45; 
+const RIGHT_SECTION_WIDTH = 0.35;
+const CENTER_GAP = 0.05;
+const DEBUG = false;
+
+function makeHitbox(width, height, x, y, z, userData) {
+  const material = new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: DEBUG ? 0.3 : 0,
+    color: DEBUG ? 0xff0000 : 0x000000,
+    depthWrite: false
+  });
+
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  mesh.position.set(x, y, z);
+  mesh.userData = { ...userData };
+  return mesh;
+}
+
+// LEFT — group selector (dot + label)
+const leftX = -0.3 + (LEFT_SECTION_WIDTH / 2);
+const leftZ = 0.0051;
+const leftHitBox = makeHitbox(
+  LEFT_SECTION_WIDTH,
+  ROW_SPACING,
+  leftX,
+  yPos,
+  leftZ,
+  {
+    type: 'filter',
+    periodName: group.name,
+    periodIndex: index
+  }
+);
+uiPanel.add(leftHitBox);
+
+// RIGHT — extra action
+const rightX = 0.1 + (RIGHT_SECTION_WIDTH / 2) + CENTER_GAP;
+const rightZ = 0.0052;
+const rightHitBox = makeHitbox(
+  RIGHT_SECTION_WIDTH,
+  ROW_SPACING,
+  rightX,
+  yPos,
+  rightZ,
+  {
+    type: 'extra',
+    periodName: group.name,
+    periodIndex: index
+  }
+);
+uiPanel.add(rightHitBox);
+
+        // ── NEW: hit‐target plane for VR raycasts ───────────────────────────────
+
         uiPanel.add(label);
     });
 
