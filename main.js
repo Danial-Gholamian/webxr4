@@ -463,7 +463,8 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   scene,
   inVR
   });
-  uiPanel?.userData?.update?.(panelState);
+  uiPanel?.userData?.update?.();
+
 
   if (uiPanel?.userData?.bgPlane) {
   const bg = uiPanel.userData.bgPlane;

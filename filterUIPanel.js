@@ -168,16 +168,18 @@ uiPanel.add(rightHitBox);
 
 
     // --- Always face camera ---
-    uiPanel.rotateY(Math.PI); // Rotate 180° to face -Z direction
-    uiPanel.userData.update = (panelState) => {
-      if (options.camera) {
-        uiPanel.quaternion.copy(options.camera.quaternion);
-      }
+    const cameraRef = options.camera;
 
-      if (panelState === 'showing' || panelState === 'shown') {
-        uiPanel.lookAt(options.camera.position);
+    uiPanel.userData.update = () => {
+      if (cameraRef) {
+        const panelPos = uiPanel.getWorldPosition(new THREE.Vector3());
+        const camPos = cameraRef.getWorldPosition(new THREE.Vector3());
+
+        uiPanel.lookAt(camPos);
+        // uiPanel.rotateY(Math.PI); // Ensure text faces the user
       }
     };
+
 
 
       uiPanel.userData.refreshUsers = (selfId) => {
@@ -262,20 +264,19 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
       panelState = 'shown';
     }
 
-    uiPanel.lookAt(camera.position);
-    if (inVR) uiPanel.userData.update?.(panelState);
+    uiPanel.userData.update?.(); // <-- fix here
   }
 
   else if (panelState === 'shown') {
     if (bgPlane) {
-      bgPlane.material.opacity = 0.6;         // Keep visible
+      bgPlane.material.opacity = 0.6;
       bgPlane.userData.isUIPanel = true;
     }
 
     uiPanel.position.copy(moveToController());
-    uiPanel.lookAt(camera.position);
-    if (inVR) uiPanel.userData.update?.(panelState);
+    uiPanel.userData.update?.(); // <-- fix here
   }
+
 
   else if (panelState === 'hiding') {
     if (bgPlane) {
