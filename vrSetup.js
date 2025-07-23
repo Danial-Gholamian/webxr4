@@ -115,15 +115,15 @@ function moveThumbstick(inputX, inputY, camera, cameraGroup, speed = movementSpe
   cameraGroup.position.add(moveVector);
 }
 
-// --- 4. Trigger Selection ---
+// --- 4. Trigger Selection ---, today
 let vrNodeSelectionInitialized = false;
+let lastSelectedCapsule = null;
 
 function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup) {
   function onVRSelect(event) {
     const controller = event.target;
-    console.log(` VR selectstart from ${controller === controller1 ? 'Left' : 'Right'} Controller`);
-
-    if (!GraphRef.current?.scene) return;
+    const controllerSide = controller === controller1 ? 'left' : 'right';
+    console.log(` VR selectstart from ${controllerSide} Controller`);
 
     const raycaster = new THREE.Raycaster();
     const matrix = new THREE.Matrix4();
@@ -133,68 +133,66 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
     raycaster.far = 100;
 
+    const uiPanel = scene.getObjectByName('FilterUIPanel') || cameraGroup.getObjectByName('FilterUIPanel');
 
-    // --------New for panel selection
-    const uiPanel = scene.getObjectByName('FilterUIPanel') ||
-                    cameraGroup.getObjectByName('FilterUIPanel');
-
-    if (uiPanel) {
-      // 1) Try selecting a filter row
-      const rows = uiPanel.children.filter(o => o.userData.type === 'filter' || o.userData.type === 'extra');
-const rowHits = raycaster.intersectObjects(rows, false);
-
-if (rowHits.length) {
-  const rowObj = rowHits[0].object;
-  const { type, periodName, periodIndex } = rowObj.userData;
-
-  if (type === 'filter') {
-    currentPeriodIndex = periodIndex;
-    highlightPeriod(periodName);
-    console.log(` Selected FILTER row: ${periodName}`, rowObj);
-
-    // Optional: permanent highlight
-    if (rowObj.material) {
-      rowObj.material.color.set(0x3366ff);
-      rowObj.material.opacity = 0.5;
-    }
-
-  } else if (type === 'extra') {
-    console.log(` Selected EXTRA action for: ${periodName}`, rowObj);
-
-    if (rowObj.material) {
-      rowObj.material.color.set(0x00cc99);   // teal-green
-      rowObj.material.opacity = 0.4; ;
-    }
-  }
-
-  return; // Stop here — don't fall through to node selection
-}
-
-
-
-      // 2) Block any other hit on the panel background
-      const bgPlane = uiPanel.userData.bgPlane;
-      if (bgPlane) {
-        const bgHits = raycaster.intersectObject(bgPlane, false);
-        if (bgHits.length) {
-          // Hit the panel but not a row → do nothing
-          return;
+    if (uiPanel && uiPanel.userData.panelState === 'hidden') {
+      const interactiveObjects = [];
+      uiPanel.traverse(obj => {
+        if (obj.isMesh && obj.userData?.interactive) {
+          interactiveObjects.push(obj);
         }
+      });
+
+      const hits = raycaster.intersectObjects(interactiveObjects, false);
+// now debugg
+      if (hits.length > 0) {
+        const hit = hits[0].object;
+        const { onClick, label, target } = hit.userData;
+
+        console.log('VR ray hit object:', hit.name);
+        console.log('hit.userData:', hit.userData);
+        console.log('hit target material:', target?.material?.color.getHexString());
+
+        // Reset previous selection
+        if (lastSelectedCapsule && lastSelectedCapsule !== target) {
+          console.log(' Deselecting previous capsule');
+          lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
+          lastSelectedCapsule.userData.isSelected = false;
+        }
+
+        // Set new selection
+        if (target?.material) {
+          const selectedColor = target.userData.selectedColor || new THREE.Color(0x3366ff);
+          console.log(' Selecting capsule:', label, 'Color:', selectedColor.getHexString());
+          target.material.color.copy(selectedColor);
+          target.userData.isSelected = true;
+          lastSelectedCapsule = target;
+        } else {
+          console.warn(' No target material found');
+        }
+
+        if (typeof onClick === 'function') onClick(label);
+        console.log(` Capsule clicked: ${label}`);
+        return;
       }
+
     }
 
-    // --------End for panel selcetion
+    // --- Fallback to graph node selection ---
+    if (!GraphRef.current?.scene) return;
 
-    const nodes = [];
+    const graphNodes = [];
     GraphRef.current.scene().traverse(obj => {
-      if (obj instanceof THREE.Mesh && obj.__data) nodes.push(obj);
+      if (obj instanceof THREE.Mesh && obj.__data) graphNodes.push(obj);
     });
 
-    const intersections = raycaster.intersectObjects(nodes, false);
-    if (intersections.length > 0) {
-      const node = intersections[0].object.__data;
+    const hits = raycaster.intersectObjects(graphNodes, false);
+    if (hits.length > 0) {
+      const node = hits[0].object.__data;
       console.log(" VR Selected node:", node);
-      requestGraphUpdate('SUBGRAPH', node.id); // Always use SUBGRAPH
+      requestGraphUpdate('SUBGRAPH', node.id);
+    } else {
+      console.log(`HERE  [${controllerSide}] Button 0 pressed but hit nothing`);
     }
   }
 
@@ -205,6 +203,7 @@ if (rowHits.length) {
     console.log("setupVRNodeSelection: Listeners initialized.");
   }
 }
+
 
 
 

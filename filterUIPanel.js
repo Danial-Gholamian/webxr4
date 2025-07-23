@@ -8,7 +8,7 @@ import { knownUsers } from './network.js';
 const PANEL_SCALE = 0.3;       // 30% of view width
 const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const FONT_SIZE = 0.05;        // 5cm in VR units
-const ROW_SPACING = 0.12;      // 12cm between rows
+const ROW_SPACING = 0.17;      // 12cm between rows
 const panelSize = new THREE.Vector3();
 let periodTitle = null;
 
@@ -21,20 +21,17 @@ export function updatePeroidLabel(peroidname) {
         periodTitle.text = `Time of the day: ${peroidname || 'Default'} 📚`;
         periodTitle.sync();
     }
-}
-export function createFilterPanel(options = { groupColors: [], camera: null }) {
-    const uiPanel = new THREE.Group();
-    uiPanel.name = "FilterUIPanel";
-    
+}export function createFilterPanel(options = { groupColors: [], camera: null }) {
+  const uiPanel = new THREE.Group();
+  uiPanel.name = 'FilterUIPanel';
 
-    const aspect = window.innerWidth / window.innerHeight;
-    uiPanel.position.set(0, -0.3, -0.8);
-    uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
+  const aspect = window.innerWidth / window.innerHeight;
+  uiPanel.position.set(0, -0.3, -0.8);
+  uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
 
-    const userListGroup = new THREE.Group();
-    userListGroup.position.set(0.2, 0.15, 0.01); // Right side of panel
-    uiPanel.add(userListGroup);
-
+  const userListGroup = new THREE.Group();
+  userListGroup.position.set(0.2, 0.15, 0.01);
+  uiPanel.add(userListGroup);
 
   const bgPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(1.2, 1.8),
@@ -45,168 +42,91 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
       depthWrite: false
     })
   );
+    bgPlane.name = 'uiPanelBackground';
+    bgPlane.userData = {
+    interactive: true,
+    isUIPanel: true,
+    absorbsOnly: true // prevents hover effects
+  };
 
-    bgPlane.name = "uiPanelBackground";
-    bgPlane.position.set(0, 0, 0);
-    bgPlane.userData.isUIPanel = true;
-    uiPanel.userData.bgPlane = bgPlane; // store reference for later
-    uiPanel.add(bgPlane);
+  uiPanel.userData.bgPlane = bgPlane;
+  uiPanel.add(bgPlane);
 
+  periodTitle = new Text();
+  periodTitle.text = 'Time of the day: Default 📚';
+  periodTitle.fontSize = FONT_SIZE;
+  periodTitle.color = 0xffffff;
+  periodTitle.anchorX = 'center';
+  periodTitle.position.set(0, 0.35, 0.01);
+  periodTitle.sync();
+  uiPanel.add(periodTitle);
 
-    // --- Title ---
-    periodTitle = new Text();
-    periodTitle.text = "Time of the day:  Default 📚";  // default state
-    periodTitle.fontSize = FONT_SIZE;
-    periodTitle.color = 0xFFFFFF;
-    periodTitle.anchorX = 'center';
-    periodTitle.position.set(0, 0.35, 0.01);
-    periodTitle.sync();
-    uiPanel.add(periodTitle);
+  options.groupColors
+    .slice()
+    .sort((a, b) => {
+      const aStartsDigit = /^\d/.test(a.name);
+      const bStartsDigit = /^\d/.test(b.name);
+      if (aStartsDigit && !bStartsDigit) return -1;
+      if (!aStartsDigit && bStartsDigit) return 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    })
+    .forEach((group, index) => {
+      const yPos = 0.2 - index * ROW_SPACING;
 
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.02),
+        new THREE.MeshBasicMaterial({ color: group.color, depthTest: false })
+      );
+      dot.position.set(-0.4, yPos, 0.01);
+      dot.renderOrder = 2;
+      uiPanel.add(dot);
 
-    // --- Dynamic Group Labels ---
+      const capsule = createCapsuleLabel(group.name, {
+        fontSize: 0.045,
+        color: 0x222244,
+        hoverColor: 0x444488,
+        padding: 0.03,
+        onClick: () => console.log(`Clicked ${group.name}`)
+      });
 
-    options.groupColors
-  .slice()
-  .sort((a, b) => {
-    const aStartsDigit = /^\d/.test(a.name);
-    const bStartsDigit = /^\d/.test(b.name);
+      capsule.position.set(-0.05, yPos, 0.01);
+      uiPanel.add(capsule);
+    });
 
-    if (aStartsDigit && !bStartsDigit) return -1;
-    if (!aStartsDigit && bStartsDigit) return 1;
-    return a.name.localeCompare(b.name, undefined, { numeric: true });
-  })
-  .forEach((group, index) => {
-
-        const yPos = 0.2 - (index * ROW_SPACING);
-        
-        // Color indicator (dot)
-        const dot = new THREE.Mesh(
-            new THREE.SphereGeometry(0.02),
-            new THREE.MeshBasicMaterial({ 
-                color: group.color,
-                depthTest: false
-            })
-        );
-        dot.position.set(-0.4, yPos, 0.01);
-        dot.renderOrder = 2;
-        uiPanel.add(dot);
-
-        // Group name
-        const label = new Text();
-        label.text = group.name;
-        label.fontSize = FONT_SIZE;
-        label.color = 0xFFFFFF;
-        label.anchorX = 'left';
-        label.anchorY = 'middle'; // Add this to vertically center text
-        label.position.set(-0.35, yPos, 0.01); // Remove the -0.015 offset
-        label.sync();
-        // ── NEW: hit‐target plane for VR raycasts ───────────────────────────────
-const LEFT_SECTION_WIDTH = 0.45; 
-const RIGHT_SECTION_WIDTH = 0.35;
-const CENTER_GAP = 0.05;
-const DEBUG = false;
-
-function makeHitbox(width, height, x, y, z, userData) {
-  const material = new THREE.MeshBasicMaterial({
-    transparent: true,
-    opacity: DEBUG ? 0.3 : 0,
-    color: DEBUG ? 0xff0000 : 0x000000,
-    depthWrite: false
+  uiPanel.traverse(child => {
+    if (child.material) {
+      child.userData.originalColor = child.material.color.clone();
+    }
   });
 
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
-  mesh.position.set(x, y, z);
-  mesh.userData = { ...userData };
-  return mesh;
-}
-
-// LEFT — group selector (dot + label)
-const leftX = -0.3 + (LEFT_SECTION_WIDTH / 2);
-const leftZ = 0.0051;
-const leftHitBox = makeHitbox(
-  LEFT_SECTION_WIDTH,
-  ROW_SPACING,
-  leftX,
-  yPos,
-  leftZ,
-  {
-    type: 'filter',
-    periodName: group.name,
-    periodIndex: index
-  }
-);
-uiPanel.add(leftHitBox);
-
-// RIGHT — extra action
-const rightX = 0.1 + (RIGHT_SECTION_WIDTH / 2) + CENTER_GAP;
-const rightZ = 0.0052;
-const rightHitBox = makeHitbox(
-  RIGHT_SECTION_WIDTH,
-  ROW_SPACING,
-  rightX,
-  yPos,
-  rightZ,
-  {
-    type: 'extra',
-    periodName: group.name,
-    periodIndex: index
-  }
-);
-uiPanel.add(rightHitBox);
-
-        // ── NEW: hit‐target plane for VR raycasts ───────────────────────────────
-
-        uiPanel.add(label);
-    });
-
-    uiPanel.traverse(child => {
-      if (child.material) {
-      child.userData.originalColor = child.material.color.clone();
-      }
-    });
-
-
-    // --- Always face camera ---
-    const cameraRef = options.camera;
-
-    uiPanel.userData.update = () => {
-      if (cameraRef) {
-        const panelPos = uiPanel.getWorldPosition(new THREE.Vector3());
-        const camPos = cameraRef.getWorldPosition(new THREE.Vector3());
-
-        uiPanel.lookAt(camPos);
-        // uiPanel.rotateY(Math.PI); // Ensure text faces the user
-      }
-    };
-
-
-
-      uiPanel.userData.refreshUsers = (selfId) => {
-    // Clear previous labels
-    while (userListGroup.children.length > 0) {
-      userListGroup.remove(userListGroup.children[0]);
+  const cameraRef = options.camera;
+  uiPanel.userData.update = () => {
+    if (cameraRef) {
+      const camPos = cameraRef.getWorldPosition(new THREE.Vector3());
+      uiPanel.lookAt(camPos);
     }
-
-    // Add updated labels
-    const entries = Object.entries(knownUsers);
-    entries.forEach(([id, name], index) => {
-      const userLabel = new Text();
-      userLabel.text = id === selfId ? `${name} (you)` : name;
-      userLabel.fontSize = FONT_SIZE * 0.8;
-      userLabel.color = 0xffffaa;
-      userLabel.anchorX = 'left';
-      userLabel.anchorY = 'middle';
-      userLabel.position.set(0, -index * ROW_SPACING * 0.6, 0);
-      userLabel.sync();
-      userListGroup.add(userLabel);
-    });
-
   };
-    uiPanel.userData.boundingBox = new THREE.Box3();
-    uiPanel.userData.boundingBox.setFromObject(uiPanel);
-    return uiPanel;
+
+  uiPanel.userData.refreshUsers = (selfId) => {
+    while (userListGroup.children.length > 0) userListGroup.remove(userListGroup.children[0]);
+    Object.entries(knownUsers).forEach(([id, name], index) => {
+      const label = id === selfId ? `${name} (you)` : name;
+      const capsule = createCapsuleLabel(label, {
+        fontSize: 0.038,
+        color: 0x333333,
+        hoverColor: 0x555577,
+        padding: 0.025,
+        onClick: () => console.log(`Clicked ${label}`)
+      });
+      capsule.position.set(0, -index * ROW_SPACING * 0.7, 0);
+      userListGroup.add(capsule);
+    });
+  };
+
+  uiPanel.userData.boundingBox = new THREE.Box3().setFromObject(uiPanel);
+  return uiPanel;
 }
+
 
 export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, controller, scene, inVR }) {
   if (!uiPanel) return;
@@ -303,3 +223,89 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
 
 
 console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeString()}`);
+
+// --------------------Sake of Test--------------------
+const DEBUG = true;
+
+export function createCapsuleLabel(text, {
+  fontSize = 0.045,
+  color = 0x222244,
+  hoverColor = 0x444488,
+  textColor = 0xffffff,
+  padding = 0.03,
+  opacity = 0.9,
+  onClick = null
+} = {}) {
+  const group = new THREE.Group();
+
+  const label = new Text();
+  label.text = text;
+  label.fontSize = fontSize;
+  label.color = textColor;
+  label.anchorX = 'center';
+  label.anchorY = 'middle';
+  label.position.set(0, 0, 0.01);
+  group.add(label);
+
+  label.sync(() => {
+    const info = label.textRenderInfo;
+    const textWidth = info?.width ?? 0.3;
+    const textHeight = info?.height ?? 0.1;
+
+    const width = textWidth + padding * 2;
+    const height = textHeight + padding * 2;
+    const radius = Math.min(height / 2, 0.1);
+
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2 + radius, -height / 2);
+    shape.lineTo(width / 2 - radius, -height / 2);
+    shape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
+    shape.lineTo(width / 2, height / 2 - radius);
+    shape.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
+    shape.lineTo(-width / 2 + radius, height / 2);
+    shape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
+    shape.lineTo(-width / 2, -height / 2 + radius);
+    shape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
+
+    const geometry = new THREE.ShapeGeometry(shape);
+    const bgMaterial = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false
+    });
+
+    const bg = new THREE.Mesh(geometry, bgMaterial);
+    bg.position.z = 0;
+    bg.userData.defaultColor = new THREE.Color(color);
+    bg.userData.hoverColor = new THREE.Color(hoverColor);
+    bg.userData.selectedColor = new THREE.Color(0x3366ff);
+    bg.userData.isSelected = false;                        
+
+    group.add(bg);
+
+// filterUIPanel.js --> createCapsuleLabel()
+
+    const hitbox = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      // ✅ Fix: visible: false makes it invisible to the camera, but not the raycaster
+      new THREE.MeshBasicMaterial({ visible: false }) 
+    );
+    hitbox.position.z = 0.02;
+    hitbox.name = 'capsuleHitbox';
+    hitbox.userData = {
+      interactive: true,
+      label: text,
+      onClick,
+      target: bg
+    };
+
+    group.userData.hitbox = hitbox;
+    group.add(hitbox);
+  });
+
+  return group;
+}
+
+
+//This is today

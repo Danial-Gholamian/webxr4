@@ -124,20 +124,11 @@ if (uiPanel?.userData.bgPlane) {
     controller.userData.lastHoveredFilter = hit;
     return; // swallow further hover logic
     }
-  if (hit.name === "uiPanelBackground") {
-      console.log(" Laser hit the UI panel background and I'm Danial");
-    hit.userData.isHovered = true;
-    if (controller.userData.lastHoveredUIPanel !== hit) {
-
-      if (controller.userData.lastHoveredUIPanel) {
-        controller.userData.lastHoveredUIPanel.material.color.set(0x000000);
-      }
-
-      hit.material.color.set(0x222266);
-      controller.userData.lastHoveredUIPanel = hit;
-    }
-
+  if (hit.name === "uiPanelBackground" || hit.userData.absorbsOnly) {
+    if (line) line.scale.z = intersections[0].distance;
+    return; //  Swallow hover without visual effects
   }
+
 
   if (line) line.scale.z = intersections[0].distance;
 
@@ -239,11 +230,9 @@ if (!hit.material.__originalEmissive) {
                   cameraGroup.getObjectByName('FilterUIPanel');
 
   if (uiPanel?.userData?.bgPlane) {
-    const bg = uiPanel.userData.bgPlane;
-    bg.userData.isHovered = false;                  // reset hover flag
-    bg.material.color.set(0x000000);                // reset to default color
-    controller.userData.lastHoveredUIPanel = null;  // clear reference
+    controller.userData.lastHoveredUIPanel = null;
   }
+
 
   const prev = controller.userData.lastHoveredObject;
   if (prev && prev.material.__originalEmissive !== undefined) {
