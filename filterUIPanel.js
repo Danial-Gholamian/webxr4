@@ -11,6 +11,7 @@ const FONT_SIZE = 0.05;        // 5cm in VR units
 const ROW_SPACING = 0.17;      // 12cm between rows
 const panelSize = new THREE.Vector3();
 let periodTitle = null;
+let selectedNodeLabel = null;
 
 const PANEL_LERP_FACTOR = 0.2;
 
@@ -21,7 +22,8 @@ export function updatePeroidLabel(peroidname) {
         periodTitle.text = `Time of the day: ${peroidname || 'Default'} 📚`;
         periodTitle.sync();
     }
-}export function createFilterPanel(options = { groupColors: [], camera: null }) {
+}
+export function createFilterPanel(options = { groupColors: [], camera: null }) {
   const uiPanel = new THREE.Group();
   uiPanel.name = 'FilterUIPanel';
 
@@ -59,7 +61,23 @@ export function updatePeroidLabel(peroidname) {
   periodTitle.anchorX = 'center';
   periodTitle.position.set(0, 0.35, 0.01);
   periodTitle.sync();
+  
+  
+  selectedNodeLabel = new Text();
+  selectedNodeLabel.text = 'Selected node: None';
+  selectedNodeLabel.fontSize = FONT_SIZE * 0.9;
+  selectedNodeLabel.color = 0xffffff;
+  selectedNodeLabel.anchorX = 'center';
+  selectedNodeLabel.position.set(0, 0.28, 0.01); // just below periodTitle
+  selectedNodeLabel.sync();
+  
   uiPanel.add(periodTitle);
+  uiPanel.add(selectedNodeLabel);
+
+  uiPanel.userData.updateSelectedNodeLabel = (nodeId) => {
+  selectedNodeLabel.text = `Selected node: ${nodeId ?? 'None'}`;
+  selectedNodeLabel.sync();
+  };
 
   options.groupColors
     .slice()

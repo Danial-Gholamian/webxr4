@@ -32,8 +32,15 @@ import { updateRemoteAvatar } from './avatars.js';
 
 let panelState = 'showing'; // 'hidden', 'showing', 'shown', 'hiding'
 const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
-const PANEL_SHOWN_POS = new THREE.Vector3(0, 0, -1.2);
-const PANEL_LERP_FACTOR = 0.2;
+
+let activePeriod = null;
+
+let selectionState = {
+  isActive: false,
+  selectedNodeId: null,
+  neighborIds: new Set()
+};
+
 
 
 
@@ -163,32 +170,24 @@ function requestGraphUpdate(mode, nodeId) {
 setUIPanel(uiPanel);
 
 export function highlightSubgraph(nodeId) {
-  updatePeroidLabel('Default');
   const clickedId = String(nodeId);
-  const neighbourIds = new Set(
-    Array.from(adjacency.get(clickedId) || []).map(String)
-  );
-  const selectedIds = new Set([clickedId, ...neighbourIds]);
+  uiPanel.userData.updateSelectedNodeLabel?.(clickedId);
+  selectionState.isActive = true;
+  selectionState.selectedNodeId = clickedId;
+  const validNeighbors = new Set();
+  const edges = Graph.graphData().links;
+  for (const edge of edges) {
+    if (activePeriod && !edge.periods?.includes(activePeriod)) continue;
 
-  Graph.scene().traverse(obj => {
-    if (obj.__data?.id !== undefined) {
-      const objId = String(obj.__data.id);
-      const isSelected = selectedIds.has(objId);
-      applyOpacityLayer(obj, "selection", isSelected);
-    }
+    const source = String(edge.source?.id ?? edge.source);
+    const target = String(edge.target?.id ?? edge.target);
 
-    if (obj.__data?.source && obj.__data?.target) {
-      const s = String(obj.__data.source?.id ?? obj.__data.source);
-      const t = String(obj.__data.target?.id ?? obj.__data.target);
-      obj.visible = (s === clickedId || t === clickedId);
-      obj.material.color.setRGB(1, 1, 1);
-      obj.material.transparent = true;
-      obj.material.opacity = 1.0;
-      obj.material.emissive?.setRGB(0.5, 0.5, 0.5);
-    }
-  });
+    if (source === clickedId) validNeighbors.add(target);
+    else if (target === clickedId) validNeighbors.add(source);
+  }
+  selectionState.neighborIds = validNeighbors;
 
-  markHoverCacheDirty();
+  updateAllVisuals();
 }
 
 
@@ -207,7 +206,14 @@ resetBtn.addEventListener('click', () => {
 });
 
 export function resetGraph() {
+  activePeriod = null;
+  selectionState.isActive = false;
+  selectionState.selectedNodeId = null;
+  selectionState.neighborIds = new Set();
+
   updatePeroidLabel('Default');
+  uiPanel.userData.updateSelectedNodeLabel?.(null);
+
   Graph.scene().traverse(obj => {
     // Reset nodes
     if (obj.__data?.id !== undefined) {
@@ -220,11 +226,9 @@ export function resetGraph() {
         obj.material.needsUpdate = true;
       }
 
-      // Clean up all custom materials
       delete userData.originalMaterial;
       delete userData.periodMaterial;
       delete userData.selectionMaterial;
-      // Add more if needed (e.g., hoverMaterial, filterMaterial)
     }
 
     // Reset edges
@@ -233,19 +237,64 @@ export function resetGraph() {
       obj.material.color.setRGB(1, 1, 1);
       obj.material.opacity = 1.0;
       obj.material.transparent = false;
-
-      if (obj.material.emissive) {
-        obj.material.emissive.setRGB(0, 0, 0);
-      }
-
+      obj.material.emissive?.setRGB(0, 0, 0);
       obj.material.needsUpdate = true;
     }
   });
 
-  // Force render refresh and physics update
   Graph.graphData(Graph.graphData());
   Graph.d3ReheatSimulation();
 }
+
+
+
+function updateAllVisuals() {
+  const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
+
+  Graph.scene().traverse(obj => {
+    // --- Nodes ---
+    if (obj.__data?.id !== undefined) {
+      const nodeId = String(obj.__data.id);
+      const inPeriod = !periodNodes || periodNodes.has(nodeId);
+      const isSelected = selectionState.selectedNodeId === nodeId;
+      const isNeighbor = selectionState.neighborIds.has(nodeId);
+
+      // Only show if it's in period and either selected or neighbor
+      const shouldShow = inPeriod && (!selectionState.isActive || isSelected || isNeighbor);
+
+      applyOpacityLayer(obj, "combined", shouldShow);
+    }
+
+    // --- Edges ---
+    if (obj.__data?.source && obj.__data?.target) {
+      const s = String(obj.__data.source?.id ?? obj.__data.source);
+      const t = String(obj.__data.target?.id ?? obj.__data.target);
+
+      const edgeInPeriod = !activePeriod || obj.__data.periods?.includes(activePeriod);
+      const edgeIsRelevant = selectionState.isActive
+        ? (s === selectionState.selectedNodeId || t === selectionState.selectedNodeId)
+        : true;
+
+      const isVisible = edgeInPeriod && edgeIsRelevant;
+      obj.visible = isVisible;
+
+      if (isVisible) {
+        obj.material.color.setRGB(1, 1, 1);
+        obj.material.transparent = true;
+        obj.material.opacity = 1.0;
+        obj.material.emissive?.setRGB(0.5, 0.5, 0.5);
+        obj.material.needsUpdate = true;
+      } else {
+        obj.material.emissive?.setRGB(0, 0, 0);
+      }
+    }
+  });
+
+  Graph.d3ReheatSimulation();
+  markHoverCacheDirty?.();
+}
+
+
 
 
 
@@ -288,32 +337,13 @@ export function precomputePeriodData() {
 }
 
 
-
 export function highlightPeriod(period) {
+  activePeriod = period;
+  selectionState.isActive = false; // clear selection on period change
   updatePeroidLabel(period);
-  const activeNodes = periodActiveNodes.get(period) || new Set();
-
-  Graph.scene().traverse(obj => {
-    if (obj.__data?.id !== undefined) {
-      const nodeId = obj.__data.id;
-      const isActive = activeNodes.has(nodeId);
-      applyOpacityLayer(obj, "period", isActive);
-    }
-
-    if (obj.__data?.source && obj.__data?.target) {
-      const isCurrentPeriod = obj.__data.periods?.includes?.(period);
-      obj.visible = isCurrentPeriod;
-
-      if (isCurrentPeriod) {
-        obj.material.color.setRGB(1, 1, 1);
-        obj.material.transparent = true;
-        obj.material.opacity = 1.0;
-        obj.material.emissive?.setRGB(0.5, 0.5, 0.5);
-        obj.material.needsUpdate = true;
-      }
-    }
-  });
+  updateAllVisuals();
 }
+
 
 // ========================
 // XR Session Event Handling
