@@ -9,7 +9,7 @@ import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 const movementSpeed = 0.5;
 const rotationSpeed = 0.03;
 const deadZone = 0.1;
-const laserDistance = 100;
+const laserDistance = 2000;
 const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
 const yButtonIndex = 5; // xr-standard index for y (left) / b (right)
 const aButtonIndex = 4; // index 4 is A (right controller)
@@ -31,6 +31,7 @@ function setupController(controller, index, renderer, cameraGroup) {
   const laser = new THREE.Line(laserGeometry, laserMaterial);
   laser.name = 'laser';
   laser.scale.z = laserDistance;
+  console.log(`Laser lenght ${laserDistance}`)
   laser.userData.isLaser = true;
 
   controller.add(laser);
@@ -131,7 +132,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     matrix.identity().extractRotation(controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
-    raycaster.far = 100;
+    raycaster.far = laserDistance;
 
     const uiPanel = scene.getObjectByName('FilterUIPanel') || cameraGroup.getObjectByName('FilterUIPanel');
 
@@ -232,7 +233,7 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
       matrix.identity().extractRotation(controller.matrixWorld);
       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
-      raycaster.far = 100;
+      raycaster.far = laserDistance;
 
       const nodes = [];
       GraphRef.current.scene().traverse(obj => {

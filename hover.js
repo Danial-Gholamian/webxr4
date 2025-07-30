@@ -84,7 +84,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   tempMatrix.identity().extractRotation(controller.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-  raycaster.far = 100;
+  raycaster.far = 2000;
 
   if (cacheNeedsUpdate) {
     nodeMeshesCache = [];

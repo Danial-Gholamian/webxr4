@@ -2,13 +2,13 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 import { knownUsers } from './network.js';
-
+import {highlightGroup} from './main.js'
 
 
 const PANEL_SCALE = 0.3;       // 30% of view width
 const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const FONT_SIZE = 0.05;        // 5cm in VR units
-const ROW_SPACING = 0.17;      // 12cm between rows
+const ROW_SPACING = 0.17;      // a12cm between rows
 const panelSize = new THREE.Vector3();
 let periodTitle = null;
 let selectedNodeLabel = null;
@@ -32,7 +32,7 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
   uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
 
   const userListGroup = new THREE.Group();
-  userListGroup.position.set(0.2, 0.15, 0.01);
+  userListGroup.position.set(0.4, 0.1, 0.01);
   uiPanel.add(userListGroup);
 
   const bgPlane = new THREE.Mesh(
@@ -89,7 +89,7 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
       return a.name.localeCompare(b.name, undefined, { numeric: true });
     })
     .forEach((group, index) => {
-      const yPos = 0.2 - index * ROW_SPACING;
+      const yPos = 0.1 - index * ROW_SPACING;
 
       const dot = new THREE.Mesh(
         new THREE.SphereGeometry(0.02),
@@ -104,7 +104,10 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
         color: 0x222244,
         hoverColor: 0x444488,
         padding: 0.03,
-        onClick: () => console.log(`Clicked ${group.name}`)
+        onClick: () => {
+          console.log(`Clicked ${group.name}`);
+          highlightGroup(group.name);
+        }
       });
 
       capsule.position.set(-0.05, yPos, 0.01);

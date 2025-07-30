@@ -42,6 +42,13 @@ let selectionState = {
 };
 
 
+const groupFilterState = {
+  isActive: false,
+  activeGroup: null,
+  nodeIds: new Set(),
+  edgeIds: new Set()
+};
+
 
 
 //
@@ -49,6 +56,8 @@ let selectionState = {
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
+// scene.background = new THREE.Color(0x87ceeb);
+
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
 setScene(scene);
@@ -189,6 +198,51 @@ export function highlightSubgraph(nodeId) {
 
   updateAllVisuals();
 }
+function getEdgeKey(a, b) {
+  return [a, b].sort().join('--');
+}
+
+export function highlightGroup(groupName) {
+  // Normalize and reset states
+  const normalizedGroup = String(groupName).trim().toLowerCase();
+
+  groupFilterState.isActive = true;
+  groupFilterState.activeGroup = normalizedGroup;
+  groupFilterState.nodeIds.clear();
+  groupFilterState.edgeIds.clear();
+
+  // Reset selection to avoid conflicts
+  selectionState.isActive = false;
+  selectionState.selectedNodeId = null;
+  selectionState.neighborIds.clear();
+
+  // Filter nodes
+  for (const node of Graph.graphData().nodes) {
+    const nodeGroup = String(node.group).trim().toLowerCase();
+    const nodeId = String(node.id);
+    if (nodeGroup === normalizedGroup) {
+      groupFilterState.nodeIds.add(nodeId);
+    }
+  }
+
+  // Filter edges where both ends are in the group AND match current period (if any)
+  for (const edge of Graph.graphData().links) {
+    const src = String(edge.source?.id ?? edge.source);
+    const tgt = String(edge.target?.id ?? edge.target);
+
+    const edgeInPeriod = !activePeriod || edge.periods?.includes(activePeriod);
+    if (
+      groupFilterState.nodeIds.has(src) &&
+      groupFilterState.nodeIds.has(tgt) &&
+      edgeInPeriod
+    ) {
+      groupFilterState.edgeIds.add(getEdgeKey(src, tgt));
+    }
+  }
+
+  updateAllVisuals();
+}
+
 
 
 const resetBtn = document.createElement('button');
@@ -211,6 +265,7 @@ export function resetGraph() {
   selectionState.selectedNodeId = null;
   selectionState.neighborIds = new Set();
 
+  clearGroupFilter() // this is for clearing group selection.
   updatePeroidLabel('Default');
   uiPanel.userData.updateSelectedNodeLabel?.(null);
 
@@ -252,36 +307,52 @@ function updateAllVisuals() {
   const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
 
   Graph.scene().traverse(obj => {
-    // --- Nodes ---
+    // ========== NODES ==========
     if (obj.__data?.id !== undefined) {
       const nodeId = String(obj.__data.id);
-      const inPeriod = !periodNodes || periodNodes.has(nodeId);
-      const isSelected = selectionState.selectedNodeId === nodeId;
-      const isNeighbor = selectionState.neighborIds.has(nodeId);
 
-      // Only show if it's in period and either selected or neighbor
-      const shouldShow = inPeriod && (!selectionState.isActive || isSelected || isNeighbor);
+      const inPeriod = !periodNodes || periodNodes.has(nodeId);
+      const inGroup = !groupFilterState.isActive || groupFilterState.nodeIds.has(nodeId);
+
+      // Start with the broader filters (period and group)
+      let shouldShow = inPeriod && inGroup;
+
+      // CORRECTED PART 1: Apply selection filter if it's active, regardless of the group filter.
+      if (selectionState.isActive) {
+        const isSelected = selectionState.selectedNodeId === nodeId;
+        const isNeighbor = selectionState.neighborIds.has(nodeId);
+        // A node must pass the broad filters AND the selection filter.
+        shouldShow = shouldShow && (isSelected || isNeighbor);
+      }
 
       applyOpacityLayer(obj, "combined", shouldShow);
     }
 
-    // --- Edges ---
+    // ========== EDGES ==========
     if (obj.__data?.source && obj.__data?.target) {
       const s = String(obj.__data.source?.id ?? obj.__data.source);
       const t = String(obj.__data.target?.id ?? obj.__data.target);
+      const edgeKey = getEdgeKey(s, t);
 
       const edgeInPeriod = !activePeriod || obj.__data.periods?.includes(activePeriod);
-      const edgeIsRelevant = selectionState.isActive
-        ? (s === selectionState.selectedNodeId || t === selectionState.selectedNodeId)
-        : true;
+      const edgeInGroup = !groupFilterState.isActive || groupFilterState.edgeIds.has(edgeKey);
 
-      const isVisible = edgeInPeriod && edgeIsRelevant;
+      // Start with broader filters
+      let isVisible = edgeInPeriod && edgeInGroup;
+
+      // CORRECTED PART 2: Apply selection logic for edges if selection is active.
+      if (selectionState.isActive) {
+        isVisible = isVisible &&
+          (s === selectionState.selectedNodeId || t === selectionState.selectedNodeId);
+      }
+
       obj.visible = isVisible;
 
+      // This part for emissive color can remain the same
       if (isVisible) {
         obj.material.color.setRGB(1, 1, 1);
-        obj.material.transparent = true;
         obj.material.opacity = 1.0;
+        obj.material.transparent = true;
         obj.material.emissive?.setRGB(0.5, 0.5, 0.5);
         obj.material.needsUpdate = true;
       } else {
@@ -293,6 +364,17 @@ function updateAllVisuals() {
   Graph.d3ReheatSimulation();
   markHoverCacheDirty?.();
 }
+
+
+
+export function clearGroupFilter() {
+  groupFilterState.isActive = false;
+  groupFilterState.activeGroup = null;
+  groupFilterState.nodeIds.clear();
+  groupFilterState.edgeIds.clear();
+  updateAllVisuals();
+}
+
 
 
 
@@ -352,6 +434,8 @@ let inVR = false;
 
 renderer.xr.addEventListener('sessionstart', () => {
   inVR = true;
+
+  cameraGroup.position.set(0, 1.6, 230);  // Initial spawn position
   const session = renderer.xr.getSession();
   // startAutoHighlightCycle(); // Test 
   session.inputSources.forEach(source => {
