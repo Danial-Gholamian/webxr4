@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 import { knownUsers } from './network.js';
 import {highlightGroup} from './main.js'
+import { broadcastGroupSelection } from './network.js';
 
 
 const PANEL_SCALE = 0.3;       // 30% of view width
@@ -107,6 +108,7 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
         onClick: () => {
           console.log(`Clicked ${group.name}`);
           highlightGroup(group.name);
+          broadcastGroupSelection(group.name); // broadcast the group selection
         }
       });
 
@@ -130,8 +132,10 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 
   uiPanel.userData.refreshUsers = (selfId) => {
     while (userListGroup.children.length > 0) userListGroup.remove(userListGroup.children[0]);
+
     Object.entries(knownUsers).forEach(([id, name], index) => {
       const label = id === selfId ? `${name} (you)` : name;
+
       const capsule = createCapsuleLabel(label, {
         fontSize: 0.038,
         color: 0x333333,
@@ -139,10 +143,14 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
         padding: 0.025,
         onClick: () => console.log(`Clicked ${label}`)
       });
-      capsule.position.set(0, -index * ROW_SPACING * 0.7, 0);
+
+
+      const yPos = 0.1 - index * ROW_SPACING * 0.85;
+      capsule.position.set(0, yPos, 0);
       userListGroup.add(capsule);
     });
   };
+
 
   uiPanel.userData.boundingBox = new THREE.Box3().setFromObject(uiPanel);
   return uiPanel;

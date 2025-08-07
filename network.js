@@ -5,10 +5,13 @@ import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVAT
 import { schoolPeriods } from './periodDefs';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
-// import { uiPanel } from './main.js';
+import { highlightGroup } from './main.js';
+
 
 const ROTATION_COMPRESSION_FACTOR = 1000;
 export const knownUsers = {}; // { socketId: name }
+export let myAvatar = null;
+
 
 let _uiPanel = null;
 export function setUIPanel(panel) {
@@ -54,7 +57,7 @@ socket.on('connect', () => {
   socket.emit('user-join', { id: socket.id, name: myUsername });
 });
 
-socket.on('user-update', ({ id, head, left, right, headRot, leftRot, rightRot }) => {
+socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
     const username = knownUsers[id] || id;
     console.log(`[RECEIVE] user-update from ${username}`, head);
   
@@ -62,7 +65,7 @@ socket.on('user-update', ({ id, head, left, right, headRot, leftRot, rightRot })
   if (id === socket.id) return;
 
   if (!userAvatars[id]) {
-    const avatar = createAvatar(null, knownUsers[id] || '');
+    const avatar = await createAvatar(null, knownUsers[id] || '');
     userAvatars[id] = {
       ...avatar,
       name: knownUsers[id],
@@ -79,6 +82,7 @@ socket.on('user-update', ({ id, head, left, right, headRot, leftRot, rightRot })
     };
     scene.add(avatar.head, avatar.left, avatar.right);
   }
+
 
   const avatar = userAvatars[id];
   avatar.targetPosition.head.fromArray(head);
@@ -120,12 +124,12 @@ export function broadcastAvatar(camera, controller1, controller2) {
     Math.round(q.w * ROTATION_COMPRESSION_FACTOR)
   ];
 
-  // ✅ Correct order: declare first
+
   const headPos = new THREE.Vector3();
   const leftPos = new THREE.Vector3();
   const rightPos = new THREE.Vector3();
 
-  // ✅ Then populate
+  // Then populate
   camera.getWorldPosition(headPos);
   controller1.getWorldPosition(leftPos);
   controller2.getWorldPosition(rightPos);
@@ -219,6 +223,16 @@ socket.on('user-list', (userArray) => {
   }
 
 
+});
+
+export function broadcastGroupSelection(groupName) {
+  console.log("Broadcasting group selection:", groupName);
+  socket.emit('group-select', { groupName });
+}
+
+socket.on('group-select', ({ groupName }) => {
+  console.log("Received group selection:", groupName);
+  highlightGroup(groupName); // Apply group highlight locally
 });
 
 

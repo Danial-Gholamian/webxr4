@@ -24,7 +24,7 @@ import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel } from './network.js';
-import { updateRemoteAvatar } from './avatars.js';
+
 
 // ========================
 //  Static Panel variables
@@ -147,15 +147,35 @@ const pathFinder = new PathFinder(Graph, adjacency, directLinksMap, colorScale);
 // UI Setup (VR Button + Panel)
 // ========================
 const vrButton = VRButton.createButton(renderer);
-vrButton.id = 'VRButton';
-vrButton.textContent = 'Enter VR';
+
+// Force remove default VRButton classes and styles
+vrButton.removeAttribute('style');
+vrButton.className = ''; // Remove any built-in styles
+
+// Then apply your clean style
 Object.assign(vrButton.style, {
-  position: 'absolute', top: '20px', right: '20px',
-  padding: '10px 16px', background: 'rgba(0,0,0,0.6)',
-  color: 'white', border: '1px solid white',
-  zIndex: '999', cursor: 'pointer', fontFamily: 'sans-serif', fontSize: '14px'
+  position: 'absolute',
+  top: '10px',
+  right: '10px',
+  padding: '8px 12px',
+  background: 'rgba(0, 0, 0, 0.6)',
+  color: 'white',
+  border: '1px solid white',
+  borderRadius: '4px',
+  fontSize: '14px',
+  fontFamily: 'sans-serif',
+  zIndex: '10',
+  cursor: 'pointer',
+  width: 'auto',
+  height: 'auto',
+  lineHeight: 'normal',
+  boxSizing: 'border-box',
+  display: 'inline-block'
 });
+vrButton.textContent = 'Enter VR';
+
 document.body.appendChild(vrButton);
+
 
 const groups = [...new Set(graphData.nodes.map(n => n.group))].map(group => ({
   name: String(group),
@@ -528,6 +548,9 @@ export const AVATAR_UPDATE_INTERVAL = 16;
 renderer.setAnimationLoop((timestamp, xrFrame) => {
   scene.updateMatrixWorld(true);
 
+
+
+  
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
   avatarInterpolation.update(userAvatars, deltaTime);
@@ -564,9 +587,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     graphUpdateNodeId = null;
   }
 
-  //Panel
-  // const uiPanel = scene.getObjectByName('FilterUIPanel') || 
-  //                 cameraGroup.getObjectByName('FilterUIPanel');
+
   
   panelState = updatePanelPosition({
   uiPanel,
