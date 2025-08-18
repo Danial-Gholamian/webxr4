@@ -136,7 +136,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
 
     const uiPanel = scene.getObjectByName('FilterUIPanel') || cameraGroup.getObjectByName('FilterUIPanel');
 
-    if (uiPanel && uiPanel.userData.panelState === 'hidden') {
+    if (uiPanel && uiPanel.userData.panelState === 'shown') {
       const interactiveObjects = [];
       uiPanel.traverse(obj => {
         if (obj.isMesh && obj.userData?.interactive) {

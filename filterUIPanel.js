@@ -157,6 +157,10 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 }
 
 
+// filterUIPanel.js
+
+// ... (keep all the code above this function the same)
+
 export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, controller, scene, inVR }) {
   if (!uiPanel) return;
   
@@ -180,7 +184,10 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
 
   uiPanel.userData.panelState = panelState;
 
-  if (panelState === 'hidden') {
+  if (panelState === 'shown') {
+
+    uiPanel.visible = true;
+
     if (bgPlane) {
       bgPlane.visible = true;
       bgPlane.material.opacity = 0.3;     // nearly invisible but still raycastable
@@ -196,7 +203,10 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
     if (inVR) uiPanel.userData.update?.(panelState);
   }
 
-  else if (panelState === 'showing') {
+  else if (panelState === 'hiding') {
+    // ✨ CHANGE: Ensure panel is visible during the hiding animation
+    uiPanel.visible = true; 
+
     if (bgPlane) {
       bgPlane.material.opacity = 0.6;
       bgPlane.userData.isUIPanel = true;
@@ -210,30 +220,30 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
     const targetPos = moveToController();
     uiPanel.position.lerp(targetPos, PANEL_LERP_FACTOR);
     if (uiPanel.position.distanceTo(targetPos) < 0.01) {
-      panelState = 'shown';
+      panelState = 'hidden';
     }
 
-    uiPanel.userData.update?.(); // <-- fix here
+    uiPanel.userData.update?.();
   }
 
-  else if (panelState === 'shown') {
-    if (bgPlane) {
-      bgPlane.material.opacity = 0.6;
-      bgPlane.userData.isUIPanel = true;
-    }
+  else if (panelState === 'hidden') {
 
-    uiPanel.position.copy(moveToController());
-    uiPanel.userData.update?.(); // <-- fix here
+    uiPanel.visible = false;
+    
+    console.warn("HIDDEN - Panel is now invisible");
   }
+  
+  else if (panelState === 'showing') {
 
+    uiPanel.visible = true;
 
-  else if (panelState === 'hiding') {
     if (bgPlane) {
       bgPlane.visible = false;                     
       bgPlane.userData.isUIPanel = false;
     }
 
     if (uiPanel.parent !== cameraGroup) {
+
       scene.remove(uiPanel);
       cameraGroup.add(uiPanel);
     }
@@ -241,7 +251,7 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
     const targetPos = moveToCamera();
     uiPanel.position.lerp(targetPos, PANEL_LERP_FACTOR);
     if (uiPanel.position.distanceTo(targetPos) < 0.01) {
-      panelState = 'hidden';
+      panelState = 'shown';
     }
 
     if (inVR) uiPanel.userData.update?.(panelState);
@@ -249,6 +259,7 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
 
   return panelState;
 }
+
 
 
 console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeString()}`);
@@ -317,7 +328,7 @@ export function createCapsuleLabel(text, {
 
     const hitbox = new THREE.Mesh(
       new THREE.PlaneGeometry(width, height),
-      // ✅ Fix: visible: false makes it invisible to the camera, but not the raycaster
+      // Fix: visible: false makes it invisible to the camera, but not the raycaster
       new THREE.MeshBasicMaterial({ visible: false }) 
     );
     hitbox.position.z = 0.02;

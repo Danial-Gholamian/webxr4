@@ -30,7 +30,7 @@ import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset,
 //  Static Panel variables
 // ========================
 
-let panelState = 'showing'; // 'hidden', 'showing', 'shown', 'hiding'
+let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
 const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
 
 let activePeriod = null;
@@ -521,10 +521,10 @@ setInterval(() => {
 
 function togglePanel() {
   console.log("console.log from togglePanel");
-  if (panelState === 'hidden' || panelState === 'hiding') {
-    panelState = 'showing';
-  } else if (panelState === 'shown' || panelState === 'showing') {
+  if (panelState === 'shown' || panelState === 'showing') {
     panelState = 'hiding';
+  } else if (panelState === 'hidden' || panelState === 'hiding') {
+    panelState = 'showing';
   }
 }
 
