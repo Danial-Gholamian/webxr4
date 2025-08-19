@@ -230,9 +230,9 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
 
     uiPanel.visible = false;
     
-    console.warn("HIDDEN - Panel is now invisible");
+    // console.warn("HIDDEN - Panel is now invisible");
   }
-  
+
   else if (panelState === 'showing') {
 
     uiPanel.visible = true;
