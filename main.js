@@ -24,8 +24,8 @@ import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel } from './network.js';
-
-
+import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
+import {schoolPeriods} from './periodDefs.js';
 // ========================
 //  Static Panel variables
 // ========================
@@ -34,6 +34,7 @@ let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
 const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
 
 let activePeriod = null;
+let currentPeriodIndex = 0;
 
 let selectionState = {
   isActive: false,
@@ -51,18 +52,37 @@ const groupFilterState = {
 
 
 
-//
+// now
 // ========================
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
-// scene.background = new THREE.Color(0x87ceeb);
+scene.background = new THREE.Color(0x7a7b7c);
+// Surrounding grid box
+const size = 600; // adjust to fit your graph
+const divisions = 20; // number of grid lines
+
+const boxGeo = new THREE.BoxGeometry(size, size, size, divisions, divisions, divisions);
+const boxMat = new THREE.MeshBasicMaterial({
+  color: 0xff0000, // red
+  wireframe: true,
+  transparent: true,
+  opacity: 0.2 // make it subtle, not overwhelming
+});
+const gridBox = new THREE.Mesh(boxGeo, boxMat);
+scene.add(gridBox);
+
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
 setScene(scene);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: false,                 // was true
+  powerPreference: 'high-performance',
+  precision: 'mediump'
+  });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.xr.enabled = true;
 const BROADCAST_INTERVAL = 100;
 // Add at the top with other variables
@@ -83,6 +103,7 @@ const controller2 = renderer.xr.getController(1);
 
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
+
 
 
 
@@ -121,23 +142,122 @@ const colorScale = scaleOrdinal(schemeCategory10)
 
 const Graph = ForceGraph3D()(document.body)
   .graphData(graphData)
+  .linkVisibility(false)   // disable built-in lines
   .nodeAutoColorBy('group')
   .nodeColor(d => colorScale(d.group))
   .nodeLabel(node => node.label || node.id)
   .onNodeClick((node, event) => {
-    if (inVR || event?.shiftKey) {
-      highlightSubgraph(node.id, 'DIRECT');
-      console.log("I was highlighted in if")
-      broadcastNodeSelection(node.id, 'DIRECT');
-
-    } else {
-      highlightSubgraph(node.id, 'DIRECT');
-      broadcastNodeSelection(node.id, 'DIRECT');
-      console.log("I was highlighted in else")
-
-
-    }
+    highlightSubgraph(node.id, 'DIRECT');
+    broadcastNodeSelection(node.id, 'DIRECT');
   });
+
+
+// Edge index map: edgeKey -> { start: idx0, end: idx1 }
+const edgeVertexMap = new Map();
+// Instead of creating thousands of individual line meshes (one per edge),
+// we build a single line made of many vertices. Each pair of vertices
+// represents one edge, and we store an "alpha" value per vertex. That way
+// we can fade out some edges by lowering their alpha while keeping others
+// fully visible, all in one draw call.
+
+function buildBatchedEdges(graphData, nodesById) {
+  const positions = [];
+  const colors = [];
+  const color = new THREE.Color();
+
+  let vIndex = 0;
+  const alphas = [];
+
+  graphData.links.forEach(link => {
+    const src = nodesById[link.source.id ?? link.source];
+    const tgt = nodesById[link.target.id ?? link.target];
+    if (!src || !tgt) return;
+
+    alphas.push(0.2);
+    alphas.push(0.2);
+    // positions
+    positions.push(src.x, src.y, src.z);
+    positions.push(tgt.x, tgt.y, tgt.z);
+
+    // default colors
+    color.setRGB(1, 1, 1);
+    colors.push(color.r, color.g, color.b);
+    colors.push(color.r, color.g, color.b);
+
+    // record indices (two vertices per link)
+    const key = getEdgeKey(link.source.id ?? link.source, link.target.id ?? link.target);
+    edgeVertexMap.set(key, { start: vIndex, end: vIndex + 1 });
+    vIndex += 2;
+  });
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('alpha', new THREE.Float32BufferAttribute(alphas, 1));
+
+  // ============================================================
+  // Custom ShaderMaterial for batched edges
+  //
+  // We use a custom shader so each edge can have its own opacity.
+  // - Each vertex stores an `alpha` attribute (0.0 → invisible, 1.0 → fully visible).
+  // - Vertex shader: passes per-vertex color and alpha down to the fragment shader.
+  // - Fragment shader: blends edges using the alpha value. If alpha <= 0.0, we
+  //   call `discard` so the fragment is not drawn at all (prevents black lines).
+  //
+  // This is GLSL (OpenGL Shading Language), which looks like C but runs on the GPU.
+  // ============================================================
+
+  const material = new THREE.ShaderMaterial({
+    transparent: true,
+    vertexColors: true,
+    depthWrite: false,            // <--- important so transparent lines don’t occlude
+    blending: THREE.NormalBlending, // <--- standard alpha blending
+    uniforms: {},
+    vertexShader: `
+      attribute float alpha;
+      varying vec3 vColor;
+      varying float vAlpha;
+      void main() {
+        vColor = color;
+        vAlpha = alpha;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vColor;
+      varying float vAlpha;
+      void main() {
+        if (vAlpha <= 0.0) discard;   // <--- don't draw invisible edges at all
+        gl_FragColor = vec4(vColor, vAlpha);
+      }
+    `
+  });
+
+
+
+  return new THREE.LineSegments(geometry, material);
+}
+
+const nodesById = {};
+Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
+
+// Build line batch
+const lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
+scene.add(lineSegments);
+
+Graph.onEngineTick(() => {
+  const pos = lineSegments.geometry.attributes.position.array;
+  let i = 0;
+  Graph.graphData().links.forEach(link => {
+    const src = nodesById[link.source.id ?? link.source];
+    const tgt = nodesById[link.target.id ?? link.target];
+
+    pos[i++] = src.x; pos[i++] = src.y; pos[i++] = src.z;
+    pos[i++] = tgt.x; pos[i++] = tgt.y; pos[i++] = tgt.z;
+  });
+  lineSegments.geometry.attributes.position.needsUpdate = true;
+});
+
 
 const GraphRef = { current: Graph };
 scene.add(Graph.scene());
@@ -185,7 +305,8 @@ export const uiPanel = createFilterPanel({ groupColors: groups, camera });
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
-
+export const timeGauge = createBarGauge(new THREE.Vector3(0, 2.8, -1.2));
+cameraGroup.add(timeGauge);
 // ========================
 // Graph Interaction + Reset
 // ========================
@@ -285,101 +406,76 @@ export function resetGraph() {
   selectionState.selectedNodeId = null;
   selectionState.neighborIds = new Set();
 
-  clearGroupFilter() // this is for clearing group selection.
+  clearGroupFilter();
   updatePeroidLabel('Default');
   uiPanel.userData.updateSelectedNodeLabel?.(null);
 
-  Graph.scene().traverse(obj => {
-    // Reset nodes
-    if (obj.__data?.id !== undefined) {
-      const userData = obj.userData;
+  // reset nodes as before (Graph.scene().traverse)
 
-      if (userData.originalMaterial) {
-        obj.material = userData.originalMaterial;
-        obj.material.opacity = 1.0;
-        obj.material.transparent = false;
-        obj.material.needsUpdate = true;
-      }
+  // reset edges (all white again)
 
-      delete userData.originalMaterial;
-      delete userData.periodMaterial;
-      delete userData.selectionMaterial;
-    }
+  const alphas = lineSegments.geometry.attributes.alpha.array;
+  for (let i = 0; i < alphas.length; i++) alphas[i] = 0.2;
+  lineSegments.geometry.attributes.alpha.needsUpdate = true;
 
-    // Reset edges
-    if (obj.__data?.source && obj.__data?.target) {
-      obj.visible = true;
-      obj.material.color.setRGB(1, 1, 1);
-      obj.material.opacity = 1.0;
-      obj.material.transparent = false;
-      obj.material.emissive?.setRGB(0, 0, 0);
-      obj.material.needsUpdate = true;
-    }
-  });
 
   Graph.graphData(Graph.graphData());
   Graph.d3ReheatSimulation();
+  updateBarGauge(timeGauge, 0, "Default");
 }
+
 
 
 
 function updateAllVisuals() {
   const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
 
+  // ---------- Nodes ----------
   Graph.scene().traverse(obj => {
-    // ========== NODES ==========
     if (obj.__data?.id !== undefined) {
       const nodeId = String(obj.__data.id);
-
       const inPeriod = !periodNodes || periodNodes.has(nodeId);
       const inGroup = !groupFilterState.isActive || groupFilterState.nodeIds.has(nodeId);
 
-      // Start with the broader filters (period and group)
       let shouldShow = inPeriod && inGroup;
 
-      // CORRECTED PART 1: Apply selection filter if it's active, regardless of the group filter.
       if (selectionState.isActive) {
         const isSelected = selectionState.selectedNodeId === nodeId;
         const isNeighbor = selectionState.neighborIds.has(nodeId);
-        // A node must pass the broad filters AND the selection filter.
         shouldShow = shouldShow && (isSelected || isNeighbor);
       }
 
       applyOpacityLayer(obj, "combined", shouldShow);
     }
-
-    // ========== EDGES ==========
-    if (obj.__data?.source && obj.__data?.target) {
-      const s = String(obj.__data.source?.id ?? obj.__data.source);
-      const t = String(obj.__data.target?.id ?? obj.__data.target);
-      const edgeKey = getEdgeKey(s, t);
-
-      const edgeInPeriod = !activePeriod || obj.__data.periods?.includes(activePeriod);
-      const edgeInGroup = !groupFilterState.isActive || groupFilterState.edgeIds.has(edgeKey);
-
-      // Start with broader filters
-      let isVisible = edgeInPeriod && edgeInGroup;
-
-      // CORRECTED PART 2: Apply selection logic for edges if selection is active.
-      if (selectionState.isActive) {
-        isVisible = isVisible &&
-          (s === selectionState.selectedNodeId || t === selectionState.selectedNodeId);
-      }
-
-      obj.visible = isVisible;
-
-      // This part for emissive color can remain the same
-      if (isVisible) {
-        obj.material.color.setRGB(1, 1, 1);
-        obj.material.opacity = 1.0;
-        obj.material.transparent = true;
-        obj.material.emissive?.setRGB(0.5, 0.5, 0.5);
-        obj.material.needsUpdate = true;
-      } else {
-        obj.material.emissive?.setRGB(0, 0, 0);
-      }
-    }
   });
+
+  // ---------- Edges (batched) ----------
+
+  const alphas = lineSegments.geometry.attributes.alpha.array;
+
+  Graph.graphData().links.forEach(link => {
+    const src = String(link.source.id ?? link.source);
+    const tgt = String(link.target.id ?? link.target);
+    const edgeKey = getEdgeKey(src, tgt);
+    const entry = edgeVertexMap.get(edgeKey);
+    if (!entry) return;
+
+    const edgeInPeriod = !activePeriod || link.periods?.includes(activePeriod);
+    const edgeInGroup = !groupFilterState.isActive || groupFilterState.edgeIds.has(edgeKey);
+
+    let isVisible = edgeInPeriod && edgeInGroup;
+    if (selectionState.isActive) {
+      isVisible = isVisible &&
+        (src === selectionState.selectedNodeId || tgt === selectionState.selectedNodeId);
+    }
+
+    const a = isVisible ? 1.0 : 0.0; // fully visible or fully invisible
+    alphas[entry.start] = a;
+    alphas[entry.end] = a;
+  });
+
+  lineSegments.geometry.attributes.alpha.needsUpdate = true;
+
 
   Graph.d3ReheatSimulation();
   markHoverCacheDirty?.();
@@ -394,10 +490,6 @@ export function clearGroupFilter() {
   groupFilterState.edgeIds.clear();
   updateAllVisuals();
 }
-
-
-
-
 
 
 // ========================
@@ -444,6 +536,12 @@ export function highlightPeriod(period) {
   selectionState.isActive = false; // clear selection on period change
   updatePeroidLabel(period);
   updateAllVisuals();
+
+  currentPeriodIndex = schoolPeriods.indexOf(period);
+
+  const value = currentPeriodIndex / (schoolPeriods.length - 1);
+
+  updateBarGauge(timeGauge, value, period);
 }
 
 
@@ -453,6 +551,7 @@ export function highlightPeriod(period) {
 let inVR = false;
 
 renderer.xr.addEventListener('sessionstart', () => {
+  Graph.enablePointerInteraction(false);
   inVR = true;
 
   cameraGroup.position.set(0, 1.6, 230);  // Initial spawn position
@@ -471,45 +570,12 @@ renderer.xr.addEventListener('sessionstart', () => {
 });
 
 renderer.xr.addEventListener('sessionend', () => {
-  stopAutoHighlightCycle(); // Test
+  stopAutoHighlightCycle?.(); // Test
   inVR = false;
+  Graph.enablePointerInteraction(true);
 });
 
-// ========================
-// Period Cycling
-// ========================
-const schoolPeriods = [
-  "arrival",
-  "class1",
-  "break1",
-  "class2",
-  "lunch",
-  "class3",
-  "break2",
-  "afterclass"
-];
 
-let currentPeriodIndex = 0;
-let cycleInterval = null;
-
-export function startPeriodPreviewCycle() {
-  if (cycleInterval) clearInterval(cycleInterval);
-
-  cycleInterval = setInterval(() => {
-    const period = schoolPeriods[currentPeriodIndex];
-    highlightPeriod(period);
-    console.log(`Highlighting period: ${period}`);
-
-    currentPeriodIndex = (currentPeriodIndex + 1) % schoolPeriods.length;
-  }, 5000); // Every 5 seconds
-}
-
-export function stopPeriodPreviewCycle() {
-  if (cycleInterval) {
-    clearInterval(cycleInterval);
-    cycleInterval = null;
-  }
-}
 
 setInterval(() => {
   if (inVR) {
@@ -544,16 +610,25 @@ precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;
 // startPeriodPreviewCycle();
 
-
+let fpsAccum = 0;
+let frameCount = 0;
 renderer.setAnimationLoop((timestamp, xrFrame) => {
   scene.updateMatrixWorld(true);
-
 
 
   
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
   avatarInterpolation.update(userAvatars, deltaTime);
+
+  const fps = 1 / Math.max(deltaTime, 1e-6);
+  fpsAccum += fps; 
+  frameCount++; 
+  if (frameCount % 60 === 0) { // log once every ~60 frames 
+    console.log("FPS:", Math.round(fpsAccum / frameCount)); 
+    frameCount = 0;
+    fpsAccum = 0; 
+  }
   // Make avatar name labels always face the camera
   Object.values(userAvatars).forEach(({ head, nameLabel }) => {
     if (nameLabel) {

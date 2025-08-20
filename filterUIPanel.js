@@ -190,8 +190,8 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
 
     if (bgPlane) {
       bgPlane.visible = true;
-      bgPlane.material.opacity = 0.3;     // nearly invisible but still raycastable
-      bgPlane.userData.isUIPanel = true;   // logic-level: not interactive
+      bgPlane.material.opacity = 0.3;
+      bgPlane.userData.isUIPanel = true;
     }
 
     if (uiPanel.parent !== cameraGroup) {
