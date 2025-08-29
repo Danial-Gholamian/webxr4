@@ -18,7 +18,10 @@ import {
   setupVRNodeSelection,
   handleXButtonInput,
   setupGraphSwitchButtons,
-  handleAButtonInput
+  handleAButtonInput,
+  handleBButtonInput,
+  handleLeftStickButton,
+  handleRightStickButton
 } from './vrSetup.js';
 import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
@@ -26,6 +29,7 @@ import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
 import {schoolPeriods} from './periodDefs.js';
+import { createPeriodStack } from './periodStack.js';
 // ========================
 //  Static Panel variables
 // ========================
@@ -50,6 +54,14 @@ const groupFilterState = {
   edgeIds: new Set()
 };
 
+const minScale = 0.01;
+const maxScale = 1.0;
+let targetScale = 0.5;      // starting size
+const scaleLerpSpeed = 0.05; // how smooth it feels
+
+let graphUpdateNeeded = false;
+let graphUpdateMode = null;
+let graphUpdateNodeId = null;
 
 
 // now
@@ -59,19 +71,18 @@ const groupFilterState = {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7a7b7c);
 // Surrounding grid box
-const size = 600; // adjust to fit your graph
-const divisions = 20; // number of grid lines
+// const size = 1000; // adjust to fit your graph
+// const divisions = 20; // number of grid lines
 
-const boxGeo = new THREE.BoxGeometry(size, size, size, divisions, divisions, divisions);
-const boxMat = new THREE.MeshBasicMaterial({
-  color: 0xff0000, // red
-  wireframe: true,
-  transparent: true,
-  opacity: 0.2 // make it subtle, not overwhelming
-});
-const gridBox = new THREE.Mesh(boxGeo, boxMat);
-scene.add(gridBox);
-
+// const boxGeo = new THREE.BoxGeometry(size, size, size, divisions, divisions, divisions);
+// const boxMat = new THREE.MeshBasicMaterial({
+//   color: 0xff0000, // red
+//   wireframe: true,
+//   transparent: true,
+//   opacity: 0.2 // make it subtle, not overwhelming
+// });
+// const gridBox = new THREE.Mesh(boxGeo, boxMat);
+// scene.add(gridBox);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
@@ -150,6 +161,22 @@ const Graph = ForceGraph3D()(document.body)
     highlightSubgraph(node.id, 'DIRECT');
     broadcastNodeSelection(node.id, 'DIRECT');
   });
+
+  // --- make edges "longer" by increasing spring length ---
+const linkForce = Graph.d3Force('link');
+if (linkForce?.distance) {
+
+  linkForce.distance(220);
+
+
+  if (Graph.numDimensions) Graph.numDimensions(3);
+  else if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
+}
+
+const charge = Graph.d3Force('charge');
+if (charge?.strength) charge.strength(-150); // more negative = more repulsion
+
+
 
 
 // Edge index map: edgeKey -> { start: idx0, end: idx1 }
@@ -243,7 +270,7 @@ Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
 
 // Build line batch
 const lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
-scene.add(lineSegments);
+// scene.add(lineSegments);
 
 Graph.onEngineTick(() => {
   const pos = lineSegments.geometry.attributes.position.array;
@@ -260,8 +287,58 @@ Graph.onEngineTick(() => {
 
 
 const GraphRef = { current: Graph };
-scene.add(Graph.scene());
-const pathFinder = new PathFinder(Graph, adjacency, directLinksMap, colorScale);
+const graphRoot = Graph.scene();
+// console.log("graphRoot: ",typeof(graphRoot));
+// console.log("graph: ",typeof(Graph));
+
+scene.add(graphRoot);
+
+// shrink the graph by 50%
+graphRoot.scale.set(0.99, 0.99, 0.99);
+// const pathFinder = new PathFinder(Graph, adjacency, directLinksMap, colorScale);
+graphRoot.add(lineSegments);
+
+
+// --- Period stack (lazy) ---
+let periodStack = null;
+
+function buildPeriodStackOnce() {
+  if (periodStack) return; // already built
+  periodStack = createPeriodStack({
+    Graph,
+    graphData,
+    periods: schoolPeriods,
+    colorScale,
+    spacing: 90,
+    nodeSize: 2.8
+  });
+  scene.add(periodStack.group);
+}
+
+
+Graph.onEngineStop(() => {
+  // optional: build once the force layout stabilizes
+  // buildPeriodStackOnce();
+});
+
+
+// function updateGraphScaling(xrFrame) {
+//   // Shrink (left stick button)
+//   handleLeftStickButton(xrFrame, () => {
+//     targetScale = Math.max(minScale, targetScale - 0.01);
+//   });
+
+//   // Grow (right stick button)
+//   handleRightStickButton(xrFrame, () => {
+//     targetScale = Math.min(maxScale, targetScale + 0.01);
+//   });
+
+//   // Smoothly interpolate current scale → target scale
+//   const current = graphRoot.scale.x;
+//   const newScale = THREE.MathUtils.lerp(current, targetScale, scaleSpeed);
+
+//   graphRoot.scale.set(newScale, newScale, newScale);
+// }
 
 // ========================
 // UI Setup (VR Button + Panel)
@@ -305,7 +382,7 @@ export const uiPanel = createFilterPanel({ groupColors: groups, camera });
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
-export const timeGauge = createBarGauge(new THREE.Vector3(0, 2.8, -1.2));
+export const timeGauge = createBarGauge(new THREE.Vector3(0, 1.4, -1.2));
 cameraGroup.add(timeGauge);
 // ========================
 // Graph Interaction + Reset
@@ -581,6 +658,7 @@ setInterval(() => {
   if (inVR) {
     
     broadcastAvatar(camera, controller1, controller2);
+    
     // console.log('Hellow');
   }
 }, 100);
@@ -598,9 +676,7 @@ function togglePanel() {
 // ========================
 // Animation Loop
 // ========================
-let graphUpdateNeeded = false;
-let graphUpdateMode = null;
-let graphUpdateNodeId = null;
+
 
 
 
@@ -614,12 +690,20 @@ let fpsAccum = 0;
 let frameCount = 0;
 renderer.setAnimationLoop((timestamp, xrFrame) => {
   scene.updateMatrixWorld(true);
+  if (periodStack?.group?.visible) {
+    periodStack.syncFromGraph?.(Graph);
+  }
 
 
-  
+
+  // if (timestamp > 10000) graphRoot.scale.set(0.1, 0.1, 0.1);
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
+  if (periodStack) periodStack.update(deltaTime);
+
   avatarInterpolation.update(userAvatars, deltaTime);
+    
+
 
   const fps = 1 / Math.max(deltaTime, 1e-6);
   fpsAccum += fps; 
@@ -704,7 +788,19 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
+    // --- Graph scaling with stick buttons ---
+    handleLeftStickButton(xrFrame, () => {
+      targetScale = Math.max(minScale, targetScale - 0.01);
+    });
 
+    handleRightStickButton(xrFrame, () => {
+      targetScale = Math.min(maxScale, targetScale + 0.01);
+    });
+
+    // Smoothly interpolate scale
+    const currentScale = graphRoot.scale.x;
+    const newScale = THREE.MathUtils.lerp(currentScale, targetScale, scaleLerpSpeed);
+    graphRoot.scale.set(newScale, newScale, newScale);
 
     handleXButtonInput(xrFrame, () => {
       resetBtn.click();
@@ -732,6 +828,13 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       });
     });
 
+    handleBButtonInput(xrFrame, () => {
+      buildPeriodStackOnce();     // ensure it exists
+      periodStack.toggle();       // then show/hide
+    });
+
+
+
 
     detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
     detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
@@ -742,3 +845,5 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   renderer.render(scene, camera);
 });
+
+// Today

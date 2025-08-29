@@ -13,6 +13,9 @@ const laserDistance = 2000;
 const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
 const yButtonIndex = 5; // xr-standard index for y (left) / b (right)
 const aButtonIndex = 4; // index 4 is A (right controller)
+const bBuutonIndex = 5;
+const leftStickButtonIndex = 3;   // L3
+const rightStickButtonIndex = 3;  // R3
 
 let currentPeriodIndex = 0;
 // --- 1. Controller Setup (with laser + teleport) ---
@@ -304,6 +307,7 @@ function updateLaserPointer(controller) {
   }
 }
 
+// Managing AButtonInput
 export function handleAButtonInput(xrFrame, onAPress) {
   if (!xrFrame || typeof onAPress !== 'function') return;
 
@@ -325,6 +329,57 @@ export function handleAButtonInput(xrFrame, onAPress) {
   handleAButtonInput._wasPressed = isPressed;
 }
 handleAButtonInput._wasPressed = false;
+
+// Managing BButtonInput
+export function handleBButtonInput(xrFrame, onBPress) {
+  if (!xrFrame || typeof onBPress !== 'function') return;
+
+  let isPressed = false;
+  for (const source of xrFrame.session.inputSources) {
+    if (source.handedness === 'right' && source.gamepad) {
+      const btns = source.gamepad.buttons;
+      if (btns.length > bBuutonIndex && btns[bBuutonIndex].pressed) {
+        isPressed = true;
+        break;
+      }
+    }
+  }
+
+  if (isPressed && !handleBButtonInput._wasPressed) {
+    onBPress();
+  }
+  handleBButtonInput._wasPressed = isPressed;
+}
+handleBButtonInput._wasPressed = false;
+
+// Generic stick-button handler
+function handleStickButton(xrFrame, handedness, buttonIndex, onHeld) {
+  if (!xrFrame || typeof onHeld !== "function") return;
+
+  for (const source of xrFrame.session.inputSources) {
+    if (source.handedness === handedness && source.gamepad) {
+      const btns = source.gamepad.buttons;
+      if (btns.length > buttonIndex && btns[buttonIndex].pressed) {
+        onHeld();
+        return;
+      }
+    }
+  }
+}
+
+export function handleLeftStickButton(xrFrame, onHeld) {
+  handleStickButton(xrFrame, "left", leftStickButtonIndex, () => {
+    console.log("Left stick pressed");
+    onHeld();
+  });
+}
+
+export function handleRightStickButton(xrFrame, onHeld) {
+  handleStickButton(xrFrame, "right", rightStickButtonIndex, () => {
+    console.log("Right stick pressed");
+    onHeld();
+  });
+}
 
 
 // --- Exports ---
