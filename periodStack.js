@@ -1,6 +1,11 @@
 // periodStack.js
 import * as THREE from 'three';
 import { forceSimulation, forceManyBody, forceLink, forceCenter } from 'd3-force';
+import { Text } from 'troika-three-text';
+
+
+
+
 
 
 function layout2D(nodes, links) {
@@ -22,8 +27,10 @@ export function createPeriodStack({
   periods,
   colorScale,
   spacing = 80,
-  nodeSize = 2.5
-}) {
+  nodeSize = 2.5,
+  selectionState = null,
+  groupFilterState = null
+  }) {
   if (!Graph) throw new Error('createPeriodStack: Graph is required');
 
   const root = new THREE.Group();
@@ -51,33 +58,64 @@ export function createPeriodStack({
   const targetsZ = [];
   const startZ = -((periods.length - 1) * spacing) / 2;
 
-  periods.forEach((period, idx) => {
-    const { nodes, links } = dataForPeriod(period);
-    if (!nodes.length && !links.length) return;
+periods.forEach((period, idx) => {
+  const { nodes, links } = dataForPeriod(period);
+  if (!nodes.length && !links.length) return;
 
-    // compute 2D layout
-    layout2D(nodes, links);
+  // --- apply selection/group filters ---
+  let filteredNodes = nodes;
+  let filteredLinks = links;
 
-    const g = new THREE.Group();
-    g.name = `Period_${period}`;
-    g.position.copy(basePos);
-    g.quaternion.copy(baseQuat);
-    g.scale.copy(baseScale).multiplyScalar(0.4); // shrink
-
-    // --- Nodes ---
-    const posArr = new Float32Array(nodes.length * 3);
-    const colArr = new Float32Array(nodes.length * 3);
-    const c = new THREE.Color();
-    nodes.forEach((n, i) => {
-      const i3 = i * 3;
-      posArr[i3]     = n.x;
-      posArr[i3 + 1] = n.y;
-      posArr[i3 + 2] = 0;
-      c.set(colorScale(n.group));
-      colArr[i3]     = c.r;
-      colArr[i3 + 1] = c.g;
-      colArr[i3 + 2] = c.b;
+  // node selection
+  if (selectionState?.isActive && selectionState.selectedNodeId) {
+    const selId = String(selectionState.selectedNodeId);
+    const neighborIds = selectionState.neighborIds || new Set();
+    filteredNodes = nodes.filter(n => n.id === selId || neighborIds.has(String(n.id)));
+    filteredLinks = links.filter(l => {
+      const s = String(l.source?.id ?? l.source);
+      const t = String(l.target?.id ?? l.target);
+      return (s === selId || t === selId);
     });
+  }
+
+  // group selection
+  if (groupFilterState?.isActive && groupFilterState.activeGroup) {
+    const gname = groupFilterState.activeGroup.toLowerCase();
+    filteredNodes = nodes.filter(n => String(n.group).toLowerCase() === gname);
+    filteredLinks = links.filter(l => {
+      const s = String(l.source?.id ?? l.source);
+      const t = String(l.target?.id ?? l.target);
+      return filteredNodes.some(n => String(n.id) === s) &&
+             filteredNodes.some(n => String(n.id) === t);
+    });
+  }
+
+  if (!filteredNodes.length && !filteredLinks.length) return;
+
+  // compute 2D layout
+  layout2D(filteredNodes, filteredLinks);
+
+  const g = new THREE.Group();
+  g.name = `Period_${period}`;
+  g.position.copy(basePos);
+  g.quaternion.copy(baseQuat);
+  g.scale.copy(baseScale).multiplyScalar(0.4); // shrink
+
+  // --- Nodes ---
+  const posArr = new Float32Array(filteredNodes.length * 3);
+  const colArr = new Float32Array(filteredNodes.length * 3);
+  const c = new THREE.Color();
+  filteredNodes.forEach((n, i) => {
+    const i3 = i * 3;
+    posArr[i3]     = n.x;
+    posArr[i3 + 1] = n.y;
+    posArr[i3 + 2] = 0;
+    c.set(colorScale(n.group));
+    colArr[i3]     = c.r;
+    colArr[i3 + 1] = c.g;
+    colArr[i3 + 2] = c.b;
+  });
+
     const nodeGeom = new THREE.BufferGeometry();
     nodeGeom.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
     nodeGeom.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
@@ -94,12 +132,12 @@ export function createPeriodStack({
     g.add(new THREE.Points(nodeGeom, nodeMat));
 
     // --- Edges ---
-    if (links.length) {
-      const epos = new Float32Array(links.length * 2 * 3);
+    if (filteredLinks.length) {
+      const epos = new Float32Array(filteredLinks.length * 2 * 3);
       let k = 0;
-      links.forEach(l => {
-        const a = nodes.find(n => String(n.id) === String(l.source?.id ?? l.source));
-        const b = nodes.find(n => String(n.id) === String(l.target?.id ?? l.target));
+      filteredLinks.forEach(l => {
+        const a = filteredNodes.find(n => String(n.id) === String(l.source?.id ?? l.source));
+        const b = filteredNodes.find(n => String(n.id) === String(l.target?.id ?? l.target));
         if (!a || !b) return;
         epos[k++] = a.x; epos[k++] = a.y; epos[k++] = 0;
         epos[k++] = b.x; epos[k++] = b.y; epos[k++] = 0;
@@ -114,6 +152,18 @@ export function createPeriodStack({
       });
       g.add(new THREE.LineSegments(edgeGeom, edgeMat));
     }
+
+    filteredNodes.forEach(n => {
+    const label = new Text();
+    label.text = String(n.id);
+    label.fontSize = 4;   // adjust relative to your scale
+    label.color = 0xffffff;
+    label.anchorX = 'center';
+    label.anchorY = 'middle';
+    label.position.set(n.x, n.y + 5, 0); // offset above node
+    label.sync(); // troika needs this
+    g.add(label);
+    });
 
     // Label
     const label = makeTextSprite(String(period));

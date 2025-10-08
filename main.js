@@ -26,10 +26,11 @@ import {
 import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel } from './network.js';
+import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
 import {schoolPeriods} from './periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
+import { initVoice } from './voice.js';
 // ========================
 //  Static Panel variables
 // ========================
@@ -46,6 +47,7 @@ let selectionState = {
   neighborIds: new Set()
 };
 
+let periodStackInstance = null;
 
 const groupFilterState = {
   isActive: false,
@@ -70,19 +72,7 @@ let graphUpdateNodeId = null;
 // ========================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7a7b7c);
-// Surrounding grid box
-// const size = 1000; // adjust to fit your graph
-// const divisions = 20; // number of grid lines
 
-// const boxGeo = new THREE.BoxGeometry(size, size, size, divisions, divisions, divisions);
-// const boxMat = new THREE.MeshBasicMaterial({
-//   color: 0xff0000, // red
-//   wireframe: true,
-//   transparent: true,
-//   opacity: 0.2 // make it subtle, not overwhelming
-// });
-// const gridBox = new THREE.Mesh(boxGeo, boxMat);
-// scene.add(gridBox);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
@@ -176,7 +166,7 @@ if (linkForce?.distance) {
 const charge = Graph.d3Force('charge');
 if (charge?.strength) charge.strength(-150); // more negative = more repulsion
 
-
+initVoice();
 
 
 // Edge index map: edgeKey -> { start: idx0, end: idx1 }
@@ -300,20 +290,34 @@ graphRoot.add(lineSegments);
 
 
 // --- Period stack (lazy) ---
-let periodStack = null;
+export let periodStack = null;
 
-function buildPeriodStackOnce() {
-  if (periodStack) return; // already built
+const baseGraphData = structuredClone(graphData);
+
+
+
+function rebuildPeriodStack() {
+  if (periodStack) {
+    scene.remove(periodStack.group);
+    periodStack = null;
+  }
+
+  const freshData = JSON.parse(JSON.stringify(graphData)); // deep clone
   periodStack = createPeriodStack({
     Graph,
-    graphData,
+    graphData: freshData,
     periods: schoolPeriods,
     colorScale,
     spacing: 90,
-    nodeSize: 2.8
+    nodeSize: 2.8,
+    selectionState,
+    groupFilterState
   });
+
   scene.add(periodStack.group);
 }
+
+
 
 
 Graph.onEngineStop(() => {
@@ -672,6 +676,30 @@ function togglePanel() {
   }
 }
 
+export function applyRemotePeriodStackToggle(visible, context = {}) {
+  if (!periodStack) rebuildPeriodStack();
+
+  // Apply context BEFORE showing
+  if (context.groupName) {
+    highlightGroup(context.groupName);
+  }
+  if (context.period) {
+    highlightPeriod(context.period);
+  }
+  if (context.selectedNodeId) {
+    highlightSubgraph(context.selectedNodeId);
+  }
+
+  if (visible) {
+    periodStack.show();
+  } else {
+    periodStack.hide();
+  }
+}
+
+
+
+
 
 // ========================
 // Animation Loop
@@ -829,9 +857,24 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleBButtonInput(xrFrame, () => {
-      buildPeriodStackOnce();     // ensure it exists
-      periodStack.toggle();       // then show/hide
+      const context = {
+        groupName: groupFilterState.activeGroup,
+        period: activePeriod,
+        selectedNodeId: selectionState.selectedNodeId
+      };
+
+      if (!periodStack || periodStack.group.visible === false) {
+        rebuildPeriodStack();
+        periodStack.show();
+        broadcastPeriodStackToggle(true, context);
+      } else {
+        periodStack.hide();
+        broadcastPeriodStackToggle(false, context);
+      }
     });
+
+
+
 
 
 

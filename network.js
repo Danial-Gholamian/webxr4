@@ -5,7 +5,7 @@ import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVAT
 import { schoolPeriods } from './periodDefs';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
-import { highlightGroup } from './main.js';
+import { highlightGroup, applyRemotePeriodStackToggle } from './main.js';
 
 
 const ROTATION_COMPRESSION_FACTOR = 1000;
@@ -230,9 +230,23 @@ export function broadcastGroupSelection(groupName) {
   socket.emit('group-select', { groupName });
 }
 
+
 socket.on('group-select', ({ groupName }) => {
   console.log("Received group selection:", groupName);
   highlightGroup(groupName); // Apply group highlight locally
 });
 
+
+
+
+export function broadcastPeriodStackToggle(visible, context = {}) {
+  console.log("Broadcasting period stack toggle:", visible, context);
+  socket.emit('period-stack-toggle', { visible, context });
+}
+
+
+socket.on('period-stack-toggle', ({ visible, context }) => {
+  console.log("Received period stack toggle:", visible, context);
+  applyRemotePeriodStackToggle(visible, context);
+});
 
