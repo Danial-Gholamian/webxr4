@@ -172,7 +172,7 @@ const invQuat = new THREE.Quaternion();
 
 // Allow Controller to be used for rotating the graph
 function enableGraphRotation(controller) {
-  controller.addEventListener('selectstart', () => {
+  controller.addEventListener('squeezestart', () => {
     // Start rotation only if pointing at the graph root (or always rotate on grab)
     isRotatingGraph = true;
     grabbedController = controller;
@@ -181,7 +181,7 @@ function enableGraphRotation(controller) {
     startGraphQuat.copy(graphRoot.quaternion);
   });
 
-  controller.addEventListener('selectend', () => {
+  controller.addEventListener('squeezeend', () => {
     if (grabbedController === controller) {
       isRotatingGraph = false;
       grabbedController = null;
