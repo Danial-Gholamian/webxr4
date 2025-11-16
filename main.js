@@ -209,6 +209,44 @@ setupController(controller2, 1, renderer, cameraGroup);
 
 
 
+// ========================
+// Graph Rotation State
+// ========================
+let isRotatingGraph = false;
+let grabbedController = null;
+
+const startControllerQuat = new THREE.Quaternion();
+const startGraphQuat = new THREE.Quaternion();
+const tmpQuat = new THREE.Quaternion();
+const invQuat = new THREE.Quaternion();
+
+
+
+// Allow Controller to be used for rotating the graph
+function enableGraphRotation(controller) {
+  controller.addEventListener('squeezestart', () => {
+    // Start rotation only if pointing at the graph root (or always rotate on grab)
+    isRotatingGraph = true;
+    grabbedController = controller;
+
+    startControllerQuat.copy(controller.quaternion);
+    startGraphQuat.copy(graphRoot.quaternion);
+  });
+
+  controller.addEventListener('squeezeend', () => {
+    if (grabbedController === controller) {
+      isRotatingGraph = false;
+      grabbedController = null;
+    }
+  });
+}
+
+enableGraphRotation(controller1)
+enableGraphRotation(controller2)
+
+
+
+
 
 
 
@@ -997,6 +1035,19 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     pollGraphSwitchButtons();
   } else {
     controls.update();
+  }
+
+  // ========================
+  // Graph Rotation Update
+  // ========================
+  if (isRotatingGraph && grabbedController) {
+
+    // qDelta = currentControllerRot * inverse(startControllerRot)
+    invQuat.copy(startControllerQuat).invert();
+    tmpQuat.copy(grabbedController.quaternion).multiply(invQuat);
+
+    // New graph rotation = delta * originalGraphRotation
+    graphRoot.quaternion.copy(tmpQuat).multiply(startGraphQuat);
   }
 
   renderer.render(scene, camera);
