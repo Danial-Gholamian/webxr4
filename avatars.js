@@ -3,58 +3,88 @@ import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-const gltfLoader = new GLTFLoader();
+const loader = new GLTFLoader();
 
-export async function createAvatar(material, name = '') {
-  const head = new THREE.Group(); // Placeholder, we'll add the GLB to this group
-  const left = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
-  const right = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
+// Paths to your models
+const HEADSET_MODEL = '/webxr4/models/meta_quest_3.glb';
+const CONTROLLER_MODEL = '/webxr4/models/vr_controller.glb';
 
-  // Load the Ready Player Me avatar
-  gltfLoader.load(
-    'https://models.readyplayer.me/688b45a04c405a37adca7af9.glb',
-    gltf => {
-      const avatarModel = gltf.scene;
-      avatarModel.scale.set(1.5, 1.5, 1.5);
-      avatarModel.position.set(0, -1.6, 0); // Adjust if needed
-      head.add(avatarModel);
-    },
-    undefined,
-    error => {
-      console.error('Failed to load avatar:', error);
-    }
-  );
+export async function createAvatar(name = '') {
+  // NEW — root group
+  const avatarRoot = new THREE.Group();
+  avatarRoot.scale.set(20, 20, 20);  // scale avatar 2× (change to any size you want)
 
+  const head = new THREE.Group();
+  const left = new THREE.Group();
+  const right = new THREE.Group();
+
+  avatarRoot.add(head);
+  avatarRoot.add(left);
+  avatarRoot.add(right);
+
+  // Headset model
+  loader.load(HEADSET_MODEL, gltf => {
+    const model = gltf.scene;
+    model.scale.set(0.5, 0.5, 0.5);
+    head.add(model);
+  });
+
+  // Controller model
+  loader.load(CONTROLLER_MODEL, gltf => {
+    const ctrl = gltf.scene;
+    ctrl.scale.set(0.4, 0.4, 0.4);
+
+    left.add(ctrl.clone());
+    right.add(ctrl.clone());
+  });
+
+  // Label
   const nameLabel = new Text();
   nameLabel.text = name;
-  nameLabel.fontSize = 0.04;
+  nameLabel.fontSize = 0.06;
   nameLabel.anchorX = 'center';
   nameLabel.anchorY = 'bottom';
-  nameLabel.color = 0xffffaa;
-  nameLabel.position.set(0, 1.6, 0); // was 0.25, now raised above avatar
+  nameLabel.position.set(0, 0.25, 0);
   nameLabel.sync();
   head.add(nameLabel);
 
-  return { head, left, right, nameLabel };
+  return { root: avatarRoot, head, left, right, nameLabel };
 }
 
 
-export function updateLocalAvatar(avatar, camera , controller1, controller2) {
+
+// ==========================
+// Local Avatar Update (camera + controllers)
+// ==========================
+const HEAD_ROTATION_FIX = new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(0, Math.PI, 0)
+);
+
+export function updateLocalAvatar(avatar, camera, controller1, controller2) {
+  // Head
   avatar.head.position.copy(camera.position);
-  avatar.head.quaternion.copy(camera.quaternion);
+  avatar.head.quaternion.copy(camera.quaternion).multiply(HEAD_ROTATION_FIX);
+
+  // Controllers
   avatar.left.position.copy(controller1.position);
   avatar.left.quaternion.copy(controller1.quaternion);
+
   avatar.right.position.copy(controller2.position);
   avatar.right.quaternion.copy(controller2.quaternion);
 }
 
-export function updateRemoteAvatar(avatar, targetPosition, targetQuaternion, factor = 0.2) {
-  avatar.head.position.lerp(targetPosition.head, factor);
-  avatar.head.quaternion.slerp(targetQuaternion.head, factor);
-  avatar.left.position.lerp(targetPosition.left, factor);
-  avatar.left.quaternion.slerp(targetQuaternion.left, factor);
-  avatar.right.position.lerp(targetPosition.right, factor);
-  avatar.right.quaternion.slerp(targetQuaternion.right, factor);
-}
 
-// 'https://models.readyplayer.me/688b45a04c405a37adca7af9.glb',
+
+// ==========================
+// Remote Avatar Interpolation
+// ==========================
+export function updateRemoteAvatar(avatar, targetPos, targetQuat, factor = 0.2) {
+  avatar.head.position.lerp(targetPos.head, factor);
+  avatar.head.quaternion.slerp(targetQuat.head, factor);
+
+  avatar.left.position.lerp(targetPos.left, factor);
+  avatar.left.quaternion.slerp(targetQuat.left, factor);
+
+  avatar.right.position.lerp(targetPos.right, factor);
+  avatar.right.quaternion.slerp(targetQuat.right, factor);
+}

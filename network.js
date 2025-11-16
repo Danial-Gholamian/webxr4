@@ -65,7 +65,7 @@ socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, right
   if (id === socket.id) return;
 
   if (!userAvatars[id]) {
-    const avatar = await createAvatar(null, knownUsers[id] || '');
+    const avatar = await createAvatar(knownUsers[id] || '');
     userAvatars[id] = {
       ...avatar,
       name: knownUsers[id],
