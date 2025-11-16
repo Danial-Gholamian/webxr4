@@ -31,6 +31,10 @@ import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js
 import {schoolPeriods} from './periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
+
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+
 // ========================
 //  Static Panel variables
 // ========================
@@ -58,7 +62,7 @@ const groupFilterState = {
 
 const minScale = 0.01;
 const maxScale = 1.0;
-let targetScale = 0.5;      // starting size
+let targetScale = 0.1;      // starting size
 const scaleLerpSpeed = 0.05; // how smooth it feels
 
 let graphUpdateNeeded = false;
@@ -72,6 +76,34 @@ let graphUpdateNodeId = null;
 // ========================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7a7b7c);
+// ======== LOAD VR ROOM / LAB ROOM ========
+const loader = new GLTFLoader();
+let labRoom;
+
+loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
+  labRoom = gltf.scene;
+
+  // Adjust size depending on model scale
+  labRoom.scale.set(35, 35, 35);
+
+  // Place user in the center of the room
+  labRoom.position.set(0, -40, 0);
+
+  // Optional: improve material/shadows
+  labRoom.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      if (child.material) {
+        child.material.roughness = 0.8;
+        child.material.metalness = 0.1;
+      }
+    }
+  });
+
+  scene.add(labRoom);
+  console.log("Lab room loaded.");
+});
 
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -99,6 +131,23 @@ const cameraGroup = new THREE.Group();
 cameraGroup.add(camera);
 scene.add(cameraGroup);
 
+// TEST 
+// --- Reference Plane for Orientation ---
+// const refPlaneGeo = new THREE.CircleGeometry(8, 64);
+// const refPlaneMat = new THREE.MeshBasicMaterial({
+//   color: 0x111111,
+//   opacity: 0.35,
+//   transparent: true,
+//   side: THREE.DoubleSide
+// });
+// const refPlane = new THREE.Mesh(refPlaneGeo, refPlaneMat);
+// refPlane.rotation.x = -Math.PI / 2;
+// refPlane.position.set(0, -1.6, 0); // just below user eye level
+// refPlane.name = "ReferencePlane";
+// cameraGroup.add(refPlane);
+
+
+// TEST
 const controller1 = renderer.xr.getController(0);
 const controller2 = renderer.xr.getController(1);
 
@@ -282,6 +331,8 @@ const graphRoot = Graph.scene();
 // console.log("graph: ",typeof(Graph));
 
 scene.add(graphRoot);
+graphRoot.position.y += 20;   // or any value you like
+
 
 // shrink the graph by 50%
 graphRoot.scale.set(0.99, 0.99, 0.99);
@@ -635,7 +686,9 @@ renderer.xr.addEventListener('sessionstart', () => {
   Graph.enablePointerInteraction(false);
   inVR = true;
 
-  cameraGroup.position.set(0, 1.6, 230);  // Initial spawn position
+  cameraGroup.position.set(0, 3.6, 230);  // Initial spawn position
+  cameraGroup.position.y += 22.2;
+
   const session = renderer.xr.getSession();
   // startAutoHighlightCycle(); // Test 
   session.inputSources.forEach(source => {
@@ -723,6 +776,14 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
 
 
+  // TEST
+  // const plane = cameraGroup.getObjectByName("ReferencePlane");
+  // if (plane) {
+  //   plane.rotation.set(-Math.PI / 2, 0, 0); // keep it flat
+  // }
+  
+
+  // TEST
 
   // if (timestamp > 10000) graphRoot.scale.set(0.1, 0.1, 0.1);
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
