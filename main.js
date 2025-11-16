@@ -70,26 +70,34 @@ let graphUpdateMode = null;
 let graphUpdateNodeId = null;
 
 
+const roomCenter = new THREE.Vector3();
+
+
 // now
 // ========================
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x7a7b7c);
+const loader0 = new THREE.TextureLoader();
+
+loader0.load('public/models/background.jpeg', (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  scene.environment = texture;
+  scene.background = texture;
+});
 // ======== LOAD VR ROOM / LAB ROOM ========
 const loader = new GLTFLoader();
 let labRoom;
+let roomHalfSize = new THREE.Vector2(); // XZ half size we allow the user to move in
 
 loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
   labRoom = gltf.scene;
 
-  // Adjust size depending on model scale
   labRoom.scale.set(35, 35, 35);
-
-  // Place user in the center of the room
   labRoom.position.set(0, -40, 0);
 
-  // Optional: improve material/shadows
   labRoom.traverse((child) => {
     if (child.isMesh) {
       child.castShadow = true;
@@ -103,7 +111,51 @@ loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
 
   scene.add(labRoom);
   console.log("Lab room loaded.");
+
+  // Compute world-space bounding box
+  const box = new THREE.Box3().setFromObject(labRoom);
+  box.getCenter(roomCenter);
+
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  // Define how close to the walls the player is allowed to get (in meters)
+  const margin = 2.0;
+
+  // "Half size" of the allowed walk area in XZ
+const shrinkFactor = 0.80;   // 80% of original size = tighter room
+
+roomHalfSize.set(
+  (size.x * 0.5) * shrinkFactor,
+  (size.z * 0.5) * shrinkFactor
+);
+
+
+
 });
+
+
+function clampCameraToRoom() {
+  if (!roomHalfSize) return;
+
+  const pos = cameraGroup.position;
+
+  // Position relative to the center of the room
+  const relX = pos.x - roomCenter.x;
+  const relZ = pos.z - roomCenter.z;
+
+  const clampedRelX = THREE.MathUtils.clamp(relX, -roomHalfSize.x, roomHalfSize.x);
+  const clampedRelZ = THREE.MathUtils.clamp(relZ, -roomHalfSize.y, roomHalfSize.y);
+
+  // Convert back to world space
+  pos.x = roomCenter.x + clampedRelX;
+  pos.z = roomCenter.z + clampedRelZ;
+
+  // If you want to prevent "flying" up/down, clamp Y too:
+  // pos.y = Math.max(pos.y, someFloorHeight);
+}
+
+
 
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -911,18 +963,17 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
-
+    clampCameraToRoom();
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
     // --- Graph scaling with stick buttons ---
     handleLeftStickButton(xrFrame, () => {
-      targetScale = Math.max(minScale, targetScale - 0.01);
+      console.log("Left stick clicked")
     });
 
     handleRightStickButton(xrFrame, () => {
-      targetScale = Math.min(maxScale, targetScale + 0.01);
-      console.log("Helloo world from right joystick");
+      console.log("Right stick clicked")
     });
 
     // Smoothly interpolate scale

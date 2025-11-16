@@ -25,14 +25,14 @@ export async function createAvatar(name = '') {
   // Headset model
   loader.load(HEADSET_MODEL, gltf => {
     const model = gltf.scene;
-    model.scale.set(0.5, 0.5, 0.5);
+    model.scale.set(5, 5, 5);
     head.add(model);
   });
 
   // Controller model
   loader.load(CONTROLLER_MODEL, gltf => {
     const ctrl = gltf.scene;
-    ctrl.scale.set(0.4, 0.4, 0.4);
+    ctrl.scale.set(4, 4, 4);
 
     left.add(ctrl.clone());
     right.add(ctrl.clone());
