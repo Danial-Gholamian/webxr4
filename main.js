@@ -861,6 +861,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
     handleRightStickButton(xrFrame, () => {
       targetScale = Math.min(maxScale, targetScale + 0.01);
+      console.log("Helloo world from right joystick");
     });
 
     // Smoothly interpolate scale
