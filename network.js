@@ -54,12 +54,12 @@ export function setScene(s) {
 
 socket.on('connect', () => {
   console.log('Connected as', socket.id);
-  socket.emit('user-join', { id: socket.id, name: myUsername });
+  // socket.emit('user-join', { id: socket.id, name: myUsername });
 });
 
 socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
     const username = knownUsers[id] || id;
-    console.log(`[RECEIVE] user-update from ${username}`, head);
+    // console.log(`[RECEIVE] user-update from ${username}`, head);
   
   // Skip self
   if (id === socket.id) return;

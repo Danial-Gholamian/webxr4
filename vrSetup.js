@@ -6,7 +6,7 @@ import { highlightPeriod } from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 
 // --- Constants ---
-const movementSpeed = 0.5;
+const movementSpeed = 0.9;
 const rotationSpeed = 0.03;
 const deadZone = 0.1;
 const laserDistance = 2000;
