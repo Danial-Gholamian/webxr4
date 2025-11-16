@@ -353,33 +353,57 @@ export function handleBButtonInput(xrFrame, onBPress) {
 handleBButtonInput._wasPressed = false;
 
 // Generic stick-button handler
-function handleStickButton(xrFrame, handedness, buttonIndex, onHeld) {
-  if (!xrFrame || typeof onHeld !== "function") return;
+function handleStickButton(xrFrame, handedness, buttonIndex, callback) {
+  if (!xrFrame) return;
 
   for (const source of xrFrame.session.inputSources) {
     if (source.handedness === handedness && source.gamepad) {
       const btns = source.gamepad.buttons;
-      if (btns.length > buttonIndex && btns[buttonIndex].pressed) {
-        onHeld();
+
+      if (btns.length > buttonIndex) {
+        const isPressed = btns[buttonIndex].pressed;
+
+        // Always return state ONCE per frame
+        callback(isPressed);
         return;
       }
     }
   }
+
+  // If no button or no input source, report not pressed
+  callback(false);
 }
 
-export function handleLeftStickButton(xrFrame, onHeld) {
-  handleStickButton(xrFrame, "left", leftStickButtonIndex, () => {
-    console.log("Left stick pressed");
-    onHeld();
+
+let leftStickWasPressed = false;
+let rightStickWasPressed = false;
+
+export function handleLeftStickButton(xrFrame, onPress) {
+  handleStickButton(xrFrame, "left", leftStickButtonIndex, (isPressed) => {
+    if (isPressed && !leftStickWasPressed) {
+      console.log("Left stick clicked");
+      cyclePeriod(-1);
+      squeezeLefttPrevPeriod();
+      if (onPress) onPress();
+    }
+
+    leftStickWasPressed = isPressed;
   });
 }
 
-export function handleRightStickButton(xrFrame, onHeld) {
-  handleStickButton(xrFrame, "right", rightStickButtonIndex, () => {
-    console.log("Right stick pressed");
-    onHeld();
+export function handleRightStickButton(xrFrame, onPress) {
+  handleStickButton(xrFrame, "right", rightStickButtonIndex, (isPressed) => {
+    if (isPressed && !rightStickWasPressed) {
+      console.log("Right stick clicked");
+      cyclePeriod(1);
+      squeezeRightNextPeriod();
+      if (onPress) onPress();
+    }
+
+    rightStickWasPressed = isPressed;
   });
 }
+
 
 
 // --- Exports ---

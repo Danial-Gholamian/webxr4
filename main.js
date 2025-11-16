@@ -78,7 +78,15 @@ const roomCenter = new THREE.Vector3();
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xED8C00);
+const loader0 = new THREE.TextureLoader();
+
+loader0.load('public/models/background.jpeg', (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  scene.environment = texture;
+  scene.background = texture;
+});
 // ======== LOAD VR ROOM / LAB ROOM ========
 const loader = new GLTFLoader();
 let labRoom;
@@ -923,11 +931,11 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
     // --- Graph scaling with stick buttons ---
     handleLeftStickButton(xrFrame, () => {
-      targetScale = Math.max(minScale, targetScale - 0.01);
+      console.log("Left stick clicked")
     });
 
     handleRightStickButton(xrFrame, () => {
-      targetScale = Math.min(maxScale, targetScale + 0.01);
+      console.log("Right stick clicked")
     });
 
     // Smoothly interpolate scale
