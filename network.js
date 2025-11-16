@@ -54,7 +54,7 @@ export function setScene(s) {
 
 socket.on('connect', () => {
   console.log('Connected as', socket.id);
-  // socket.emit('user-join', { id: socket.id, name: myUsername });
+  socket.emit('user-join', { id: socket.id, name: myUsername });
 });
 
 socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
@@ -208,9 +208,10 @@ socket.on('user-list', (userArray) => {
 
   Object.keys(knownUsers).forEach(k => delete knownUsers[k]);
 
-  userArray.forEach(({ id, name }) => {
-    knownUsers[id] = name;
+  userArray.forEach(({ socketId, name }) => {
+    knownUsers[socketId] = name;
   });
+
   
   Object.values(userAvatars).forEach(avatar => {
   if (avatar.nameLabel) {

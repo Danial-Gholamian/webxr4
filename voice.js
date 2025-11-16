@@ -31,12 +31,9 @@ export async function initVoice() {
 
     // When a new user joins, send them an offer
     socket.on('user-list', (users) => {
-      users.forEach(({ id }) => {
-        if (id !== socket.id) {
-          if (!peerConnections[id]) {
-            console.log("Creating offer for new user:", id);
-            createOffer(id);
-          }
+    users.forEach(({ socketId }) => {
+      if (socketId !== socket.id) {
+        createOffer(socketId);  // correct target!
         }
       });
     });

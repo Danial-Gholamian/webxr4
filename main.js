@@ -80,7 +80,7 @@ const roomCenter = new THREE.Vector3();
 const scene = new THREE.Scene();
 const loader0 = new THREE.TextureLoader();
 
-loader0.load('public/models/background.jpeg', (texture) => {
+loader0.load('/models/background.jpeg', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   texture.colorSpace = THREE.SRGBColorSpace;
 
