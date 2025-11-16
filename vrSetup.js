@@ -44,12 +44,12 @@ function setupController(controller, index, renderer, cameraGroup) {
   controller.addEventListener('squeezestart', () => {
     if (index === 0) {
       // Left controller → go back
-      cyclePeriod(-1);
-      squeezeLefttPrevPeriod();
+      // cyclePeriod(-1);
+      // squeezeLefttPrevPeriod();
     } else if (index === 1) {
       // Right controller → go forward
-      cyclePeriod(1);
-      squeezeRightNextPeriod();
+      // cyclePeriod(1);
+      // squeezeRightNextPeriod();
     }
   });
 }
