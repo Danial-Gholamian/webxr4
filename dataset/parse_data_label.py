@@ -1,5 +1,5 @@
 # Open the input file and read data
-input_file_path = 'hospital.dat'
+input_file_path = 'dataset/Hospital.dat'
 
 # t i j Si Sj -> time node#1 node#2 nodeId1 nodeId2
 '''
@@ -33,12 +33,14 @@ with open(input_file_path, 'r') as file:
             nodes_mapping[j] = Sj
 
 # Write to the first .dat file (t, i, j) format
-with open('hospital.dat', 'w') as f_t_ij:
+with open('dataset/hospital.dat', 'w') as f_t_ij:
     f_t_ij.write("\n".join(t_ij_lines) + "\n")
 
-# Write to the second .dat file (i, Si) and (j, Sj) format
-with open('file_si_sj.dat', 'w') as f_si_sj:
-    f_si_sj.write("\n".join(f"{i} {Si}" for i, Si in nodes_mapping.items()) + "\n")
-    f_si_sj.write("\n".join(f"{j} {Sj}" for j, Sj in nodes_mapping.items()) + "\n")
+# Sort the nodes_mapping by keys (IDs)
+sorted_nodes = sorted(nodes_mapping.items())  # Sort by key (ID)
 
-print("Files have been created: 'file_t_ij.dat' and 'file_si_sj.dat'")
+# Write to the second .dat file (i, Si) format after sorting
+with open('dataset/hospital_labels.dat', 'w') as labels:
+    for x, Sx in sorted_nodes:
+        labels.write(f"{x} {Sx}\n")
+print("Files have been created: 'hospital.dat' and 'hospital_labels.dat'")
