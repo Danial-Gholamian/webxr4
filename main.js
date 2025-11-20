@@ -80,7 +80,7 @@ const roomCenter = new THREE.Vector3();
 const scene = new THREE.Scene();
 const loader0 = new THREE.TextureLoader();
 
-loader0.load('/models/background.jpeg', (texture) => {
+loader0.load('public/models/background.jpeg', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   texture.colorSpace = THREE.SRGBColorSpace;
 
@@ -449,8 +449,8 @@ function rebuildPeriodStack() {
     graphData: freshData,
     periods: schoolPeriods,
     colorScale,
-    spacing: 90,
-    nodeSize: 2.8,
+    spacing: 50,
+    nodeSize: 1.2,
     selectionState,
     groupFilterState
   });
@@ -1030,8 +1030,11 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
+  if (!periodStack?.group?.visible) {
     detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
     detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
+  }
+
     pollGraphSwitchButtons();
   } else {
     controls.update();

@@ -26,7 +26,7 @@ export function createPeriodStack({
   graphData,
   periods,
   colorScale,
-  spacing = 80,
+  spacing ,
   nodeSize = 2.5,
   selectionState = null,
   groupFilterState = null
@@ -58,6 +58,17 @@ export function createPeriodStack({
   const targetsZ = [];
   const startZ = -((periods.length - 1) * spacing) / 2;
 
+// TEST
+// GRID LAYOUT FOR PERIOD GRAPHS
+const periodCount = periods.length;
+const gridCols = Math.ceil(Math.sqrt(periodCount));
+const gridRows = Math.ceil(periodCount / gridCols);
+
+const graphCell = spacing * 2;  // distance between period graphs
+const halfW = (gridCols - 1) * graphCell * 0.5;
+const halfH = (gridRows - 1) * graphCell * 0.5;
+
+// TEST
 periods.forEach((period, idx) => {
   const { nodes, links } = dataForPeriod(period);
   if (!nodes.length && !links.length) return;
@@ -172,7 +183,16 @@ periods.forEach((period, idx) => {
 
     root.add(g);
     subGroups.push(g);
-    targetsZ.push(startZ + idx * spacing);
+    // Calculate grid position for this entire graph
+    const col = idx % gridCols;
+    const row = Math.floor(idx / gridCols);
+
+    const gx = col * graphCell - halfW;
+    const gz = row * graphCell - halfH;
+
+    // Save the target position for animation
+    targetsZ.push({ x: gx, z: gz });
+
   });
 
   // --- show/hide/toggle ---
@@ -195,9 +215,17 @@ periods.forEach((period, idx) => {
     t = Math.min(1, t + dt / duration);
     const u = ease(t);
     subGroups.forEach((g, i) => {
-      const fromZ = (state === 'showing') ? basePos.z : basePos.z + targetsZ[i];
-      const toZ   = (state === 'showing') ? basePos.z + targetsZ[i] : basePos.z;
-      g.position.z = THREE.MathUtils.lerp(fromZ, toZ, u);
+    const tgt = targetsZ[i];
+
+    const fromX = (state === 'showing') ? basePos.x : basePos.x + tgt.x;
+    const fromZ = (state === 'showing') ? basePos.z : basePos.z + tgt.z;
+
+    const toX   = (state === 'showing') ? basePos.x + tgt.x : basePos.x;
+    const toZ   = (state === 'showing') ? basePos.z + tgt.z : basePos.z;
+
+    g.position.x = THREE.MathUtils.lerp(fromX, toX, u);
+    g.position.z = THREE.MathUtils.lerp(fromZ, toZ, u);
+
       g.quaternion.copy(baseQuat);
     });
     if (t >= 1) {
