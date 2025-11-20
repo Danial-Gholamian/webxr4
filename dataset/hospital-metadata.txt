@@ -1,0 +1,4 @@
+start_time 140 
+end_time 347640 
+total_seconds 347500 
+total_interactions 32424 

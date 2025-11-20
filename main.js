@@ -10,7 +10,7 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
 import ForceGraph3D from '3d-force-graph';
-import graphData from './graph-data-periods.js';
+import graphData from './hospital-graph-data-periods.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   setupController,
@@ -28,7 +28,7 @@ import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './fil
 import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
-import {schoolPeriods} from './periodDefs.js';
+import {schoolPeriods} from './hospital-periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 

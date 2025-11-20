@@ -1,12 +1,52 @@
 from collections import defaultdict
 
-# Select the resolution of the timeslices 
-# 3600 seconds - 1 hour
-# 8 hours
-RESOLUTION = 3600 * 8
+# Constants
+RESOLUTION = 3600 * 8  # 8 hours in seconds
+DATA_FILE = 'dataset/hospital-data.dat'
+LABEL_FILE = 'dataset/hospital-labels.dat'
+METADATA_FILE = 'dataset/hospital-metadata.txt'
+OUTPUT_FILE = 'dataset/hospital-graph-data-periods.js'
+
+# Initialize times
+START_TIME = 0
+END_TIME = 0
+TOTAL_TIME = 0
+
+# Read metadata to get START_TIME, END_TIME, and TOTAL_TIME
+with open(METADATA_FILE, 'r') as file:
+    data = file.readlines()
+    START_TIME = int(data[0].split()[1])
+    END_TIME = int(data[1].split()[1])
+    TOTAL_TIME = int(data[2].split()[1])
+
+print(f"Start time: {START_TIME}")
+print(f"End time: {END_TIME}")
+print(f"Total time: {TOTAL_TIME}")
+
+# Generate time slices
+TIME_SLICES = {}
+period = 1
+
+# Generate time slices without exceeding END_TIME
+# each timeslice is named period 1 ... period n
+TIME_SLICES = {}
+period = 1
+current_start_time = START_TIME
+
+while current_start_time < END_TIME:
+    current_end_time = min(current_start_time + RESOLUTION, END_TIME)  
+    # Ensure we do not exceed END_TIME
+    TIME_SLICES[f"period {period}"] = (current_start_time, current_end_time)
+    
+    # Move to the next period
+    current_start_time += RESOLUTION
+    period += 1
+
+# Display the results
+for period_name, time_range in TIME_SLICES.items():
+    print(f"{period_name}: {time_range}")
 
 
-# Or map th e
 # Time Period Mapping Strategy:
 # --------------------------------------
 # This program divides the full contact dataset into meaningful school day periods
@@ -25,56 +65,29 @@ RESOLUTION = 3600 * 8
 # school period it occurred in, enabling time-aware network analysis.
 
 
-# Define school day periods in timestamp units
-SCHEDULE = {
-    "arrival": (0, 104),         # ~35 minutes
-    "class1": (105, 374),        # 1 hour 30 minutes
-    "break1": (375, 434),        # 20 minutes
-    "class2": (435, 704),        # 1 hour 30 minutes
-    "lunch": (705, 854),         # 50 minutes
-    "class3": (855, 1124),       # 1 hour 30 minutes
-    "break2": (1125, 1184),      # 20 minutes
-    "class4": (1185, 1454),      # 1 hour 30 minutes
-    "afterclass": (1455, 1554),  # ~33 minutes
-
-    "arrival2": (4301, 4405),         # ~35 minutes
-    "class1_2": (4406, 4675),         # 1 hour 30 minutes
-    "break1_2": (4676, 4735),         # 20 minutes
-    "class2_2": (4736, 5005),         # 1 hour 30 minutes
-    "lunch2": (5006, 5155),           # 50 minutes
-    "class3_2": (5156, 5425),         # 1 hour 30 minutes
-    "break2_2": (5426, 5485),         # 20 minutes
-    "class4_2": (5486, 5755),         # 1 hour 30 minutes
-    "afterclass2": (5756, 5845)       # ~33 minutes
-}
-
-
-
 def get_timeslice(ts):
-    for period, (start, end) in SCHEDULE.items():
+    for period, (start, end) in TIME_SLICES.items():
         if start <= ts <= end:
             return period
     return "unknown"
 
+
 def parse_group_file(filename):
     group_map = {}
-    teacher_ids = set()
     with open(filename, "r") as file:
         for line in file:
             parts = line.strip().split()
             if len(parts) != 2:
                 continue
             node_id, group = parts[0], parts[1]
-            if group == "Teachers":
-                teacher_ids.add(node_id)
-            else:
-                group_map[node_id] = group
-    return group_map, teacher_ids
+            group_map[node_id] = group
+    return group_map
+
 
 def main():
-    edge_file = "primarySchool.dat"
-    group_file = "student.dat"
-    output_file = "graph-data-periods.js"
+    edge_file = DATA_FILE
+    group_file = LABEL_FILE
+    output_file = OUTPUT_FILE
 
     nodes_set = set()
     edge_to_periods = defaultdict(set)
@@ -85,15 +98,17 @@ def main():
             parts = line.strip().split()
             if len(parts) != 3:
                 continue
-            src, tgt, ts = parts
+            # t i j format
+            ts, src, tgt = parts
             ts = int(ts)
             period = get_timeslice(ts)
             edge = tuple(sorted((src, tgt)))
             edge_to_periods[edge].add(period)
             nodes_set.update([src, tgt])
-
+    # print(edge_to_periods)     
     # Read group info
-    group_map, teacher_ids = parse_group_file(group_file)
+    group_map = parse_group_file(group_file)
+    # print(group_map)
 
     # Create node list
     nodes = []
@@ -102,10 +117,7 @@ def main():
             "id": node_id,
             "label": node_id
         }
-        if node_id in teacher_ids:
-            node["group"] = "Teachers"
-            node["isTeacher"] = True
-        elif node_id in group_map:
+        if node_id in group_map:
             node["group"] = group_map[node_id]
         nodes.append(node)
 
@@ -119,8 +131,6 @@ def main():
             parts = [f"id: '{node['id']}'", f"label: '{node['label']}'"]
             if "group" in node:
                 parts.append(f"group: '{node['group']}'")
-            if "isTeacher" in node:
-                parts.append("isTeacher: true")
             line = "    { " + ", ".join(parts) + " }"
             if i < len(nodes) - 1:
                 line += ","
