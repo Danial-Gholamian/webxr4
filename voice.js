@@ -29,14 +29,6 @@ export async function initVoice() {
         await peerConnections[sourceId]?.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
-    // When a new user joins, send them an offer
-    socket.on('user-list', (users) => {
-    users.forEach(({ socketId }) => {
-      if (socketId !== socket.id) {
-        createOffer(socketId);  // correct target!
-        }
-      });
-    });
 
   } catch (err) {
     console.error("Failed to initialize voice:", err);
@@ -90,3 +82,21 @@ async function createOffer(targetId) {
   await pc.setLocalDescription(offer);
   socket.emit('webrtc-offer', { targetId, offer });
 }
+
+export function handleUserList(users) {
+  if (!localStream) return;
+
+  users.forEach(({ socketId }) => {
+    if (socketId === socket.id) return;
+    if (peerConnections[socketId]) return;
+
+    // Only the user with the higher socketId creates the offer
+    if (socket.id > socketId) {
+      console.log("I am the caller → creating offer to", socketId);
+      createOffer(socketId);
+    } else {
+      console.log("I am the receiver → waiting for offer from", socketId);
+    }
+  });
+}
+

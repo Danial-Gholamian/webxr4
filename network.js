@@ -6,6 +6,8 @@ import { schoolPeriods } from './periodDefs';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
 import { highlightGroup, applyRemotePeriodStackToggle } from './main.js';
+import { handleUserList } from './voice.js';
+
 
 
 const ROTATION_COMPRESSION_FACTOR = 1000;
@@ -222,7 +224,7 @@ socket.on('user-list', (userArray) => {
   if (_uiPanel?.userData?.refreshUsers) {
     _uiPanel.userData.refreshUsers(socket.id);
   }
-
+  handleUserList(userArray);
 
 });
 
