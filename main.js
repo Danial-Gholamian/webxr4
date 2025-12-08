@@ -10,7 +10,7 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
 import ForceGraph3D from '3d-force-graph';
-import graphData from './graph-data-periods.js';
+import graphData from './school-data-periods.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   setupController,
