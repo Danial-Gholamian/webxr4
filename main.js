@@ -10,7 +10,8 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
 import ForceGraph3D from '3d-force-graph';
-import graphData from './school-data-periods.js';
+import graphDataA from './school-data-periods.js';        // dataset A
+import graphDataB from './hospital-data-period.js';      // dataset B (or any other)
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   setupController,
@@ -28,13 +29,19 @@ import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './fil
 import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
-import {schoolPeriods} from './periodDefs.js';
+import {schoolPeriods} from './schoolDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+const allGroups = new Set();
+[graphDataA, graphDataB].forEach(data => {
+  data.nodes.forEach(n => allGroups.add(n.group));
+});
 
+export const colorScale = scaleOrdinal(schemeCategory10)
+  .domain([...allGroups]);
 // ========================
 //  Static Panel variables
 // ========================
@@ -258,13 +265,13 @@ const directLinksMap = new Map();
 
 
 // Init adjacency maps
-for (const node of graphData.nodes) {
+for (const node of graphDataA.nodes) {
   const id = String(node.id);
   adjacency.set(id, new Set());
   directLinksMap.set(id, []);
 }
 
-for (const link of graphData.links) {
+for (const link of graphDataA.links) {
   const srcId = String(link.source?.id ?? link.source);
   const tgtId = String(link.target?.id ?? link.target);
   adjacency.get(srcId).add(tgtId);
@@ -277,32 +284,84 @@ for (const link of graphData.links) {
 // ========================
 // Graph Initialization
 // ========================
-const colorScale = scaleOrdinal(schemeCategory10)
-  .domain([...new Set(graphData.nodes.map(n => n.group))]);
 
-const Graph = ForceGraph3D()(document.body)
-  .graphData(graphData)
-  .linkVisibility(false)   // disable built-in lines
-  .nodeAutoColorBy('group')
-  .nodeColor(d => colorScale(d.group))
-  .nodeLabel(node => node.label || node.id)
-  .onNodeClick((node, event) => {
-    highlightSubgraph(node.id, 'DIRECT');
-    broadcastNodeSelection(node.id, 'DIRECT');
-  });
+function createForceGraph(container, data) {
+  const g = ForceGraph3D()(container)
+    .graphData(data)
+    .linkVisibility(false)
+    .nodeAutoColorBy('group')
+    .nodeColor(d => colorScale(d.group))
+    .nodeLabel(node => node.label || node.id)
+    .onNodeClick((node) => {
+      highlightSubgraph(node.id);
+      broadcastNodeSelection(node.id);
+    });
+
+  // tune forces
+  const lf = g.d3Force('link');
+  if (lf?.distance) lf.distance(220);
+
+  const charge = g.d3Force('charge');
+  if (charge?.strength) charge.strength(-150);
+
+  return g;
+}
+
+const fgHostA = document.createElement('div');
+fgHostA.style.display = 'none';
+document.body.appendChild(fgHostA);
+
+const fgHostB = document.createElement('div');
+fgHostB.style.display = 'none';
+document.body.appendChild(fgHostB);
+
+const GraphA = createForceGraph(fgHostA, graphDataA);
+const GraphB = createForceGraph(fgHostB, graphDataB);
+
+// store in an array for generalization
+const graphs = [GraphA, GraphB];
+
+export const GraphRef = { current: GraphA };
+
+
+const graphRootA = GraphA.scene();
+const graphRootB = GraphB.scene();
+
+graphRootA.visible = true;
+graphRootB.visible = false;
+
+const graphRootGroup = new THREE.Group();
+graphRootGroup.add(graphRootA);
+graphRootGroup.add(graphRootB);
+
+graphRootGroup.position.y += 20;
+graphRootGroup.scale.set(0.99, 0.99, 0.99);
+
+scene.add(graphRootGroup);
+
+const graphRoot = graphRootGroup;
+
+
+
+// const colorScale = scaleOrdinal(schemeCategory10)
+//   .domain([...new Set(graphData.nodes.map(n => n.group))]);
+
+
+
+
 
   // --- make edges "longer" by increasing spring length ---
-const linkForce = Graph.d3Force('link');
+const linkForce = GraphRef.current.d3Force('link');
 if (linkForce?.distance) {
 
   linkForce.distance(220);
 
 
-  if (Graph.numDimensions) Graph.numDimensions(3);
-  else if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
+  if (GraphRef.current.numDimensions) GraphRef.current.numDimensions(3);
+  else if (GraphRef.current.d3ReheatSimulation) GraphRef.current.d3ReheatSimulation();
 }
 
-const charge = Graph.d3Force('charge');
+const charge = GraphRef.current.d3Force('charge');
 if (charge?.strength) charge.strength(-150); // more negative = more repulsion
 
 initVoice();
@@ -395,16 +454,16 @@ function buildBatchedEdges(graphData, nodesById) {
 }
 
 const nodesById = {};
-Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
+GraphRef.current.graphData().nodes.forEach(n => nodesById[n.id] = n);
 
 // Build line batch
-const lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
-// scene.add(lineSegments);
+const lineSegments = buildBatchedEdges(GraphRef.current.graphData(), nodesById);
+graphRootGroup.add(lineSegments);
 
-Graph.onEngineTick(() => {
+GraphRef.current.onEngineTick(() => {
   const pos = lineSegments.geometry.attributes.position.array;
   let i = 0;
-  Graph.graphData().links.forEach(link => {
+  GraphRef.current.graphData().links.forEach(link => {
     const src = nodesById[link.source.id ?? link.source];
     const tgt = nodesById[link.target.id ?? link.target];
 
@@ -415,25 +474,15 @@ Graph.onEngineTick(() => {
 });
 
 
-const GraphRef = { current: Graph };
-const graphRoot = Graph.scene();
-// console.log("graphRoot: ",typeof(graphRoot));
-// console.log("graph: ",typeof(Graph));
-
-scene.add(graphRoot);
-graphRoot.position.y += 20;   // or any value you like
 
 
-// shrink the graph by 50%
-graphRoot.scale.set(0.99, 0.99, 0.99);
-// const pathFinder = new PathFinder(Graph, adjacency, directLinksMap, colorScale);
-graphRoot.add(lineSegments);
+
 
 
 // --- Period stack (lazy) ---
 export let periodStack = null;
 
-const baseGraphData = structuredClone(graphData);
+const baseGraphData = structuredClone(graphDataA);
 
 
 
@@ -443,10 +492,10 @@ function rebuildPeriodStack() {
     periodStack = null;
   }
 
-  const freshData = JSON.parse(JSON.stringify(graphData)); // deep clone
+  const freshData = JSON.parse(JSON.stringify(graphDataA)); // deep clone
   periodStack = createPeriodStack({
     Graph,
-    graphData: freshData,
+    graphDataA: freshData,
     periods: schoolPeriods,
     colorScale,
     spacing: 50,
@@ -459,9 +508,7 @@ function rebuildPeriodStack() {
 }
 
 
-
-
-Graph.onEngineStop(() => {
+GraphRef.current.onEngineStop(() => {
   // optional: build once the force layout stabilizes
   // buildPeriodStackOnce();
 });
@@ -519,7 +566,7 @@ vrButton.textContent = 'Enter VR';
 document.body.appendChild(vrButton);
 
 
-const groups = [...new Set(graphData.nodes.map(n => n.group))].map(group => ({
+const groups = [...new Set(graphDataA.nodes.map(n => n.group))].map(group => ({
   name: String(group),
   color: colorScale(group)
 }));
@@ -547,7 +594,7 @@ export function highlightSubgraph(nodeId) {
   selectionState.isActive = true;
   selectionState.selectedNodeId = clickedId;
   const validNeighbors = new Set();
-  const edges = Graph.graphData().links;
+  const edges = GraphRef.current.graphData().links;
   for (const edge of edges) {
     if (activePeriod && !edge.periods?.includes(activePeriod)) continue;
 
@@ -580,7 +627,7 @@ export function highlightGroup(groupName) {
   selectionState.neighborIds.clear();
 
   // Filter nodes
-  for (const node of Graph.graphData().nodes) {
+  for (const node of GraphRef.current.graphData().nodes) {
     const nodeGroup = String(node.group).trim().toLowerCase();
     const nodeId = String(node.id);
     if (nodeGroup === normalizedGroup) {
@@ -589,7 +636,7 @@ export function highlightGroup(groupName) {
   }
 
   // Filter edges where both ends are in the group AND match current period (if any)
-  for (const edge of Graph.graphData().links) {
+  for (const edge of GraphRef.current.graphData().links) {
     const src = String(edge.source?.id ?? edge.source);
     const tgt = String(edge.target?.id ?? edge.target);
 
@@ -641,8 +688,8 @@ export function resetGraph() {
   lineSegments.geometry.attributes.alpha.needsUpdate = true;
 
 
-  Graph.graphData(Graph.graphData());
-  Graph.d3ReheatSimulation();
+  GraphRef.current.graphData(GraphRef.current.graphData());
+  GraphRef.current.d3ReheatSimulation();
   updateBarGauge(timeGauge, 0, "Default");
 }
 
@@ -653,7 +700,7 @@ function updateAllVisuals() {
   const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
 
   // ---------- Nodes ----------
-  Graph.scene().traverse(obj => {
+  GraphRef.current.scene().traverse(obj => {
     if (obj.__data?.id !== undefined) {
       const nodeId = String(obj.__data.id);
       const inPeriod = !periodNodes || periodNodes.has(nodeId);
@@ -675,7 +722,7 @@ function updateAllVisuals() {
 
   const alphas = lineSegments.geometry.attributes.alpha.array;
 
-  Graph.graphData().links.forEach(link => {
+  GraphRef.current.graphData().links.forEach(link => {
     const src = String(link.source.id ?? link.source);
     const tgt = String(link.target.id ?? link.target);
     const edgeKey = getEdgeKey(src, tgt);
@@ -699,7 +746,7 @@ function updateAllVisuals() {
   lineSegments.geometry.attributes.alpha.needsUpdate = true;
 
 
-  Graph.d3ReheatSimulation();
+  GraphRef.current.d3ReheatSimulation();
   markHoverCacheDirty?.();
 }
 
@@ -739,7 +786,7 @@ export const periodActiveNodes = new Map();
 export function precomputePeriodData() {
   periodActiveNodes.clear();
 
-  Graph.graphData().links.forEach(link => {
+  GraphRef.current.graphData().links.forEach(link => {
     const periods = link.periods || [];
 
     periods.forEach(period => {
@@ -773,7 +820,7 @@ export function highlightPeriod(period) {
 let inVR = false;
 
 renderer.xr.addEventListener('sessionstart', () => {
-  Graph.enablePointerInteraction(false);
+  GraphRef.current.enablePointerInteraction(false);
   inVR = true;
 
   cameraGroup.position.set(0, 3.6, 230);  // Initial spawn position
@@ -796,7 +843,7 @@ renderer.xr.addEventListener('sessionstart', () => {
 renderer.xr.addEventListener('sessionend', () => {
   stopAutoHighlightCycle?.(); // Test
   inVR = false;
-  Graph.enablePointerInteraction(true);
+  GraphRef.current.enablePointerInteraction(true);
 });
 
 
@@ -907,7 +954,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   if (graphUpdateNeeded) {
     switch (graphUpdateMode) {
       case 'FULL':
-        Graph.scene().traverse(obj => {
+        GraphRef.current.scene().traverse(obj => {
           if (obj.material?.opacity !== undefined) {
             obj.material.transparent = false;
             obj.material.opacity = 1.0;
