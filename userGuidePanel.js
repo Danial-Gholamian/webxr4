@@ -1,56 +1,104 @@
 import * as THREE from 'three';
 
+const GUIDE_ITEMS = [
+    {
+        img: "/assets/guide/trigger.png",
+        text: "Trigger → Select Node"
+    },
+    {
+        img: "/assets/guide/grip.png",
+        text: "Grip (Squeeze) → Rotate Graph"
+    },
+    {
+        img: "/assets/guide/left-stick.png",
+        text: "Left Stick → Rotate View"
+    },
+    {
+        img: "/assets/guide/right-stick.png",
+        text: "Right Stick → Move"
+    },
+    {
+        img: "/assets/guide/a-button.png",
+        text: "A → Toggle Filter Panel"
+    },
+    {
+        img: "/assets/guide/b-button.png",
+        text: "B → Toggle Period Stack"
+    },
+    {
+        img: "/assets/guide/x-button.png",
+        text: "X → Reset Graph"
+    },
+    {
+        img: "/assets/guide/y-button.png",
+        text: "Y → Toggle User Guide Panel"
+    }
+];
+
 // The user guide panel with the help instructions
 export function createUserGuidePanel() {
     const group = new THREE.Group();
     group.name = "UserGuidePanel";
 
-    const bgGeo = new THREE.PlaneGeometry(0.9, 0.8);
-    const bgMat = new THREE.MeshBasicMaterial({
-        color: 0x111111,
-        transparent: true,
-        opacity: 0.92
-    });
-    const bg = new THREE.Mesh(bgGeo, bgMat);
-    group.add(bg);
+    // --- Canvas Setup ---
+    const canvasWidth = 1024;
+    const rowHeight = 80;
+    const titleHeight = 120;
+    const footerHeight = 60;
+    const totalHeight = titleHeight + GUIDE_ITEMS.length * rowHeight + footerHeight;
 
-    // ---- Canvas Text ----
-    const canvas = document.createElement("canvas");
-    canvas.width = 1024;
-    canvas.height = 1024;
-    const ctx = canvas.getContext("2d");
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = totalHeight;
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "48px Arial";
-    ctx.fillText("🎮 USER GUIDE", 40, 80);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const lines = [
-        "JUST FOR NOW... WILL CHANGE GUIDE TEXT AND ADD IMAGES LATER",
-        "Trigger → Select Node",
-        "Grip (Squeeze) → Rotate Graph",
-        "Left Stick → Rotate View",
-        "Right Stick → Move",
-        "A → Toggle Filter Panel",
-        "B → Toggle Period Stack",
-        "X → Reset Graph",
-        "",
-        "Point at ? icon anytime to reopen this guide"
-    ];
+    // --- Draw Background ---
+    ctx.fillStyle = 'rgba(17, 17, 17, 0.92)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    lines.forEach((line, i) => {
-        ctx.fillText(line, 60, 160 + i * 75);
-    });
+    // --- Draw Title ---
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 60px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('VR Controls Guide', canvas.width / 2, 20);
 
+    // --- Draw Items ---
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+
+    let y = titleHeight;
+    for (const item of GUIDE_ITEMS) {
+        ctx.fillText(item.text, 40, y);
+        y += rowHeight;
+    }
+
+    // --- Draw Footer ---
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press Y anytime to reopen this guide', canvas.width / 2, totalHeight - footerHeight + 10);
+
+    // --- Texture & Mesh ---
     const texture = new THREE.CanvasTexture(canvas);
-    const textMat = new THREE.MeshBasicMaterial({
+    texture.needsUpdate = true;
+
+    const aspect = canvas.width / canvas.height;
+    const panelHeight = 0.9;        // world units
+    const panelWidth = panelHeight * aspect;
+
+    const planeGeo = new THREE.PlaneGeometry(panelWidth, panelHeight);
+    const planeMat = new THREE.MeshBasicMaterial({
         map: texture,
-        transparent: true
+        transparent: true,
+        depthTest: false
     });
 
-    const textPlane = new THREE.Mesh(bgGeo, textMat);
-    textPlane.position.z = 0.001;
-    group.add(textPlane);
-
+    const panelMesh = new THREE.Mesh(planeGeo, planeMat);
+    group.add(panelMesh);
 
     group.visible = false;
     group.position.set(0, 1.5, -1.5); // 60cm in front of eyes
@@ -58,6 +106,17 @@ export function createUserGuidePanel() {
 
     console.log("--------------- CREATED USER HELP GUIDE PANEL ---------------")
     return group;
+}
+
+function createImagePlane(url, width = 0.25, height = 0.25) {
+    const texture = new THREE.TextureLoader().load(url);
+    const mat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true
+    });
+
+    const geo = new THREE.PlaneGeometry(width, height);
+    return new THREE.Mesh(geo, mat);
 }
 
 // Creates the ? help icon that the user can click on to expand the
