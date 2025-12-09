@@ -20,9 +20,11 @@ import {
   setupGraphSwitchButtons,
   handleAButtonInput,
   handleBButtonInput,
+  handleYButtonInput,
   handleLeftStickButton,
   handleRightStickButton
 } from './vrSetup.js';
+import {createUserGuidePanel, createHelpIcon} from './userGuidePanel.js';
 import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
@@ -183,6 +185,67 @@ const cameraGroup = new THREE.Group();
 cameraGroup.add(camera);
 scene.add(cameraGroup);
 
+// ========================
+// User Guide Panel Setup 
+// in Camera Group
+// ========================
+// User Guide Panel
+const userGuidePanel = createUserGuidePanel();
+cameraGroup.add(userGuidePanel);
+
+userGuidePanel.traverse(obj => {
+  if (obj.isMesh && obj.material) {
+    obj.material.depthTest = false;
+    obj.renderOrder = 999;
+  }
+});
+
+function toggleGuidePanel() {
+  console.log("Toggle Guide Panel")
+  userGuidePanel.visible = !userGuidePanel.visible
+}
+
+
+  // MIGHT BE USED TO REPLACE BUTTON FUNCTIONALITY
+// // Help icon
+// const helpIcon = createHelpIcon();
+// helpIcon.userData.onHelpClick = () => {
+//   userGuidePanel.visible = !userGuidePanel.visible;
+// };
+
+// cameraGroup.add(helpIcon);
+
+// helpIcon.traverse(obj => {
+//   if (obj.isMesh && obj.material) {
+//     obj.material.depthTest = false;
+//     obj.renderOrder = 999;
+//   }
+// });
+
+
+// // Create a wireframe cube around the cameraGroup
+// const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5); // 0.5m cube
+// const wireframe = new THREE.WireframeGeometry(geometry);
+// const line = new THREE.LineSegments(
+//   wireframe,
+//   new THREE.LineBasicMaterial({ color: 0x00ff00 })
+// );
+
+// // Position it at the cameraGroup origin (or adjust as needed)
+// line.position.set(0, 0, 0); 
+
+// // Make sure it’s rendered on top
+// line.renderOrder = 999;
+// line.material.depthTest = false;
+
+// // Add to cameraGroup
+// cameraGroup.add(line);
+
+// // Optional: log world position
+// console.log("Wireframe world pos:", line.getWorldPosition(new THREE.Vector3()));
+
+
+
 // TEST 
 // --- Reference Plane for Orientation ---
 // const refPlaneGeo = new THREE.CircleGeometry(8, 64);
@@ -205,6 +268,9 @@ const controller2 = renderer.xr.getController(1);
 
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
+
+
+
 
 
 
@@ -1023,6 +1089,19 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         broadcastPeriodStackToggle(false, context);
       }
     });
+
+    handleYButtonInput(xrFrame, () => {
+      toggleGuidePanel();
+      [controller1, controller2].forEach(c => {
+      const gp = c.userData.inputSource?.gamepad;
+      const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
+      if (h?.pulse) {
+        h.pulse(0.8, 100);
+      } else if (navigator.vibrate) {
+        navigator.vibrate(100);
+        }
+      });
+    })
 
 
 
