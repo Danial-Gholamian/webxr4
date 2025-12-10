@@ -453,11 +453,36 @@ function buildBatchedEdges(graphData, nodesById) {
   return new THREE.LineSegments(geometry, material);
 }
 
+function rebuildBatchedEdgesForCurrentGraph() {
+  // 1. Remove old line batch
+  graphRootGroup.remove(lineSegments);
+
+  // 2. Rebuild nodesById map
+  Object.keys(nodesById).forEach(k => delete nodesById[k]);
+  GraphRef.current.graphData().nodes.forEach(n => nodesById[n.id] = n);
+
+  // 3. Clear edgeVertexMap
+  edgeVertexMap.clear();
+
+  // 4. Build new batched edges
+  const newBatch = buildBatchedEdges(GraphRef.current.graphData(), nodesById);
+
+  // 5. Add to scene
+  graphRootGroup.add(newBatch);
+
+  // 6. Replace global reference
+  lineSegments.geometry.dispose();
+  lineSegments.material.dispose();
+  lineSegments = newBatch;
+}
+
+
+
 const nodesById = {};
 GraphRef.current.graphData().nodes.forEach(n => nodesById[n.id] = n);
 
 // Build line batch
-const lineSegments = buildBatchedEdges(GraphRef.current.graphData(), nodesById);
+let lineSegments = buildBatchedEdges(GraphRef.current.graphData(), nodesById);
 graphRootGroup.add(lineSegments);
 
 GraphRef.current.onEngineTick(() => {
@@ -887,6 +912,52 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
   }
 }
 
+//TESR
+export function switchToSchoolDataset() {
+  console.log("Switching to SCHOOL dataset");
+
+  GraphRef.current = GraphA;
+  graphRootA.visible = true;
+  graphRootB.visible = false;
+
+  // rebuild edges!
+  rebuildBatchedEdgesForCurrentGraph();
+
+  resetGraph();       
+  precomputePeriodData();
+
+  uiPanel.userData.updateGroupList(
+    [...new Set(graphDataA.nodes.map(n => n.group))].map(g => ({
+      name: g,
+      color: colorScale(g)
+    }))
+  );
+}
+
+export function switchToHospitalDataset() {
+  console.log("Switching to HOSPITAL dataset");
+
+  GraphRef.current = GraphB;
+  graphRootA.visible = false;
+  graphRootB.visible = true;
+
+  // rebuild edges!
+  rebuildBatchedEdgesForCurrentGraph();
+
+  resetGraph();
+  precomputePeriodData();
+
+  uiPanel.userData.updateGroupList(
+    [...new Set(graphDataB.nodes.map(n => n.group))].map(g => ({
+      name: g,
+      color: colorScale(g)
+    }))
+  );
+}
+
+
+
+//TESR
 
 
 

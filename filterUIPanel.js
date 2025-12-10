@@ -4,6 +4,8 @@ import { Text } from 'troika-three-text';
 import { knownUsers } from './network.js';
 import {highlightGroup} from './main.js'
 import { broadcastGroupSelection } from './network.js';
+import { switchToSchoolDataset, switchToHospitalDataset } from './main.js';
+
 
 
 const PANEL_SCALE = 0.3;       // 30% of view width
@@ -19,10 +21,10 @@ const PANEL_LERP_FACTOR = 0.2;
 
 
 export function updatePeroidLabel(peroidname) {
-    if (periodTitle) {
-        periodTitle.text = `Time of the day: ${peroidname || 'Default'} 📚`;
-        periodTitle.sync();
-    }
+  if (periodTitle) {
+    periodTitle.text = `Time of the day: ${peroidname || 'Default'} 📚`;
+    periodTitle.sync();
+  }
 }
 export function createFilterPanel(options = { groupColors: [], camera: null }) {
   const uiPanel = new THREE.Group();
@@ -75,18 +77,62 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
   uiPanel.add(periodTitle);
   uiPanel.add(selectedNodeLabel);
 
+// =========================
+// Dataset Selection Buttons
+// =========================
+
+const datasetY = 0.47; // slightly above the periodTitle
+
+// SCHOOL button
+const schoolCapsule = createCapsuleLabel("School", {
+  fontSize: 0.04,
+  color: 0x004488,
+  hoverColor: 0x0066aa,
+  padding: 0.025,
+  onClick: () => switchToSchoolDataset()
+
+});
+schoolCapsule.position.set(-0.25, datasetY, 0.01);
+uiPanel.add(schoolCapsule);
+
+// HOSPITAL button
+const hospitalCapsule = createCapsuleLabel("Hospital", {
+  fontSize: 0.04,
+  color: 0x884400,
+  hoverColor: 0xaa6600,
+  padding: 0.025,
+  onClick: () => switchToHospitalDataset()
+});
+hospitalCapsule.position.set(0.25, datasetY, 0.01);
+uiPanel.add(hospitalCapsule);
+
   uiPanel.userData.updateSelectedNodeLabel = (nodeId) => {
   selectedNodeLabel.text = `Selected node: ${nodeId ?? 'None'}`;
   selectedNodeLabel.sync();
   };
 
-  options.groupColors
+// ==============================
+// Refresh group capsules on load
+// ==============================
+const groupListGroup = new THREE.Group();
+groupListGroup.position.set(0, 0, 0.02);
+uiPanel.add(groupListGroup);
+uiPanel.userData.groupListGroup = groupListGroup;
+
+uiPanel.userData.updateGroupList = (groups) => {
+
+  // remove old capsules
+  while (groupListGroup.children.length > 0) {
+    groupListGroup.remove(groupListGroup.children[0]);
+  }
+
+  groups
     .slice()
     .sort((a, b) => {
-      const aStartsDigit = /^\d/.test(a.name);
-      const bStartsDigit = /^\d/.test(b.name);
-      if (aStartsDigit && !bStartsDigit) return -1;
-      if (!aStartsDigit && bStartsDigit) return 1;
+      const aDigit = /^\d/.test(a.name);
+      const bDigit = /^\d/.test(b.name);
+      if (aDigit && !bDigit) return -1;
+      if (!aDigit && bDigit) return 1;
       return a.name.localeCompare(b.name, undefined, { numeric: true });
     })
     .forEach((group, index) => {
@@ -98,7 +144,7 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
       );
       dot.position.set(-0.4, yPos, 0.01);
       dot.renderOrder = 2;
-      uiPanel.add(dot);
+      groupListGroup.add(dot);
 
       const capsule = createCapsuleLabel(group.name, {
         fontSize: 0.045,
@@ -106,15 +152,16 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
         hoverColor: 0x444488,
         padding: 0.03,
         onClick: () => {
-          console.log(`Clicked ${group.name}`);
           highlightGroup(group.name);
-          broadcastGroupSelection(group.name); // broadcast the group selection
+          broadcastGroupSelection(group.name);
         }
       });
 
       capsule.position.set(-0.05, yPos, 0.01);
-      uiPanel.add(capsule);
+      groupListGroup.add(capsule);
     });
+};
+
 
   uiPanel.traverse(child => {
     if (child.material) {
@@ -153,6 +200,12 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 
 
   uiPanel.userData.boundingBox = new THREE.Box3().setFromObject(uiPanel);
+
+  uiPanel.userData.updatePeriods = (periods) => {
+  console.log("Periods updated from dataset:", periods);
+  // OPTIONAL: later add period capsules here
+};
+
   return uiPanel;
 }
 
