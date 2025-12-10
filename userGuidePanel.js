@@ -2,35 +2,35 @@ import * as THREE from 'three';
 
 const GUIDE_ITEMS = [
     {
-        img: "/assets/guide/trigger.png",
+        img: "/public/img/trigger.png",
         text: "Trigger → Select Node"
     },
     {
-        img: "/assets/guide/grip.png",
+        img: "/public/img/grip.png",
         text: "Grip (Squeeze) → Rotate Graph"
     },
     {
-        img: "/assets/guide/left-stick.png",
+        img: "/public/img/left-stick.png",
         text: "Left Stick → Rotate View"
     },
     {
-        img: "/assets/guide/right-stick.png",
+        img: "/public/img/right-stick.png",
         text: "Right Stick → Move"
     },
     {
-        img: "/assets/guide/a-button.png",
+        img: "/public/img/a-button.png",
         text: "A → Toggle Filter Panel"
     },
     {
-        img: "/assets/guide/b-button.png",
+        img: "/public/img/b-button.png",
         text: "B → Toggle Period Stack"
     },
     {
-        img: "/assets/guide/x-button.png",
+        img: "/public/img/x-button.png",
         text: "X → Reset Graph"
     },
     {
-        img: "/assets/guide/y-button.png",
+        img: "/public/img/y-button.png",
         text: "Y → Toggle User Guide Panel"
     }
 ];
