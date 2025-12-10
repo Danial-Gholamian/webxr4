@@ -6,7 +6,7 @@ const laserDistance = 2000;
 //vrSetup.js
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
-import { schoolPeriods } from './schoolDefs.js';
+import { activePeriods, currentPeriodIndex as mainPeriodIndex } from './main.js';
 import { highlightPeriod } from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 
@@ -19,7 +19,7 @@ const bBuutonIndex = 5;
 const leftStickButtonIndex = 3;   // L3
 const rightStickButtonIndex = 3;  // R3
 
-let currentPeriodIndex = 0;
+
 // --- 1. Controller Setup (with laser + teleport) ---
 function setupController(controller, index, renderer, cameraGroup) {
   const controllerGrip = renderer.xr.getControllerGrip(index);
@@ -58,11 +58,22 @@ function setupController(controller, index, renderer, cameraGroup) {
 
 // --- 1.2 Changing time slices ---
 function cyclePeriod(delta) {
-  currentPeriodIndex = (currentPeriodIndex + delta + schoolPeriods.length) % schoolPeriods.length;
-  const period = schoolPeriods[currentPeriodIndex];
+    console.log(`this is active period that was passed in--> ${activePeriods}`)
+
+  if (!activePeriods || activePeriods.length === 0) {
+    console.warn("No periods available for current dataset.");
+    return;
+  }
+
+  mainPeriodIndex.value = 
+    (mainPeriodIndex.value + delta + activePeriods.length) % activePeriods.length;
+
+  const period = activePeriods[mainPeriodIndex.value];
+
+  console.log("VR changing period to:", period);
   highlightPeriod(period);
-  console.log(`Period changed to: ${period}`);
 }
+
 
 // --- 2. Teleport Movement ---
 function teleportFromController(controller, cameraGroup, teleportDistance = 5) {

@@ -30,6 +30,7 @@ import { PathFinder } from './pathFinder.js';
 import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
 import {schoolPeriods} from './schoolDefs.js';
+import {hospitalPeriods} from './hospitalDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -49,8 +50,11 @@ export const colorScale = scaleOrdinal(schemeCategory10)
 let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
 const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
 
-let activePeriod = null;
-let currentPeriodIndex = 0;
+export let activePeriod = null;
+export let currentPeriodIndex = { value: 0 };
+export let activePeriods = schoolPeriods; 
+export let currentDataset = 'school';
+
 
 let selectionState = {
   isActive: false,
@@ -58,7 +62,8 @@ let selectionState = {
   neighborIds: new Set()
 };
 
-let periodStackInstance = null;
+
+
 
 const groupFilterState = {
   isActive: false,
@@ -500,10 +505,6 @@ GraphRef.current.onEngineTick(() => {
 
 
 
-
-
-
-
 // --- Period stack (lazy) ---
 export let periodStack = null;
 
@@ -814,29 +815,50 @@ export function precomputePeriodData() {
   GraphRef.current.graphData().links.forEach(link => {
     const periods = link.periods || [];
 
+    const srcId = String(link.source?.id ?? link.source);
+    const tgtId = String(link.target?.id ?? link.target);
+
     periods.forEach(period => {
       if (!periodActiveNodes.has(period)) {
         periodActiveNodes.set(period, new Set());
       }
-      periodActiveNodes.get(period).add(link.source);
-      periodActiveNodes.get(period).add(link.target);
+      periodActiveNodes.get(period).add(srcId);
+      periodActiveNodes.get(period).add(tgtId);
     });
   });
 }
 
 
+
 export function highlightPeriod(period) {
   activePeriod = period;
   selectionState.isActive = false; // clear selection on period change
+
   updatePeroidLabel(period);
-  updateAllVisuals();
 
-  currentPeriodIndex = schoolPeriods.indexOf(period);
+  // dataset-aware period list
+  const idx = activePeriods.indexOf(period);
 
-  const value = currentPeriodIndex / (schoolPeriods.length - 1);
+  if (idx === -1) {
+    console.warn("Period not found in current dataset:", period);
+
+    // Failsafe: do NOT hide entire graph
+    activePeriod = null;
+    updateAllVisuals();
+    updateBarGauge(timeGauge, 0, "Default");
+    return;
+  }
+
+  currentPeriodIndex.value = idx;
+
+  const value = activePeriods.length > 1
+    ? idx / (activePeriods.length - 1)
+    : 0;
 
   updateBarGauge(timeGauge, value, period);
+  updateAllVisuals();
 }
+
 
 
 // ========================
@@ -915,7 +937,9 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 //TESR
 export function switchToSchoolDataset() {
   console.log("Switching to SCHOOL dataset");
-
+  currentDataset = 'school';
+  
+  activePeriods = schoolPeriods;   
   GraphRef.current = GraphA;
   graphRootA.visible = true;
   graphRootB.visible = false;
@@ -923,7 +947,6 @@ export function switchToSchoolDataset() {
   // rebuild edges!
   rebuildBatchedEdgesForCurrentGraph();
 
-  resetGraph();       
   precomputePeriodData();
 
   uiPanel.userData.updateGroupList(
@@ -937,14 +960,21 @@ export function switchToSchoolDataset() {
 export function switchToHospitalDataset() {
   console.log("Switching to HOSPITAL dataset");
 
+  resetGraph();
+  currentDataset = 'hospital';
+  activePeriods = hospitalPeriods;   // <-- correct list of valid periods
+
   GraphRef.current = GraphB;
   graphRootA.visible = false;
   graphRootB.visible = true;
 
-  // rebuild edges!
   rebuildBatchedEdgesForCurrentGraph();
 
-  resetGraph();
+  activePeriod = null;
+  currentPeriodIndex.value = 0;
+  updatePeroidLabel("Default");
+  updateBarGauge(timeGauge, 0, "Default");
+
   precomputePeriodData();
 
   uiPanel.userData.updateGroupList(
@@ -954,6 +984,7 @@ export function switchToHospitalDataset() {
     }))
   );
 }
+
 
 
 

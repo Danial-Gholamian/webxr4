@@ -1,7 +1,7 @@
 // network.js
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
-import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVATAR_UPDATE_INTERVAL } from './main.js';
+import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVATAR_UPDATE_INTERVAL, activePeriods } from './main.js';
 import { schoolPeriods } from './schoolDefs.js';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
@@ -185,9 +185,10 @@ export function getCurrentPeriodIndex() {
 }
 
 export function setCurrentPeriodIndex(index, broadcast = true) {
-  currentPeriodIndex = Math.max(0, Math.min(index, schoolPeriods.length - 1));
-  const period = schoolPeriods[currentPeriodIndex];
+  currentPeriodIndex = Math.max(0, Math.min(index, activePeriods.length - 1));
+  const period = activePeriods[currentPeriodIndex];
   highlightPeriod(period);
+  console.log("I'm the second guy!!!!")
   
   if (broadcast) {
     socket.emit('period-change', period);
