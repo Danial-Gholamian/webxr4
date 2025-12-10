@@ -22,23 +22,27 @@ function layout2D(nodes, links) {
 
 
 export function createPeriodStack({
-  Graph,
+  graph,               // ForceGraph3D instance
   graphData,
   periods,
   colorScale,
-  spacing ,
+  spacing,
   nodeSize = 2.5,
   selectionState = null,
   groupFilterState = null
-  }) {
-  if (!Graph) throw new Error('createPeriodStack: Graph is required');
+}) {
+  if (!graph) throw new Error('createPeriodStack: graph is required');
+  if (!graphData) throw new Error('createPeriodStack: graphData is required');
 
+  // FIX: define the container group
   const root = new THREE.Group();
   root.name = 'PeriodStack';
   root.visible = false;
 
-  const mainRoot = Graph.scene();
-  const fgCanvas = Graph.renderer ? Graph.renderer().domElement : null;
+  const mainRoot = graph.scene();
+  const fgCanvas = (graph.renderer && graph.renderer()) 
+      ? graph.renderer().domElement 
+      : null;
   const basePos = mainRoot.position.clone();
   const baseQuat = mainRoot.quaternion.clone();
   const baseScale = mainRoot.scale.clone();

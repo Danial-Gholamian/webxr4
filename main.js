@@ -584,11 +584,14 @@ function rebuildPeriodStack() {
     periodStack = null;
   }
 
-  const freshData = JSON.parse(JSON.stringify(graphDataA)); // deep clone
+  // choose the correct base data depending on dataset
+  const baseData = currentDataset === 'school' ? graphDataA : graphDataB;
+  const freshData = JSON.parse(JSON.stringify(baseData)); // deep clone
+
   periodStack = createPeriodStack({
-    Graph,
-    graphDataA: freshData,
-    periods: schoolPeriods,
+    graph: GraphRef.current,
+    graphData: freshData,    // MUST be graphData, not graphDataA/graphDataB
+    periods: activePeriods,  // full array of periods, NOT activePeriod
     colorScale,
     spacing: 50,
     nodeSize: 1.2,
@@ -598,6 +601,8 @@ function rebuildPeriodStack() {
 
   scene.add(periodStack.group);
 }
+
+
 
 
 GraphRef.current.onEngineStop(() => {

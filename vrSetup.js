@@ -1,7 +1,4 @@
-const movementSpeed = 0.9;
-const rotationSpeed = 0.03;
-const deadZone = 0.1;
-const laserDistance = 2000;
+
 
 //vrSetup.js
 import * as THREE from 'three';
@@ -11,7 +8,10 @@ import { highlightPeriod } from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 
 // --- Constants ---
-
+const movementSpeed = 0.9;
+const rotationSpeed = 0.03;
+const deadZone = 0.1;
+const laserDistance = 2000;
 const xButtonIndex = 4; // xr-standard index for X (left) / A (right)
 const yButtonIndex = 5; // xr-standard index for y (left) / b (right)
 const aButtonIndex = 4; // index 4 is A (right controller)
