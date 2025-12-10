@@ -365,6 +365,29 @@ export function handleBButtonInput(xrFrame, onBPress) {
 }
 handleBButtonInput._wasPressed = false;
 
+
+export function handleYButtonInput(xrFrame, onYPress) {
+  if (!xrFrame || typeof onYPress !== 'function') return;
+
+  let isPressed = false;
+  for (const source of xrFrame.session.inputSources) {
+    if (source.handedness === 'left' && source.gamepad) {
+      const btns = source.gamepad.buttons;
+      if (btns.length > yButtonIndex && btns[yButtonIndex].pressed) {
+        isPressed = true;
+        break;
+      }
+    }
+  }
+
+  
+  if (isPressed && !handleYButtonInput._wasPressed) {
+    onYPress();
+  }
+
+  handleYButtonInput._wasPressed = isPressed;
+}
+
 // Generic stick-button handler
 function handleStickButton(xrFrame, handedness, buttonIndex, callback) {
   if (!xrFrame) return;
