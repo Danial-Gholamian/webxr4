@@ -596,13 +596,12 @@ function rebuildPeriodStack() {
     spacing: 50,
     nodeSize: 1.2,
     selectionState,
-    groupFilterState
+    groupFilterState,
+    graphRootGroup
   });
 
   scene.add(periodStack.group);
 }
-
-
 
 
 GraphRef.current.onEngineStop(() => {

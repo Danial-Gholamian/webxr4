@@ -29,7 +29,8 @@ export function createPeriodStack({
   spacing,
   nodeSize = 2.5,
   selectionState = null,
-  groupFilterState = null
+  groupFilterState = null,
+  graphRootGroup
 }) {
   if (!graph) throw new Error('createPeriodStack: graph is required');
   if (!graphData) throw new Error('createPeriodStack: graphData is required');
@@ -207,10 +208,24 @@ periods.forEach((period, idx) => {
 
   function show() {
     if (!subGroups.length) return;
-    state = 'showing'; t = 0; root.visible = true;
-    if (mainRoot) mainRoot.visible = false;
-    if (fgCanvas) fgCanvas.style.display = 'none';
+
+    state = 'showing'; 
+    t = 0; 
+    root.visible = true;
+
+    if (graphRootGroup) {
+      graphRootGroup.visible = false;
+    }
+
+
+
+    // VR-SAFE hiding of the canvas
+    if (fgCanvas) {
+      fgCanvas.style.opacity = '0';
+      fgCanvas.style.pointerEvents = 'none';
+    }
   }
+
   function hide() { if (subGroups.length) { state = 'hiding'; t = 0; } }
   function toggle() { (state === 'hidden' || state === 'hiding') ? show() : hide(); }
 
@@ -234,11 +249,21 @@ periods.forEach((period, idx) => {
     });
     if (t >= 1) {
       state = (state === 'showing') ? 'shown' : 'hidden';
-      if (state === 'hidden') {
-        root.visible = false;
-        if (mainRoot) mainRoot.visible = true;
-        if (fgCanvas) fgCanvas.style.display = 'block';
+    if (state === 'hidden') {
+      root.visible = false;
+      
+    if (graphRootGroup) {
+      graphRootGroup.visible = true;
+    }
+
+
+
+      if (fgCanvas) {
+        fgCanvas.style.opacity = '1';
+        fgCanvas.style.pointerEvents = 'auto';
       }
+    }
+
     }
   }
 
