@@ -29,7 +29,8 @@ import {createUserGuidePanel, createHelpIcon} from './userGuidePanel.js';
 import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
+import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle,
+   broadcastDatasetSwitch } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
 import {schoolPeriods} from './schoolDefs.js';
 import {hospitalPeriods} from './hospitalDefs.js';
@@ -280,10 +281,6 @@ const controller2 = renderer.xr.getController(1);
 
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
-
-
-
-
 
 
 
@@ -670,6 +667,8 @@ export const uiPanel = createFilterPanel({ groupColors: groups, camera });
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
+
+
 export const timeGauge = createBarGauge(new THREE.Vector3(0, 1.4, -1.2));
 cameraGroup.add(timeGauge);
 // ========================
@@ -1005,10 +1004,11 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 }
 
 //TESR
-export function switchToSchoolDataset() {
+export function switchToSchoolDataset(broadcast = true) {
   console.log("Switching to SCHOOL dataset");
   currentDataset = 'school';
   
+   if (broadcast) broadcastDatasetSwitch('school');
   activePeriods = schoolPeriods;   
   GraphRef.current = GraphA;
   graphRootA.visible = true;
@@ -1027,10 +1027,10 @@ export function switchToSchoolDataset() {
   );
 }
 
-export function switchToHospitalDataset() {
+export function switchToHospitalDataset(broadcast = true) {
   console.log("Switching to HOSPITAL dataset");
-
-  resetGraph();
+   if (broadcast) broadcastDatasetSwitch('hospital');
+  // resetGraph();
   currentDataset = 'hospital';
   activePeriods = hospitalPeriods;   // <-- correct list of valid periods
 

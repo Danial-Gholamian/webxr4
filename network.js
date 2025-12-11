@@ -1,7 +1,9 @@
 // network.js
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
-import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVATAR_UPDATE_INTERVAL, activePeriods } from './main.js';
+import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVATAR_UPDATE_INTERVAL, activePeriods,
+  switchToHospitalDataset, switchToSchoolDataset
+ } from './main.js';
 import { schoolPeriods } from './schoolDefs.js';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
@@ -149,7 +151,25 @@ export function broadcastAvatar(camera, controller1, controller2) {
   lastAvatarUpdate = now;
 }
 
+// $DATASET
+export function broadcastDatasetSwitch(datasetName) {
+  console.log("Broadcasting dataset switch:", datasetName);
+  socket.emit('dataset-switch', { dataset: datasetName });
+}
 
+socket.on('dataset-switch', ({ dataset }) => {
+  console.log("Received dataset switch:", dataset);
+
+  if (dataset === 'school') {
+    switchToSchoolDataset(false);   
+  } else if (dataset === 'hospital') {
+    switchToHospitalDataset(false);
+  }
+});
+
+
+
+// $DATASET
 
 export function broadcastNodeSelection(nodeId, mode = 'DIRECT') {
   console.log("This node was broadcasted: ", nodeId)
