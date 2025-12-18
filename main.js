@@ -751,52 +751,63 @@ function edgeVisibleInSelection(link, selectionState) {
   );
 }
 
-
-
-function updateAllVisuals() {
-  const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
-
-  // ---------- Nodes ----------
+/**
+ * Function for updating nodes during selection
+ * @param {*} periodNodes 
+ */
+function updateNodeVisuals(periodNodes) {
   GraphRef.current.scene().traverse(obj => {
-    if (obj.__data?.id !== undefined) {
-      const nodeId = String(obj.__data.id);
+    if (!obj.__data?.id) return;
 
-      const inPeriod = nodeVisibleInPeriod(nodeId, periodNodes);
-      const inGroup = nodeVisibleInGroup(nodeId, groupFilterState);
-      const inSelection = nodeVisibleInSelection(nodeId, selectionState);
+    const nodeId = String(obj.__data.id);
 
-      const visible = inPeriod && inGroup && (!selectionState.isActive || inSelection);
+    const visible =
+      nodeVisibleInPeriod(nodeId, periodNodes) &&
+      nodeVisibleInGroup(nodeId, groupFilterState) &&
+      nodeVisibleInSelection(nodeId, selectionState);
 
-      applyOpacityLayer(obj, "combined", visible);
-    }
+    applyOpacityLayer(obj, "combined", visible);
   });
+}
 
-  // ---------- Edges (batched) ----------
-
+/**
+ * Update Edge visibility during node selection
+ */
+function updateEdgeVisuals() {
   const alphas = lineSegments.geometry.attributes.alpha.array;
 
-  Graph.graphData().links.forEach(link => {
+  GraphRef.current.graphData().links.forEach(link => {
     const src = String(link.source.id ?? link.source);
     const tgt = String(link.target.id ?? link.target);
-    const edgeKey = getEdgeKey(src, tgt);
-    const entry = edgeVertexMap.get(edgeKey);
+    const key = getEdgeKey(src, tgt);
+    const entry = edgeVertexMap.get(key);
+    if (!entry) return;
 
-    if (!entry) return; // Exit early if entry doesn't exist
-
-    const isVisible =
+    const visible =
       edgeVisibleInPeriod(link, activePeriod) &&
-      edgeVisibleInGroup(edgeKey, groupFilterState) &&
+      edgeVisibleInGroup(key, groupFilterState) &&
       edgeVisibleInSelection(link, selectionState);
 
-    const alphaValue = isVisible ? 1.0 : 0.0; // Fully visible or fully invisible
-    alphas[entry.start] = alphaValue;
-    alphas[entry.end] = alphaValue;
+    const a = visible ? 1.0 : 0.0;
+    alphas[entry.start] = a;
+    alphas[entry.end] = a;
   });
 
   lineSegments.geometry.attributes.alpha.needsUpdate = true;
+}
 
 
-  Graph.d3ReheatSimulation();
+/**
+ * Update the visibility of nodes and edges depending on selection states
+ */
+function updateAllVisuals() {
+  const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
+
+
+  updateNodeVisuals(periodNodes);
+  updateEdgeVisuals();
+
+  GraphRef.current.d3ReheatSimulation();
   markHoverCacheDirty?.();
 }
 
