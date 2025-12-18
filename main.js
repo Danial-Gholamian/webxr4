@@ -9,6 +9,11 @@ import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
+
+// Controller and Data Adapter
+import { GraphVisualController } from "./graphVisualController.js";
+import { SchoolTemporalGraphAdapter } from "./schoolTemporalGraphAdapter.js";
+
 import ForceGraph3D from '3d-force-graph';
 import graphData from './graph-data-periods.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -206,62 +211,6 @@ function toggleGuidePanel() {
 }
 
 
-// MIGHT BE USED TO REPLACE BUTTON FUNCTIONALITY
-// // Help icon
-// const helpIcon = createHelpIcon();
-// helpIcon.userData.onHelpClick = () => {
-//   userGuidePanel.visible = !userGuidePanel.visible;
-// };
-
-// cameraGroup.add(helpIcon);
-
-// helpIcon.traverse(obj => {
-//   if (obj.isMesh && obj.material) {
-//     obj.material.depthTest = false;
-//     obj.renderOrder = 999;
-//   }
-// });
-
-
-// // Create a wireframe cube around the cameraGroup
-// const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5); // 0.5m cube
-// const wireframe = new THREE.WireframeGeometry(geometry);
-// const line = new THREE.LineSegments(
-//   wireframe,
-//   new THREE.LineBasicMaterial({ color: 0x00ff00 })
-// );
-
-// // Position it at the cameraGroup origin (or adjust as needed)
-// line.position.set(0, 0, 0); 
-
-// // Make sure it’s rendered on top
-// line.renderOrder = 999;
-// line.material.depthTest = false;
-
-// // Add to cameraGroup
-// cameraGroup.add(line);
-
-// // Optional: log world position
-// console.log("Wireframe world pos:", line.getWorldPosition(new THREE.Vector3()));
-
-
-
-// TEST 
-// --- Reference Plane for Orientation ---
-// const refPlaneGeo = new THREE.CircleGeometry(8, 64);
-// const refPlaneMat = new THREE.MeshBasicMaterial({
-//   color: 0x111111,
-//   opacity: 0.35,
-//   transparent: true,
-//   side: THREE.DoubleSide
-// });
-// const refPlane = new THREE.Mesh(refPlaneGeo, refPlaneMat);
-// refPlane.rotation.x = -Math.PI / 2;
-// refPlane.position.set(0, -1.6, 0); // just below user eye level
-// refPlane.name = "ReferencePlane";
-// cameraGroup.add(refPlane);
-
-
 // TEST
 const controller1 = renderer.xr.getController(0);
 const controller2 = renderer.xr.getController(1);
@@ -343,6 +292,7 @@ for (const link of graphData.links) {
 // ========================
 // Graph Initialization
 // ========================
+
 const colorScale = scaleOrdinal(schemeCategory10)
   .domain([...new Set(graphData.nodes.map(n => n.group))]);
 
@@ -353,9 +303,11 @@ const Graph = ForceGraph3D()(document.body)
   .nodeColor(d => colorScale(d.group))
   .nodeLabel(node => node.label || node.id)
   .onNodeClick((node, event) => {
-    highlightSubgraph(node.id, 'DIRECT');
+    graphController.highlightNode(node.id);
+    // highlightSubgraph(node.id, 'DIRECT');
     broadcastNodeSelection(node.id, 'DIRECT');
   });
+
 
 // --- make edges "longer" by increasing spring length ---
 const linkForce = Graph.d3Force('link');
@@ -500,6 +452,25 @@ graphRoot.add(lineSegments);
 export let periodStack = null;
 
 const baseGraphData = structuredClone(graphData);
+
+
+
+
+// Create controller after graph init
+const graphController = new GraphVisualController({
+  graph: Graph,
+  scene: Graph.scene(),
+  lineSegments,
+  edgeVertexMap,
+  adapter: SchoolTemporalGraphAdapter
+});
+
+// set dataset to controller
+// graphController.setDataset(graphData);
+
+Graph.onEngineStop(() => {
+  graphController.setDataset(graphData);
+});
 
 
 
