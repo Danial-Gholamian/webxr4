@@ -24,13 +24,13 @@ import {
   handleLeftStickButton,
   handleRightStickButton
 } from './vrSetup.js';
-import {createUserGuidePanel, createHelpIcon} from './userGuidePanel.js';
-import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
+import { createUserGuidePanel, createHelpIcon } from './userGuidePanel.js';
+import { detectHover, initLabels, markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
+import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
-import {schoolPeriods} from './periodDefs.js';
+import { schoolPeriods } from './periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -125,12 +125,12 @@ loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
   const margin = 2.0;
 
   // "Half size" of the allowed walk area in XZ
-const shrinkFactor = 0.80;   // 80% of original size = tighter room
+  const shrinkFactor = 0.80;   // 80% of original size = tighter room
 
-roomHalfSize.set(
-  (size.x * 0.5) * shrinkFactor,
-  (size.z * 0.5) * shrinkFactor
-);
+  roomHalfSize.set(
+    (size.x * 0.5) * shrinkFactor,
+    (size.z * 0.5) * shrinkFactor
+  );
 
 
 
@@ -167,7 +167,7 @@ const renderer = new THREE.WebGLRenderer({
   antialias: false,                 // was true
   powerPreference: 'high-performance',
   precision: 'mediump'
-  });
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.xr.enabled = true;
@@ -206,7 +206,7 @@ function toggleGuidePanel() {
 }
 
 
-  // MIGHT BE USED TO REPLACE BUTTON FUNCTIONALITY
+// MIGHT BE USED TO REPLACE BUTTON FUNCTIONALITY
 // // Help icon
 // const helpIcon = createHelpIcon();
 // helpIcon.userData.onHelpClick = () => {
@@ -357,7 +357,7 @@ const Graph = ForceGraph3D()(document.body)
     broadcastNodeSelection(node.id, 'DIRECT');
   });
 
-  // --- make edges "longer" by increasing spring length ---
+// --- make edges "longer" by increasing spring length ---
 const linkForce = Graph.d3Force('link');
 if (linkForce?.distance) {
 
@@ -712,6 +712,44 @@ export function resetGraph() {
   updateBarGauge(timeGauge, 0, "Default");
 }
 
+// ------------ Checking node state  -------------
+function nodeVisibleInPeriod(nodeId, periodNodes) {
+  return !periodNodes || periodNodes.has(nodeId);
+}
+
+function nodeVisibleInGroup(nodeId, groupFilterState) {
+  return !groupFilterState.isActive || groupFilterState.nodeIds.has(nodeId);
+}
+
+function nodeVisibleInSelection(nodeId, selectionState) {
+  if (!selectionState.isActive) return false; // Changed to return false when inactive
+  return (
+    selectionState.selectedNodeId === nodeId ||
+    selectionState.neighborIds.has(nodeId)
+  );
+}
+
+//  ---------------- Checking Edge State -------------------
+// Edges inherit visibility constraints from both temporal membership and node-based selection context.
+function edgeVisibleInPeriod(link, activePeriod) {
+  return !activePeriod || link.periods?.includes(activePeriod);
+}
+
+function edgeVisibleInGroup(edgeKey, groupFilterState) {
+  return !groupFilterState.isActive || groupFilterState.edgeIds.has(edgeKey);
+}
+
+function edgeVisibleInSelection(link, selectionState) {
+  if (!selectionState.isActive) return false;
+
+  const src = String(link.source.id ?? link.source);
+  const tgt = String(link.target.id ?? link.target);
+
+  return (
+    src === selectionState.selectedNodeId ||
+    tgt === selectionState.selectedNodeId
+  );
+}
 
 
 
@@ -719,21 +757,17 @@ function updateAllVisuals() {
   const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
 
   // ---------- Nodes ----------
-  Graph.scene().traverse(obj => {
+  GraphRef.current.scene().traverse(obj => {
     if (obj.__data?.id !== undefined) {
       const nodeId = String(obj.__data.id);
-      const inPeriod = !periodNodes || periodNodes.has(nodeId);
-      const inGroup = !groupFilterState.isActive || groupFilterState.nodeIds.has(nodeId);
 
-      let shouldShow = inPeriod && inGroup;
+      const inPeriod = nodeVisibleInPeriod(nodeId, periodNodes);
+      const inGroup = nodeVisibleInGroup(nodeId, groupFilterState);
+      const inSelection = nodeVisibleInSelection(nodeId, selectionState);
 
-      if (selectionState.isActive) {
-        const isSelected = selectionState.selectedNodeId === nodeId;
-        const isNeighbor = selectionState.neighborIds.has(nodeId);
-        shouldShow = shouldShow && (isSelected || isNeighbor);
-      }
+      const visible = inPeriod && inGroup && (!selectionState.isActive || inSelection);
 
-      applyOpacityLayer(obj, "combined", shouldShow);
+      applyOpacityLayer(obj, "combined", visible);
     }
   });
 
@@ -746,20 +780,17 @@ function updateAllVisuals() {
     const tgt = String(link.target.id ?? link.target);
     const edgeKey = getEdgeKey(src, tgt);
     const entry = edgeVertexMap.get(edgeKey);
-    if (!entry) return;
 
-    const edgeInPeriod = !activePeriod || link.periods?.includes(activePeriod);
-    const edgeInGroup = !groupFilterState.isActive || groupFilterState.edgeIds.has(edgeKey);
+    if (!entry) return; // Exit early if entry doesn't exist
 
-    let isVisible = edgeInPeriod && edgeInGroup;
-    if (selectionState.isActive) {
-      isVisible = isVisible &&
-        (src === selectionState.selectedNodeId || tgt === selectionState.selectedNodeId);
-    }
+    const isVisible =
+      edgeVisibleInPeriod(link, activePeriod) &&
+      edgeVisibleInGroup(edgeKey, groupFilterState) &&
+      edgeVisibleInSelection(link, selectionState);
 
-    const a = isVisible ? 1.0 : 0.0; // fully visible or fully invisible
-    alphas[entry.start] = a;
-    alphas[entry.end] = a;
+    const alphaValue = isVisible ? 1.0 : 0.0; // Fully visible or fully invisible
+    alphas[entry.start] = alphaValue;
+    alphas[entry.end] = alphaValue;
   });
 
   lineSegments.geometry.attributes.alpha.needsUpdate = true;
@@ -869,9 +900,9 @@ renderer.xr.addEventListener('sessionend', () => {
 
 setInterval(() => {
   if (inVR) {
-    
+
     broadcastAvatar(camera, controller1, controller2);
-    
+
     // console.log('Hellow');
   }
 }, 100);
@@ -937,7 +968,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   // if (plane) {
   //   plane.rotation.set(-Math.PI / 2, 0, 0); // keep it flat
   // }
-  
+
 
   // TEST
 
@@ -947,28 +978,28 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   if (periodStack) periodStack.update(deltaTime);
 
   avatarInterpolation.update(userAvatars, deltaTime);
-    
+
 
 
   const fps = 1 / Math.max(deltaTime, 1e-6);
-  fpsAccum += fps; 
-  frameCount++; 
+  fpsAccum += fps;
+  frameCount++;
   if (frameCount % 60 === 0) { // log once every ~60 frames 
-    console.log("FPS:", Math.round(fpsAccum / frameCount)); 
+    console.log("FPS:", Math.round(fpsAccum / frameCount));
     frameCount = 0;
-    fpsAccum = 0; 
+    fpsAccum = 0;
   }
   // Make avatar name labels always face the camera
   Object.values(userAvatars).forEach(({ head, nameLabel }) => {
     if (nameLabel) {
-  
+
       nameLabel.lookAt(camera.position);
     }
   });
 
-  if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL)  {
-  broadcastAvatar(camera, controller1, controller2);
-  lastBroadcast = timestamp;
+  if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) {
+    broadcastAvatar(camera, controller1, controller2);
+    lastBroadcast = timestamp;
   }
   if (graphUpdateNeeded) {
     switch (graphUpdateMode) {
@@ -992,24 +1023,24 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
 
 
-  
+
   panelState = updatePanelPosition({
-  uiPanel,
-  panelState,
-  camera,
-  cameraGroup,
-  controller: controller1,
-  scene,
-  inVR
+    uiPanel,
+    panelState,
+    camera,
+    cameraGroup,
+    controller: controller1,
+    scene,
+    inVR
   });
   uiPanel?.userData?.update?.();
 
 
   if (uiPanel?.userData?.bgPlane) {
-  const bg = uiPanel.userData.bgPlane;
-  
-  // Only update color if panel is interactive
-    if (bg.userData.isUIPanel) { 
+    const bg = uiPanel.userData.bgPlane;
+
+    // Only update color if panel is interactive
+    if (bg.userData.isUIPanel) {
       const targetColor = bg.userData.isHovered ? 0x4444aa : 0x000000;
       bg.material.color.lerp(new THREE.Color(targetColor), 0.1);
     }
@@ -1061,14 +1092,14 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleAButtonInput(xrFrame, () => {
-    togglePanel();
-    [controller1, controller2].forEach(c => {
-      const gp = c.userData.inputSource?.gamepad;
-      const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
-      if (h?.pulse) {
-        h.pulse(0.8, 100);
-      } else if (navigator.vibrate) {
-        navigator.vibrate(100);
+      togglePanel();
+      [controller1, controller2].forEach(c => {
+        const gp = c.userData.inputSource?.gamepad;
+        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
+        if (h?.pulse) {
+          h.pulse(0.8, 100);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(100);
         }
       });
     });
@@ -1093,12 +1124,12 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     handleYButtonInput(xrFrame, () => {
       toggleGuidePanel();
       [controller1, controller2].forEach(c => {
-      const gp = c.userData.inputSource?.gamepad;
-      const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
-      if (h?.pulse) {
-        h.pulse(0.8, 100);
-      } else if (navigator.vibrate) {
-        navigator.vibrate(100);
+        const gp = c.userData.inputSource?.gamepad;
+        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
+        if (h?.pulse) {
+          h.pulse(0.8, 100);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(100);
         }
       });
     })
@@ -1109,10 +1140,10 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-  if (!periodStack?.group?.visible) {
-    detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
-    detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
-  }
+    if (!periodStack?.group?.visible) {
+      detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
+      detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
+    }
 
     pollGraphSwitchButtons();
   } else {
