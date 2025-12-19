@@ -578,6 +578,8 @@ function requestGraphUpdate(mode, nodeId) {
 
 setUIPanel(uiPanel);
 
+// DELETE LATER
+console.log("DELETE HIGHLIGHTSUBGRAPH AFTER FIXING THE DEPENDECY IN NETWORK.JS");
 export function highlightSubgraph(nodeId) {
   const clickedId = String(nodeId);
   uiPanel.userData.updateSelectedNodeLabel?.(clickedId);
@@ -598,6 +600,8 @@ export function highlightSubgraph(nodeId) {
 
   updateAllVisuals();
 }
+
+
 function getEdgeKey(a, b) {
   return [a, b].sort().join('--');
 }
@@ -682,169 +686,169 @@ export function resetGraph() {
   Graph.d3ReheatSimulation();
   updateBarGauge(timeGauge, 0, "Default");
 }
-/**
- * Build a unified visibility context that captures the current
- * temporal, group-based, and selection-based interaction state.
- *
- * This context object is passed to all visibility functions so that
- * node and edge rendering decisions are derived from a single
- * source of truth, rather than scattered global state.
- *
- * @returns {Object} ctx - Visibility context
- */
-function buildVisibilityContext() {
-  return {
-    // Currently active temporal slice (null if none)
-    activePeriod,
+// /**
+//  * Build a unified visibility context that captures the current
+//  * temporal, group-based, and selection-based interaction state.
+//  *
+//  * This context object is passed to all visibility functions so that
+//  * node and edge rendering decisions are derived from a single
+//  * source of truth, rather than scattered global state.
+//  *
+//  * @returns {Object} ctx - Visibility context
+//  */
+// function buildVisibilityContext() {
+//   return {
+//     // Currently active temporal slice (null if none)
+//     activePeriod,
 
-    // Set of node IDs active in the current period (or null if no period filter)
-    periodNodes: activePeriod
-      ? (periodActiveNodes.get(activePeriod) || new Set())
-      : null,
+//     // Set of node IDs active in the current period (or null if no period filter)
+//     periodNodes: activePeriod
+//       ? (periodActiveNodes.get(activePeriod) || new Set())
+//       : null,
 
-    // Node selection state (single-node ego network)
-    selection: {
-      active: selectionState.isActive,
-      selectedNodeId: selectionState.selectedNodeId,
-      neighbors: selectionState.neighborIds
-    },
+//     // Node selection state (single-node ego network)
+//     selection: {
+//       active: selectionState.isActive,
+//       selectedNodeId: selectionState.selectedNodeId,
+//       neighbors: selectionState.neighborIds
+//     },
 
-    // Group-based filtering state
-    group: {
-      active: groupFilterState.isActive,
-      nodeIds: groupFilterState.nodeIds,
-      edgeIds: groupFilterState.edgeIds
-    }
-  };
-}
+//     // Group-based filtering state
+//     group: {
+//       active: groupFilterState.isActive,
+//       nodeIds: groupFilterState.nodeIds,
+//       edgeIds: groupFilterState.edgeIds
+//     }
+//   };
+// }
 
-/**
- * Determine whether a node should be visible under the current visibility context.
- *
- * Visibility is evaluated as the intersection of multiple constraints:
- *  1. Temporal membership (if a period is active)
- *  2. Group membership (if a group filter is active)
- *  3. Selection focus (if a node selection is active)
- *
- * This function represents the *visibility policy* for nodes.
- *
- * @param {string} nodeId - ID of the node being evaluated
- * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
- * @returns {boolean} Whether the node should be rendered as visible
- */
-function isNodeVisible(nodeId, ctx) {
-  // Temporal constraint: node must exist in the active period
-  if (ctx.activePeriod && !ctx.periodNodes.has(nodeId)) return false;
+// /**
+//  * Determine whether a node should be visible under the current visibility context.
+//  *
+//  * Visibility is evaluated as the intersection of multiple constraints:
+//  *  1. Temporal membership (if a period is active)
+//  *  2. Group membership (if a group filter is active)
+//  *  3. Selection focus (if a node selection is active)
+//  *
+//  * This function represents the *visibility policy* for nodes.
+//  *
+//  * @param {string} nodeId - ID of the node being evaluated
+//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
+//  * @returns {boolean} Whether the node should be rendered as visible
+//  */
+// function isNodeVisible(nodeId, ctx) {
+//   // Temporal constraint: node must exist in the active period
+//   if (ctx.activePeriod && !ctx.periodNodes.has(nodeId)) return false;
 
-  // Group constraint: node must belong to the active group
-  if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
+//   // Group constraint: node must belong to the active group
+//   if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
 
-  // Selection constraint: show only the selected node and its neighbors
-  if (ctx.selection.active) {
-    return (
-      nodeId === ctx.selection.selectedNodeId ||
-      ctx.selection.neighbors.has(nodeId)
-    );
-  }
+//   // Selection constraint: show only the selected node and its neighbors
+//   if (ctx.selection.active) {
+//     return (
+//       nodeId === ctx.selection.selectedNodeId ||
+//       ctx.selection.neighbors.has(nodeId)
+//     );
+//   }
 
-  // Default: visible when no restrictive context applies
-  return true;
-}
+//   // Default: visible when no restrictive context applies
+//   return true;
+// }
 
-/**
- * Determine whether an edge should be visible under the current visibility context.
- *
- * Edge visibility is derived from:
- *  - Temporal membership (edge exists in the active period)
- *  - Group filtering (both endpoints belong to the group)
- *  - Selection focus (edge is incident to the selected node)
- *
- * Edges inherit visibility constraints from both their own attributes
- * (e.g., periods) and node-based interaction context.
- *
- * @param {Object} link - Edge object from the graph data
- * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
- * @returns {boolean} Whether the edge should be rendered as visible
- */
-function isEdgeVisible(link, ctx) {
-  const src = String(link.source.id ?? link.source);
-  const tgt = String(link.target.id ?? link.target);
-  const key = getEdgeKey(src, tgt);
+// /**
+//  * Determine whether an edge should be visible under the current visibility context.
+//  *
+//  * Edge visibility is derived from:
+//  *  - Temporal membership (edge exists in the active period)
+//  *  - Group filtering (both endpoints belong to the group)
+//  *  - Selection focus (edge is incident to the selected node)
+//  *
+//  * Edges inherit visibility constraints from both their own attributes
+//  * (e.g., periods) and node-based interaction context.
+//  *
+//  * @param {Object} link - Edge object from the graph data
+//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
+//  * @returns {boolean} Whether the edge should be rendered as visible
+//  */
+// function isEdgeVisible(link, ctx) {
+//   const src = String(link.source.id ?? link.source);
+//   const tgt = String(link.target.id ?? link.target);
+//   const key = getEdgeKey(src, tgt);
 
-  // Temporal constraint
-  if (ctx.activePeriod && !link.periods?.includes(ctx.activePeriod)) return false;
+//   // Temporal constraint
+//   if (ctx.activePeriod && !link.periods?.includes(ctx.activePeriod)) return false;
 
-  // Group constraint
-  if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
+//   // Group constraint
+//   if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
 
-  // Selection constraint: show only edges incident to the selected node
-  if (ctx.selection.active) {
-    return (
-      src === ctx.selection.selectedNodeId ||
-      tgt === ctx.selection.selectedNodeId
-    );
-  }
+//   // Selection constraint: show only edges incident to the selected node
+//   if (ctx.selection.active) {
+//     return (
+//       src === ctx.selection.selectedNodeId ||
+//       tgt === ctx.selection.selectedNodeId
+//     );
+//   }
 
-  return true;
-}
+//   return true;
+// }
 
-/**
- * Update node materials based on the current visibility context.
- *
- * This function traverses the Three.js scene graph and applies
- * opacity-based visibility to node meshes according to the
- * node visibility policy.
- *
- * Rendering decisions are kept separate from visibility logic
- * (see isNodeVisible), allowing the system to evolve without
- * tightly coupling interaction logic and rendering code.
- *
- * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
- */
-function updateNodeVisuals(ctx) {
-  GraphRef.current.scene().traverse(obj => {
-    if (!obj.__data?.id) return;
+// /**
+//  * Update node materials based on the current visibility context.
+//  *
+//  * This function traverses the Three.js scene graph and applies
+//  * opacity-based visibility to node meshes according to the
+//  * node visibility policy.
+//  *
+//  * Rendering decisions are kept separate from visibility logic
+//  * (see isNodeVisible), allowing the system to evolve without
+//  * tightly coupling interaction logic and rendering code.
+//  *
+//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
+//  */
+// function updateNodeVisuals(ctx) {
+//   GraphRef.current.scene().traverse(obj => {
+//     if (!obj.__data?.id) return;
 
-    const nodeId = String(obj.__data.id);
-    const visible = isNodeVisible(nodeId, ctx);
+//     const nodeId = String(obj.__data.id);
+//     const visible = isNodeVisible(nodeId, ctx);
 
-    applyOpacityLayer(obj, "combined", visible);
-  });
-}
+//     applyOpacityLayer(obj, "combined", visible);
+//   });
+// }
 
 
-/**
- * Update edge visibility using a batched line representation.
- *
- * Instead of toggling individual edge meshes, this function updates
- * per-vertex alpha values in a shared BufferGeometry. This enables:
- *  - Efficient large-graph rendering (single draw call)
- *  - Smooth transitions between interaction states
- *
- * Edge visibility is determined by the edge visibility policy
- * (see isEdgeVisible).
- *
- * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
- */
-function updateEdgeVisuals(ctx) {
-  const alphas = lineSegments.geometry.attributes.alpha.array;
+// /**
+//  * Update edge visibility using a batched line representation.
+//  *
+//  * Instead of toggling individual edge meshes, this function updates
+//  * per-vertex alpha values in a shared BufferGeometry. This enables:
+//  *  - Efficient large-graph rendering (single draw call)
+//  *  - Smooth transitions between interaction states
+//  *
+//  * Edge visibility is determined by the edge visibility policy
+//  * (see isEdgeVisible).
+//  *
+//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
+//  */
+// function updateEdgeVisuals(ctx) {
+//   const alphas = lineSegments.geometry.attributes.alpha.array;
 
-  GraphRef.current.graphData().links.forEach(link => {
-    const src = String(link.source.id ?? link.source);
-    const tgt = String(link.target.id ?? link.target);
-    const key = getEdgeKey(src, tgt);
-    const entry = edgeVertexMap.get(key);
-    if (!entry) return;
+//   GraphRef.current.graphData().links.forEach(link => {
+//     const src = String(link.source.id ?? link.source);
+//     const tgt = String(link.target.id ?? link.target);
+//     const key = getEdgeKey(src, tgt);
+//     const entry = edgeVertexMap.get(key);
+//     if (!entry) return;
 
-    const visible = isEdgeVisible(link, ctx);
-    const a = visible ? 1.0 : 0.0;
+//     const visible = isEdgeVisible(link, ctx);
+//     const a = visible ? 1.0 : 0.0;
 
-    alphas[entry.start] = a;
-    alphas[entry.end] = a;
-  });
+//     alphas[entry.start] = a;
+//     alphas[entry.end] = a;
+//   });
 
-  lineSegments.geometry.attributes.alpha.needsUpdate = true;
-}
+//   lineSegments.geometry.attributes.alpha.needsUpdate = true;
+// }
 
 /**
  * Coordinates a full visual update of the graph.
@@ -859,13 +863,7 @@ function updateEdgeVisuals(ctx) {
  * flow through this function.
  */
 function updateAllVisuals() {
-  const context = buildVisibilityContext();
-
-  updateNodeVisuals(context);
-  updateEdgeVisuals(context);
-
-  GraphRef.current.d3ReheatSimulation();
-  markHoverCacheDirty?.();
+  graphController.update();
 }
 
 
@@ -883,22 +881,24 @@ export function clearGroupFilter() {
 // Auto Highlight Cycle
 // ========================
 
-function applyOpacityLayer(obj, context, visible) {
-  const base = obj.userData.originalMaterial ||= obj.material;
+// function applyOpacityLayer(obj, context, visible) {
+//   const base = obj.userData.originalMaterial ||= obj.material;
 
-  // Clone per context (e.g., periodMaterial, selectionMaterial)
-  const key = context + "Material";
-  if (!obj.userData[key]) {
-    obj.userData[key] = base.clone();
-  }
+//   // Clone per context (e.g., periodMaterial, selectionMaterial)
+//   const key = context + "Material";
+//   if (!obj.userData[key]) {
+//     obj.userData[key] = base.clone();
+//   }
 
-  const mat = obj.userData[key];
-  mat.transparent = true;
-  mat.opacity = visible ? 1.0 : 0.1;
-  mat.needsUpdate = true;
+//   const mat = obj.userData[key];
+//   mat.transparent = true;
+//   mat.opacity = visible ? 1.0 : 0.1;
+//   mat.needsUpdate = true;
 
-  obj.material = mat;
-}
+//   obj.material = mat;
+// }
+
+
 export const periodActiveNodes = new Map();
 
 export function precomputePeriodData() {
@@ -989,13 +989,15 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 
   // Apply context BEFORE showing
   if (context.groupName) {
-    highlightGroup(context.groupName);
+    graphController.highlightGroup(context.groupName)
+    // highlightGroup(context.groupName);
   }
   if (context.period) {
     highlightPeriod(context.period);
   }
   if (context.selectedNodeId) {
-    highlightSubgraph(context.selectedNodeId);
+    graphController.highlightNode(context.selectedNodeId)
+    // highlightSubgraph(context.selectedNodeId);
   }
 
   if (visible) {
@@ -1081,7 +1083,8 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         break;
       case 'SUBGRAPH':
       case 'DIRECT':
-        highlightSubgraph(graphUpdateNodeId);
+        // highlightSubgraph(graphUpdateNodeId);
+        graphController.highlightNode(graphUpdateNodeId)
         broadcastNodeSelection(graphUpdateNodeId);
         break;
     }
