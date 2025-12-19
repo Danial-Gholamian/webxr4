@@ -70,7 +70,9 @@ export class GraphVisualController {
         this._resetState();
         this._precomputePeriodData();
 
-        this.update();
+        // this.update();
+        // NOTE: UNCOMMENTING THIS MAKES THE GRAPH UPDATE EVERYTIME 
+        // WHEN Graph.onEnginestop is called in main.js
     }
 
     // =========================================================
@@ -144,7 +146,9 @@ export class GraphVisualController {
 
     highlightPeriod(periodId) {
         this.state.activePeriod = periodId;
-        this.clearNodeSelection();
+        this.state.selection.active = false;
+        this.state.selection.selectedNodeId = null;
+        // this.clearNodeSelection();
         this.update();
     }
 
@@ -167,6 +171,7 @@ export class GraphVisualController {
      * This replaces updateAllVisuals().
      */
     update() {
+        console.trace("GraphVisualController.update");
         const ctx = this._buildVisibilityContext();
 
         this._updateNodeVisuals(ctx);
@@ -258,6 +263,31 @@ export class GraphVisualController {
         obj.material = mat;
     }
 
+
+    //     _applyOpacityLayer(obj, context, visible) {
+    //     // Cache original material once
+    //     if (!obj.userData.originalMaterial) {
+    //         obj.userData.originalMaterial = obj.material;
+    //     }
+
+    //     // If fully visible → restore original material
+    //     if (visible) {
+    //         obj.material = obj.userData.originalMaterial;
+    //         return;
+    //     }
+
+    //     // Otherwise use a dimmed clone
+    //     const key = context + "Material";
+
+    //     if (!obj.userData[key]) {
+    //         const clone = obj.userData.originalMaterial.clone();
+    //         clone.transparent = true;
+    //         clone.opacity = 0.15;
+    //         obj.userData[key] = clone;
+    //     }
+
+    //     obj.material = obj.userData[key];
+    // }
     // =========================================================
     // Internal helpers — Rendering
     // =========================================================
@@ -265,6 +295,9 @@ export class GraphVisualController {
     _updateNodeVisuals(ctx) {
         this.graph.scene().traverse(obj => {
             if (!obj.__data) return;
+
+            // // ✅ Only node meshes have __data.id
+            // if (!obj.__data?.id) return;
 
             const nodeId = this.adapter.getNodeId(obj.__data);
             const visible = this._isNodeVisible(nodeId, ctx);
@@ -275,6 +308,10 @@ export class GraphVisualController {
 
     _updateEdgeVisuals(ctx) {
         const alphas = this.lineSegments.geometry.attributes.alpha.array;
+        console.log(
+            "edges:",
+            this.lineSegments.geometry.attributes.alpha.array.length
+        );
 
         this.graph.graphData().links.forEach(link => {
             const src = this.adapter.getEdgeSource(link);

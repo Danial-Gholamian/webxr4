@@ -158,11 +158,7 @@ function clampCameraToRoom() {
   pos.x = roomCenter.x + clampedRelX;
   pos.z = roomCenter.z + clampedRelZ;
 
-  // If you want to prevent "flying" up/down, clamp Y too:
-  // pos.y = Math.max(pos.y, someFloorHeight);
 }
-
-
 
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -496,32 +492,6 @@ function rebuildPeriodStack() {
 }
 
 
-
-
-// Graph.onEngineStop(() => {
-//   // optional: build once the force layout stabilizes
-//   // buildPeriodStackOnce();
-// });
-
-
-// function updateGraphScaling(xrFrame) {
-//   // Shrink (left stick button)
-//   handleLeftStickButton(xrFrame, () => {
-//     targetScale = Math.max(minScale, targetScale - 0.01);
-//   });
-
-//   // Grow (right stick button)
-//   handleRightStickButton(xrFrame, () => {
-//     targetScale = Math.min(maxScale, targetScale + 0.01);
-//   });
-
-//   // Smoothly interpolate current scale → target scale
-//   const current = graphRoot.scale.x;
-//   const newScale = THREE.MathUtils.lerp(current, targetScale, scaleSpeed);
-
-//   graphRoot.scale.set(newScale, newScale, newScale);
-// }
-
 // ========================
 // UI Setup (VR Button + Panel)
 // ========================
@@ -697,186 +667,6 @@ export function resetGraph() {
   // Graph.d3ReheatSimulation();
   updateBarGauge(timeGauge, 0, "Default");
 }
-// /**
-//  * Build a unified visibility context that captures the current
-//  * temporal, group-based, and selection-based interaction state.
-//  *
-//  * This context object is passed to all visibility functions so that
-//  * node and edge rendering decisions are derived from a single
-//  * source of truth, rather than scattered global state.
-//  *
-//  * @returns {Object} ctx - Visibility context
-//  */
-// function buildVisibilityContext() {
-//   return {
-//     // Currently active temporal slice (null if none)
-//     activePeriod,
-
-//     // Set of node IDs active in the current period (or null if no period filter)
-//     periodNodes: activePeriod
-//       ? (periodActiveNodes.get(activePeriod) || new Set())
-//       : null,
-
-//     // Node selection state (single-node ego network)
-//     selection: {
-//       active: selectionState.isActive,
-//       selectedNodeId: selectionState.selectedNodeId,
-//       neighbors: selectionState.neighborIds
-//     },
-
-//     // Group-based filtering state
-//     group: {
-//       active: groupFilterState.isActive,
-//       nodeIds: groupFilterState.nodeIds,
-//       edgeIds: groupFilterState.edgeIds
-//     }
-//   };
-// }
-
-// /**
-//  * Determine whether a node should be visible under the current visibility context.
-//  *
-//  * Visibility is evaluated as the intersection of multiple constraints:
-//  *  1. Temporal membership (if a period is active)
-//  *  2. Group membership (if a group filter is active)
-//  *  3. Selection focus (if a node selection is active)
-//  *
-//  * This function represents the *visibility policy* for nodes.
-//  *
-//  * @param {string} nodeId - ID of the node being evaluated
-//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
-//  * @returns {boolean} Whether the node should be rendered as visible
-//  */
-// function isNodeVisible(nodeId, ctx) {
-//   // Temporal constraint: node must exist in the active period
-//   if (ctx.activePeriod && !ctx.periodNodes.has(nodeId)) return false;
-
-//   // Group constraint: node must belong to the active group
-//   if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
-
-//   // Selection constraint: show only the selected node and its neighbors
-//   if (ctx.selection.active) {
-//     return (
-//       nodeId === ctx.selection.selectedNodeId ||
-//       ctx.selection.neighbors.has(nodeId)
-//     );
-//   }
-
-//   // Default: visible when no restrictive context applies
-//   return true;
-// }
-
-// /**
-//  * Determine whether an edge should be visible under the current visibility context.
-//  *
-//  * Edge visibility is derived from:
-//  *  - Temporal membership (edge exists in the active period)
-//  *  - Group filtering (both endpoints belong to the group)
-//  *  - Selection focus (edge is incident to the selected node)
-//  *
-//  * Edges inherit visibility constraints from both their own attributes
-//  * (e.g., periods) and node-based interaction context.
-//  *
-//  * @param {Object} link - Edge object from the graph data
-//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
-//  * @returns {boolean} Whether the edge should be rendered as visible
-//  */
-// function isEdgeVisible(link, ctx) {
-//   const src = String(link.source.id ?? link.source);
-//   const tgt = String(link.target.id ?? link.target);
-//   const key = getEdgeKey(src, tgt);
-
-//   // Temporal constraint
-//   if (ctx.activePeriod && !link.periods?.includes(ctx.activePeriod)) return false;
-
-//   // Group constraint
-//   if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
-
-//   // Selection constraint: show only edges incident to the selected node
-//   if (ctx.selection.active) {
-//     return (
-//       src === ctx.selection.selectedNodeId ||
-//       tgt === ctx.selection.selectedNodeId
-//     );
-//   }
-
-//   return true;
-// }
-
-// /**
-//  * Update node materials based on the current visibility context.
-//  *
-//  * This function traverses the Three.js scene graph and applies
-//  * opacity-based visibility to node meshes according to the
-//  * node visibility policy.
-//  *
-//  * Rendering decisions are kept separate from visibility logic
-//  * (see isNodeVisible), allowing the system to evolve without
-//  * tightly coupling interaction logic and rendering code.
-//  *
-//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
-//  */
-// function updateNodeVisuals(ctx) {
-//   GraphRef.current.scene().traverse(obj => {
-//     if (!obj.__data?.id) return;
-
-//     const nodeId = String(obj.__data.id);
-//     const visible = isNodeVisible(nodeId, ctx);
-
-//     applyOpacityLayer(obj, "combined", visible);
-//   });
-// }
-
-
-// /**
-//  * Update edge visibility using a batched line representation.
-//  *
-//  * Instead of toggling individual edge meshes, this function updates
-//  * per-vertex alpha values in a shared BufferGeometry. This enables:
-//  *  - Efficient large-graph rendering (single draw call)
-//  *  - Smooth transitions between interaction states
-//  *
-//  * Edge visibility is determined by the edge visibility policy
-//  * (see isEdgeVisible).
-//  *
-//  * @param {Object} ctx - Visibility context returned by buildVisibilityContext()
-//  */
-// function updateEdgeVisuals(ctx) {
-//   const alphas = lineSegments.geometry.attributes.alpha.array;
-
-//   GraphRef.current.graphData().links.forEach(link => {
-//     const src = String(link.source.id ?? link.source);
-//     const tgt = String(link.target.id ?? link.target);
-//     const key = getEdgeKey(src, tgt);
-//     const entry = edgeVertexMap.get(key);
-//     if (!entry) return;
-
-//     const visible = isEdgeVisible(link, ctx);
-//     const a = visible ? 1.0 : 0.0;
-
-//     alphas[entry.start] = a;
-//     alphas[entry.end] = a;
-//   });
-
-//   lineSegments.geometry.attributes.alpha.needsUpdate = true;
-// }
-
-/**
- * Coordinates a full visual update of the graph.
- *
- * This function acts as the top-level synchronization point
- * between interaction state and rendering. It:
- *  1. Builds the current visibility context
- *  2. Updates node and edge visuals accordingly
- *  3. Triggers layout stabilization and hover cache updates
- *
- * All interaction-driven visual changes should ultimately
- * flow through this function.
- */
-// function updateAllVisuals() {
-//   graphController.update();
-// }
-
 
 
 export function clearGroupFilter() {
@@ -887,46 +677,6 @@ export function clearGroupFilter() {
   // updateAllVisuals();
 }
 
-
-// ========================
-// Auto Highlight Cycle
-// ========================
-
-// function applyOpacityLayer(obj, context, visible) {
-//   const base = obj.userData.originalMaterial ||= obj.material;
-
-//   // Clone per context (e.g., periodMaterial, selectionMaterial)
-//   const key = context + "Material";
-//   if (!obj.userData[key]) {
-//     obj.userData[key] = base.clone();
-//   }
-
-//   const mat = obj.userData[key];
-//   mat.transparent = true;
-//   mat.opacity = visible ? 1.0 : 0.1;
-//   mat.needsUpdate = true;
-
-//   obj.material = mat;
-// }
-
-
-// export const periodActiveNodes = new Map();
-
-// export function precomputePeriodData() {
-//   // periodActiveNodes.clear();
-
-//   // Graph.graphData().links.forEach(link => {
-//   //   const periods = link.periods || [];
-
-//   //   periods.forEach(period => {
-//   //     if (!periodActiveNodes.has(period)) {
-//   //       periodActiveNodes.set(period, new Set());
-//   //     }
-//   //     periodActiveNodes.get(period).add(link.source);
-//   //     periodActiveNodes.get(period).add(link.target);
-//   //   });
-//   // });
-// }
 
 
 export function highlightPeriod(period) {
@@ -1024,18 +774,12 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 
 
 
-
-
 // ========================
 // Animation Loop
 // ========================
 
-
-
-
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
 setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup);
-// precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;
 // startPeriodPreviewCycle();
 
@@ -1047,17 +791,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     periodStack.syncFromGraph?.(Graph);
   }
 
-
-  // TEST
-  // const plane = cameraGroup.getObjectByName("ReferencePlane");
-  // if (plane) {
-  //   plane.rotation.set(-Math.PI / 2, 0, 0); // keep it flat
-  // }
-
-
-  // TEST
-
-  // if (timestamp > 10000) graphRoot.scale.set(0.1, 0.1, 0.1);
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
   if (periodStack) periodStack.update(deltaTime);
@@ -1220,12 +953,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       });
     })
 
-
-
-
-
-
-
     if (!periodStack?.group?.visible) {
       detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
       detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
@@ -1251,5 +978,3 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   renderer.render(scene, camera);
 });
-
-// Today

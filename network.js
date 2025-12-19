@@ -1,7 +1,7 @@
 // network.js
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
-import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVATAR_UPDATE_INTERVAL } from './main.js';
+import { highlightSubgraph, resetGraph, highlightPeriod, AVATAR_UPDATE_INTERVAL } from './main.js';
 import { schoolPeriods } from './periodDefs';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
@@ -193,6 +193,22 @@ export function setCurrentPeriodIndex(index, broadcast = true) {
     socket.emit('period-change', period);
   }
 }
+
+// export function setCurrentPeriodIndex(index, broadcast = true) {
+//   const clamped = Math.max(0, Math.min(index, schoolPeriods.length - 1));
+
+//   // 🛑 GUARD: no-op if already active
+//   if (clamped === currentPeriodIndex) return;
+
+//   currentPeriodIndex = clamped;
+//   const period = schoolPeriods[currentPeriodIndex];
+
+//   highlightPeriod(period);
+
+//   if (broadcast) {
+//     socket.emit('period-change', period);
+//   }
+// }
 
 export let squeezeRightNextPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() + 1, true);
 export let squeezeLefttPrevPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() - 1, true);
