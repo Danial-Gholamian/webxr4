@@ -158,7 +158,11 @@ function clampCameraToRoom() {
   pos.x = roomCenter.x + clampedRelX;
   pos.z = roomCenter.z + clampedRelZ;
 
+  // If you want to prevent "flying" up/down, clamp Y too:
+  // pos.y = Math.max(pos.y, someFloorHeight);
 }
+
+
 
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -774,12 +778,18 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 
 
 
+
+
 // ========================
 // Animation Loop
 // ========================
 
+
+
+
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
 setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup);
+// precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;
 // startPeriodPreviewCycle();
 
@@ -791,6 +801,17 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     periodStack.syncFromGraph?.(Graph);
   }
 
+
+  // TEST
+  // const plane = cameraGroup.getObjectByName("ReferencePlane");
+  // if (plane) {
+  //   plane.rotation.set(-Math.PI / 2, 0, 0); // keep it flat
+  // }
+
+
+  // TEST
+
+  // if (timestamp > 10000) graphRoot.scale.set(0.1, 0.1, 0.1);
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
   if (periodStack) periodStack.update(deltaTime);
@@ -953,6 +974,12 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       });
     })
 
+
+
+
+
+
+
     if (!periodStack?.group?.visible) {
       detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
       detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
@@ -978,3 +1005,5 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   renderer.render(scene, camera);
 });
+
+// Today

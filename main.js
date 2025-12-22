@@ -335,6 +335,7 @@ const edgeVertexMap = new Map();
 // fully visible, all in one draw call.
 
 function buildBatchedEdges(graphData, nodesById) {
+  console.log("buildBatchedEdges called")
   const positions = [];
   const colors = [];
   const color = new THREE.Color();
@@ -419,6 +420,8 @@ Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
 const lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
 // scene.add(lineSegments);
 
+lineSegments.name = '__EDGE_LAYER__';
+
 Graph.onEngineTick(() => {
   const pos = lineSegments.geometry.attributes.position.array;
   let i = 0;
@@ -466,11 +469,11 @@ const graphController = new GraphVisualController({
 });
 
 // set dataset to controller
-// graphController.setDataset(graphData);
+graphController.setDataset(graphData);
 
-Graph.onEngineStop(() => {
-  graphController.setDataset(graphData);
-});
+// Graph.onEngineStop(() => {
+//   graphController.setDataset(graphData);
+// });
 
 
 
