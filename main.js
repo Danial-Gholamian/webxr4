@@ -336,6 +336,7 @@ const edgeVertexMap = new Map();
 
 function buildBatchedEdges(graphData, nodesById) {
   console.log("buildBatchedEdges called")
+  // edgeVertexMap.clear()
   const positions = [];
   const colors = [];
   const color = new THREE.Color();
@@ -419,8 +420,6 @@ Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
 // Build line batch
 const lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
 // scene.add(lineSegments);
-
-lineSegments.name = '__EDGE_LAYER__';
 
 Graph.onEngineTick(() => {
   const pos = lineSegments.geometry.attributes.position.array;

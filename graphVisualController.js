@@ -52,6 +52,9 @@ export class GraphVisualController {
 
         // --- Internal flags ---
         this._needsUpdate = false;
+
+        // --- Baseline edge opacity ---
+        this.BASE_EDGE_ALPHA = 0.2;
     }
 
     // =========================================================
@@ -158,7 +161,15 @@ export class GraphVisualController {
     }
 
     resetAll() {
+        console.log("edgeVertexMap size:", this.edgeVertexMap.size);
         this._resetState();
+
+        const lines = [];
+        this.scene.traverse(o => {
+            if (o.isLineSegments) lines.push(o);
+        });
+
+        console.log('LineSegments in scene:', lines.length, lines);
         this.update();
     }
 
@@ -171,6 +182,7 @@ export class GraphVisualController {
      * This replaces updateAllVisuals().
      */
     update() {
+        console.log("edgeVertexMap size:", this.edgeVertexMap.size);
         console.trace("GraphVisualController.update");
         const ctx = this._buildVisibilityContext();
 
@@ -321,7 +333,7 @@ export class GraphVisualController {
             if (!entry) return;
 
             const visible = this._isEdgeVisible(link, ctx);
-            const a = visible ? 1.0 : 0.0;
+            const a = visible ? this.BASE_EDGE_ALPHA : 0.0;
 
             alphas[entry.start] = a;
             alphas[entry.end] = a;
