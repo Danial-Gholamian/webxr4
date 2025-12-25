@@ -1,27 +1,28 @@
+If you click a node that doesn't exist in a certain period nothing shows up (maybe not a bug but an accurate representation
+Need to refactor the periodstack logic...
+
+
+
+Current change may contain bugs BEWARE....
+
+
 // periodStack.js
 
-// Current of logic of the period stack...
-// MIGHT NEED TO BE CHANGED LATER
-// Condition	Nodes shown
-// Period only	All nodes active in that period
-// Selection only	Selected node + neighbors
-// Period + Selection	Selected node + neighbors within that period
-// Group + Period	Group ∩ period
-// Group + Selection	Group ∩ neighbors
-// All three	Intersection of all
-// --------------------------------------------------
-// PeriodStack NEVER decides visibility.
-// It only asks the GraphVisualController.
-//
-// Visibility rules live ONLY in the controller.
-// --------------------------------------------------
 
+// PeriodStack never decides visibility of the nodes
+// It only asks the controller and then display them
+// periodStack:
+//   ├─ ask controller: is this node visible in period X?
+//   ├─ ask controller: is this edge visible in period X?
+
+
+// periodStack.js
 import * as THREE from 'three';
 import { forceSimulation, forceManyBody, forceLink, forceCenter } from 'd3-force';
 import { Text } from 'troika-three-text';
 
 /* --------------------------------------------------
-   2D layout helper (mutates nodes)
+   Simple 2D layout helper
 -------------------------------------------------- */
 function layout2D(nodes, links) {
   const sim = forceSimulation(nodes)
@@ -55,29 +56,9 @@ export function createPeriodStack({
   const mainRoot = Graph.scene();
   const fgCanvas = Graph.renderer ? Graph.renderer().domElement : null;
 
-  const basePos   = mainRoot.position.clone();
-  const baseQuat  = mainRoot.quaternion.clone();
+  const basePos = mainRoot.position.clone();
+  const baseQuat = mainRoot.quaternion.clone();
   const baseScale = mainRoot.scale.clone();
-
-  /* --------------------------------------------------
-     Optional performance optimization:
-     filter graph data by period only
-  -------------------------------------------------- */
-  function dataForPeriod(period) {
-    const links = graphData.links.filter(l => l.periods?.includes(period));
-
-    const nodeIds = new Set();
-    links.forEach(l => {
-      nodeIds.add(String(l.source?.id ?? l.source));
-      nodeIds.add(String(l.target?.id ?? l.target));
-    });
-
-    const nodes = graphData.nodes.filter(n =>
-      nodeIds.has(String(n.id))
-    );
-
-    return { nodes, links };
-  }
 
   const subGroups = [];
   const targets = [];
@@ -95,25 +76,24 @@ export function createPeriodStack({
   -------------------------------------------------- */
   periods.forEach((period, idx) => {
 
-    // Period-level filtering (performance only)
-    const { nodes: periodNodes, links: periodLinks } = dataForPeriod(period);
-
-    //Ask controller what is visible IN THIS PERIOD
-    const visibleNodes = periodNodes.filter(n =>
+    // --- filter via controller ---
+    // Decides the nodes and edges to display
+    //   ├─ ask controller: is this node visible in period X?
+    //   ├─ ask controller: is this edge visible in period X?
+    const nodes = graphData.nodes.filter(n =>
       controller.isNodeVisibleInContext(n.id, period)
     );
 
-    const visibleLinks = periodLinks.filter(l =>
+    const links = graphData.links.filter(l =>
       controller.isEdgeVisibleInContext(l, period)
     );
 
-    if (!visibleNodes.length || !visibleLinks.length) return;
+    if (!nodes.length || !links.length) return;
 
-    // Layout ONLY visible nodes
-    const nodesForLayout = visibleNodes.map(n => ({ ...n }));
-    layout2D(nodesForLayout, visibleLinks);
+    // clone nodes for layout
+    const nodesForLayout = nodes.map(n => ({ ...n }));
+    layout2D(nodesForLayout, links);
 
-    // Build group
     const g = new THREE.Group();
     g.name = `Period_${period}`;
     g.position.copy(basePos);
@@ -155,10 +135,10 @@ export function createPeriodStack({
     g.add(new THREE.Points(nodeGeom, nodeMat));
 
     /* ---------- edges ---------- */
-    const edgePos = new Float32Array(visibleLinks.length * 2 * 3);
+    const edgePos = new Float32Array(links.length * 2 * 3);
     let k = 0;
 
-    visibleLinks.forEach(l => {
+    links.forEach(l => {
       const a = nodesForLayout.find(n => String(n.id) === String(l.source?.id ?? l.source));
       const b = nodesForLayout.find(n => String(n.id) === String(l.target?.id ?? l.target));
       if (!a || !b) return;
@@ -179,7 +159,7 @@ export function createPeriodStack({
 
     g.add(new THREE.LineSegments(edgeGeom, edgeMat));
 
-    /* ---------- labels ---------- */
+    /* ---------- node labels ---------- */
     nodesForLayout.forEach(n => {
       const label = new Text();
       label.text = String(n.id);
@@ -192,6 +172,7 @@ export function createPeriodStack({
       g.add(label);
     });
 
+    /* ---------- period label ---------- */
     const pLabel = makeTextSprite(String(period));
     pLabel.position.set(0, 30, 0);
     g.add(pLabel);
@@ -220,7 +201,7 @@ export function createPeriodStack({
     state = 'showing';
     t = 0;
     root.visible = true;
-    mainRoot.visible = false;
+    if (mainRoot) mainRoot.visible = false;
     if (fgCanvas) fgCanvas.style.display = 'none';
   }
 
@@ -241,6 +222,7 @@ export function createPeriodStack({
 
       const fromX = state === 'showing' ? basePos.x : basePos.x + tgt.x;
       const fromZ = state === 'showing' ? basePos.z : basePos.z + tgt.z;
+
       const toX   = state === 'showing' ? basePos.x + tgt.x : basePos.x;
       const toZ   = state === 'showing' ? basePos.z + tgt.z : basePos.z;
 
@@ -253,7 +235,7 @@ export function createPeriodStack({
       state = state === 'showing' ? 'shown' : 'hidden';
       if (state === 'hidden') {
         root.visible = false;
-        mainRoot.visible = true;
+        if (mainRoot) mainRoot.visible = true;
         if (fgCanvas) fgCanvas.style.display = 'block';
       }
     }

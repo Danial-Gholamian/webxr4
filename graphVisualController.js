@@ -54,7 +54,7 @@ export class GraphVisualController {
         this._needsUpdate = false;
 
         // --- Baseline edge opacity ---
-        this.BASE_EDGE_ALPHA = 0.2;
+        this.BASE_EDGE_ALPHA = 0.6;
     }
 
     // =========================================================
@@ -89,8 +89,15 @@ export class GraphVisualController {
         this.state.selection.selectedNodeId = id;
         this.state.selection.neighbors.clear();
 
-        // Compute neighbors using adapter semantics
+        const activePeriod = this.state.activePeriod;
+
         this.graph.graphData().links.forEach(link => {
+            // 🔒 Enforce period constraint
+            if (activePeriod) {
+                const periods = this.adapter.getEdgePeriods(link) || [];
+                if (!periods.includes(activePeriod)) return;
+            }
+
             const src = this.adapter.getEdgeSource(link);
             const tgt = this.adapter.getEdgeTarget(link);
 
@@ -99,6 +106,22 @@ export class GraphVisualController {
         });
 
         this.update();
+        // const id = String(nodeId);
+
+        // this.state.selection.active = true;
+        // this.state.selection.selectedNodeId = id;
+        // this.state.selection.neighbors.clear();
+
+        // // Compute neighbors using adapter semantics
+        // this.graph.graphData().links.forEach(link => {
+        //     const src = this.adapter.getEdgeSource(link);
+        //     const tgt = this.adapter.getEdgeTarget(link);
+
+        //     if (src === id) this.state.selection.neighbors.add(tgt);
+        //     else if (tgt === id) this.state.selection.neighbors.add(src);
+        // });
+
+        // this.update();
     }
 
     clearNodeSelection() {
@@ -151,7 +174,7 @@ export class GraphVisualController {
         this.state.activePeriod = periodId;
         this.state.selection.active = false;
         this.state.selection.selectedNodeId = null;
-        // this.clearNodeSelection();
+        this.clearNodeSelection();
         this.update();
     }
 
@@ -219,14 +242,51 @@ export class GraphVisualController {
         };
     }
 
-    _isNodeVisible(nodeId, ctx) {
-        if (ctx.activePeriod && !ctx.periodNodes?.has(nodeId)) return false;
-        if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
+    // _isNodeVisible(nodeId, ctx) {
+    //     if (ctx.activePeriod && !ctx.periodNodes?.has(nodeId)) return false;
+    //     if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
 
+    //     if (ctx.selection.active) {
+    //         return (
+    //             nodeId === ctx.selection.selectedNodeId ||
+    //             ctx.selection.neighbors.has(nodeId)
+    //         );
+    //     }
+
+    //     return true;
+    // }
+
+    _isNodeVisible(nodeId, ctx) {
+        // 1️⃣ Period constraint (hard)
+        if (ctx.activePeriod && !ctx.periodNodes?.has(nodeId)) {
+            return false;
+        }
+
+        // 2️⃣ Group constraint
+        if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) {
+            return false;
+        }
+
+        // 3️⃣ Selection constraint (period-aware!)
         if (ctx.selection.active) {
+            const selId = ctx.selection.selectedNodeId;
+
+            if (!ctx.activePeriod) {
+                return (
+                    nodeId === selId ||
+                    ctx.selection.neighbors.has(nodeId)
+                );
+            }
+
+            // 🔑 Period-scoped neighbors
+            const periodNeighbors = this._getPeriodNeighbors(
+                selId,
+                ctx.activePeriod
+            );
+
             return (
-                nodeId === ctx.selection.selectedNodeId ||
-                ctx.selection.neighbors.has(nodeId)
+                nodeId === selId ||
+                periodNeighbors.has(nodeId)
             );
         }
 
@@ -275,31 +335,6 @@ export class GraphVisualController {
         obj.material = mat;
     }
 
-
-    //     _applyOpacityLayer(obj, context, visible) {
-    //     // Cache original material once
-    //     if (!obj.userData.originalMaterial) {
-    //         obj.userData.originalMaterial = obj.material;
-    //     }
-
-    //     // If fully visible → restore original material
-    //     if (visible) {
-    //         obj.material = obj.userData.originalMaterial;
-    //         return;
-    //     }
-
-    //     // Otherwise use a dimmed clone
-    //     const key = context + "Material";
-
-    //     if (!obj.userData[key]) {
-    //         const clone = obj.userData.originalMaterial.clone();
-    //         clone.transparent = true;
-    //         clone.opacity = 0.15;
-    //         obj.userData[key] = clone;
-    //     }
-
-    //     obj.material = obj.userData[key];
-    // }
     // =========================================================
     // Internal helpers — Rendering
     // =========================================================
@@ -377,4 +412,57 @@ export class GraphVisualController {
     _getEdgeKey(a, b) {
         return [a, b].sort().join("--");
     }
+
+    /**
+     * Query node visibility for an arbitrary period context
+     * (used by secondary views like PeriodStack)
+     */
+    isNodeVisibleInContext(nodeId, periodId) {
+        const ctx = {
+            activePeriod: periodId,
+            periodNodes: periodId
+                ? this.periodActiveNodes.get(periodId)
+                : null,
+            selection: this.state.selection,
+            group: this.state.group
+        };
+
+        return this._isNodeVisible(String(nodeId), ctx);
+    }
+
+    /**
+     * Query edge visibility for an arbitrary period context
+     */
+    isEdgeVisibleInContext(link, periodId) {
+        const ctx = {
+            activePeriod: periodId,
+            periodNodes: periodId
+                ? this.periodActiveNodes.get(periodId)
+                : null,
+            selection: this.state.selection,
+            group: this.state.group
+        };
+
+        return this._isEdgeVisible(link, ctx);
+    }
+
+
+    _getPeriodNeighbors(nodeId, periodId) {
+        const neighbors = new Set();
+        if (!periodId) return neighbors;
+
+        this.graph.graphData().links.forEach(link => {
+            const periods = this.adapter.getEdgePeriods(link) || [];
+            if (!periods.includes(periodId)) return;
+
+            const src = this.adapter.getEdgeSource(link);
+            const tgt = this.adapter.getEdgeTarget(link);
+
+            if (src === nodeId) neighbors.add(tgt);
+            if (tgt === nodeId) neighbors.add(src);
+        });
+
+        return neighbors;
+    }
+
 }
