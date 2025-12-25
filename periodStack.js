@@ -36,6 +36,8 @@ function layout2D(nodes, links) {
 /* --------------------------------------------------
    Period Stack (controller-driven)
 -------------------------------------------------- */
+// PeriodStack queries controller synchronously.
+// If controller state changes, stack must be rebuilt.
 export function createPeriodStack({
   Graph,
   graphData,

@@ -448,7 +448,6 @@ graphRoot.add(lineSegments);
 
 
 // --- Period stack (lazy) ---
-export let periodStack = null;
 
 const baseGraphData = structuredClone(graphData);
 
@@ -470,6 +469,8 @@ graphController.setDataset(graphData);
 // Graph.onEngineStop(() => {
 //   graphController.setDataset(graphData);
 // });
+
+export let periodStack = null;
 
 // This lets other modules import the controller without circular dependency
 export function getGraphController() {
@@ -563,25 +564,25 @@ export function highlightSubgraph(nodeId) {
 
 
   console.log("GET RID OF ME LATER WHEN YOU GET RID OF THE DEPENDENCIES :)");
-  const clickedId = String(nodeId);
-  uiPanel.userData.updateSelectedNodeLabel?.(clickedId);
-  selectionState.isActive = true;
-  selectionState.selectedNodeId = clickedId;
+  // const clickedId = String(nodeId);
+  // uiPanel.userData.updateSelectedNodeLabel?.(clickedId);
+  // selectionState.isActive = true;
+  // selectionState.selectedNodeId = clickedId;
 
-  const validNeighbors = new Set();
-  const edges = Graph.graphData().links;
-  for (const edge of edges) {
-    if (activePeriod && !edge.periods?.includes(activePeriod)) continue;
+  // const validNeighbors = new Set();
+  // const edges = Graph.graphData().links;
+  // for (const edge of edges) {
+  //   if (activePeriod && !edge.periods?.includes(activePeriod)) continue;
 
-    const source = String(edge.source?.id ?? edge.source);
-    const target = String(edge.target?.id ?? edge.target);
+  //   const source = String(edge.source?.id ?? edge.source);
+  //   const target = String(edge.target?.id ?? edge.target);
 
-    if (source === clickedId) validNeighbors.add(target);
-    else if (target === clickedId) validNeighbors.add(source);
-  }
-  selectionState.neighborIds = validNeighbors;
+  //   if (source === clickedId) validNeighbors.add(target);
+  //   else if (target === clickedId) validNeighbors.add(source);
+  // }
+  // selectionState.neighborIds = validNeighbors;
 
-  // updateAllVisuals();
+  // // updateAllVisuals();
 }
 
 
@@ -593,44 +594,44 @@ export function highlightGroup(groupName) {
   graphController.highlightGroup(groupName)
 
 
-  // Normalize and reset states
-  const normalizedGroup = String(groupName).trim().toLowerCase();
+  // // Normalize and reset states
+  // const normalizedGroup = String(groupName).trim().toLowerCase();
 
-  groupFilterState.isActive = true;
-  groupFilterState.activeGroup = normalizedGroup;
-  groupFilterState.nodeIds.clear();
-  groupFilterState.edgeIds.clear();
+  // groupFilterState.isActive = true;
+  // groupFilterState.activeGroup = normalizedGroup;
+  // groupFilterState.nodeIds.clear();
+  // groupFilterState.edgeIds.clear();
 
-  // Reset selection to avoid conflicts
-  selectionState.isActive = false;
-  selectionState.selectedNodeId = null;
-  selectionState.neighborIds.clear();
+  // // Reset selection to avoid conflicts
+  // selectionState.isActive = false;
+  // selectionState.selectedNodeId = null;
+  // selectionState.neighborIds.clear();
 
-  // Filter nodes
-  for (const node of Graph.graphData().nodes) {
-    const nodeGroup = String(node.group).trim().toLowerCase();
-    const nodeId = String(node.id);
-    if (nodeGroup === normalizedGroup) {
-      groupFilterState.nodeIds.add(nodeId);
-    }
-  }
+  // // Filter nodes
+  // for (const node of Graph.graphData().nodes) {
+  //   const nodeGroup = String(node.group).trim().toLowerCase();
+  //   const nodeId = String(node.id);
+  //   if (nodeGroup === normalizedGroup) {
+  //     groupFilterState.nodeIds.add(nodeId);
+  //   }
+  // }
 
-  // Filter edges where both ends are in the group AND match current period (if any)
-  for (const edge of Graph.graphData().links) {
-    const src = String(edge.source?.id ?? edge.source);
-    const tgt = String(edge.target?.id ?? edge.target);
+  // // Filter edges where both ends are in the group AND match current period (if any)
+  // for (const edge of Graph.graphData().links) {
+  //   const src = String(edge.source?.id ?? edge.source);
+  //   const tgt = String(edge.target?.id ?? edge.target);
 
-    const edgeInPeriod = !activePeriod || edge.periods?.includes(activePeriod);
-    if (
-      groupFilterState.nodeIds.has(src) &&
-      groupFilterState.nodeIds.has(tgt) &&
-      edgeInPeriod
-    ) {
-      groupFilterState.edgeIds.add(getEdgeKey(src, tgt));
-    }
-  }
+  //   const edgeInPeriod = !activePeriod || edge.periods?.includes(activePeriod);
+  //   if (
+  //     groupFilterState.nodeIds.has(src) &&
+  //     groupFilterState.nodeIds.has(tgt) &&
+  //     edgeInPeriod
+  //   ) {
+  //     groupFilterState.edgeIds.add(getEdgeKey(src, tgt));
+  //   }
+  // }
 
-  // updateAllVisuals();
+  // // updateAllVisuals();
 }
 
 
@@ -948,14 +949,21 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleBButtonInput(xrFrame, () => {
+      const state = graphController.getState();
+
       const context = {
-        groupName: groupFilterState.activeGroup,
-        period: activePeriod,
-        selectedNodeId: selectionState.selectedNodeId
-        // groupName: graphController.state.group.active,
-        // period: graphController.state.activePeriod,
-        // selectedNodeId: graphController.state.selection.selectedNodeId
+        groupName: state.activeGroup,
+        period: state.activePeriod,
+        selectedNodeId: state.selectedNodeId
       };
+      // const context = {
+      //   groupName: groupFilterState.activeGroup,
+      //   period: activePeriod,
+      //   selectedNodeId: selectionState.selectedNodeId
+      //   // groupName: graphController.state.group.active,
+      //   // period: graphController.state.activePeriod,
+      //   // selectedNodeId: graphController.state.selection.selectedNodeId
+      // };
 
       if (!periodStack || periodStack.group.visible === false) {
         rebuildPeriodStack();
