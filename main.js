@@ -50,26 +50,26 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
 const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
 
-let activePeriod = null;
+// let activePeriod = null;
 let currentPeriodIndex = 0;
 
-let selectionState = {
-  isActive: false,
-  selectedNodeId: null,
-  neighborIds: new Set()
-};
+// let selectionState = {
+//   isActive: false,
+//   selectedNodeId: null,
+//   neighborIds: new Set()
+// };
 
-let periodStackInstance = null;
+// let periodStackInstance = null;
 
-const groupFilterState = {
-  isActive: false,
-  activeGroup: null,
-  nodeIds: new Set(),
-  edgeIds: new Set()
-};
+// const groupFilterState = {
+//   isActive: false,
+//   activeGroup: null,
+//   nodeIds: new Set(),
+//   edgeIds: new Set()
+// };
 
-const minScale = 0.01;
-const maxScale = 1.0;
+// const minScale = 0.01;
+// const maxScale = 1.0;
 let targetScale = 0.1;      // starting size
 const scaleLerpSpeed = 0.05; // how smooth it feels
 
