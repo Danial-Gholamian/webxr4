@@ -30,12 +30,11 @@ import {
   handleLeftStickButton,
   handleRightStickButton
 } from './vrSetup.js';
-import { createUserGuidePanel, createHelpIcon } from './userGuidePanel.js';
-import { detectHover, initLabels, markHoverCacheDirty, hoverLabel } from './hover.js';
+import { createUserGuidePanel } from './userGuidePanel.js';
+import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
-import { PathFinder } from './pathFinder.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
-import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
+import { createBarGauge, updateBarGauge } from './barGauge.js';
 import { schoolPeriods } from './periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';

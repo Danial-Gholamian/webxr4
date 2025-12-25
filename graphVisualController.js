@@ -92,7 +92,7 @@ export class GraphVisualController {
         const activePeriod = this.state.activePeriod;
 
         this.graph.graphData().links.forEach(link => {
-            // 🔒 Enforce period constraint
+            // Enforce period constraint
             if (activePeriod) {
                 const periods = this.adapter.getEdgePeriods(link) || [];
                 if (!periods.includes(activePeriod)) return;

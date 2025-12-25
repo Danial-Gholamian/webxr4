@@ -1,11 +1,10 @@
 // network.js
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
-import { highlightSubgraph, resetGraph, highlightPeriod, AVATAR_UPDATE_INTERVAL } from './main.js';
+import { highlightPeriod, AVATAR_UPDATE_INTERVAL } from './main.js';
 import { schoolPeriods } from './periodDefs';
 import { createAvatar } from './avatars.js';
 import { myUsername } from './main.js';
-import { highlightGroup, applyRemotePeriodStackToggle } from './main.js';
 import { handleUserList } from './voice.js';
 
 
@@ -184,9 +183,10 @@ socket.on('node-select', ({ nodeId, mode }) => {
   if (injectedHandlers?.onNodeSelect) {
     console.log('[network] using injected handler');
     injectedHandlers.onNodeSelect(nodeId, mode);
-  } else {
-    highlightSubgraph(nodeId, mode); // fallback
-  }
+  } 
+  // else {
+  //   highlightSubgraph(nodeId, mode); // fallback
+  // }
 });
 
 socket.on('graph-reset', () => {
@@ -195,9 +195,10 @@ socket.on('graph-reset', () => {
   if (injectedHandlers?.onGraphReset) {
     console.log('[network] using injected handler');
     injectedHandlers.onGraphReset();
-  } else {
-    resetGraph();
   }
+  //  else {
+  //   resetGraph();
+  // }
 
 });
 
