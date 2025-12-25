@@ -206,7 +206,7 @@ export class GraphVisualController {
      */
     update() {
         console.log("edgeVertexMap size:", this.edgeVertexMap.size);
-        console.trace("GraphVisualController.update");
+        // console.trace("GraphVisualController.update");
         const ctx = this._buildVisibilityContext();
 
         this._updateNodeVisuals(ctx);

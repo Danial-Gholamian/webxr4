@@ -34,7 +34,7 @@ import { createUserGuidePanel, createHelpIcon } from './userGuidePanel.js';
 import { detectHover, initLabels, markHoverCacheDirty, hoverLabel } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
+import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
 import { schoolPeriods } from './periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
@@ -50,26 +50,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
 const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
 
-// let activePeriod = null;
 let currentPeriodIndex = 0;
-
-// let selectionState = {
-//   isActive: false,
-//   selectedNodeId: null,
-//   neighborIds: new Set()
-// };
-
-// let periodStackInstance = null;
-
-// const groupFilterState = {
-//   isActive: false,
-//   activeGroup: null,
-//   nodeIds: new Set(),
-//   edgeIds: new Set()
-// };
-
-// const minScale = 0.01;
-// const maxScale = 1.0;
 let targetScale = 0.1;      // starting size
 const scaleLerpSpeed = 0.05; // how smooth it feels
 
@@ -301,7 +282,6 @@ const Graph = ForceGraph3D()(document.body)
   .nodeLabel(node => node.label || node.id)
   .onNodeClick((node, event) => {
     graphController.highlightNode(node.id);
-    // highlightSubgraph(node.id, 'DIRECT');
     broadcastNodeSelection(node.id, 'DIRECT');
   });
 
@@ -434,8 +414,6 @@ Graph.onEngineTick(() => {
 
 const GraphRef = { current: Graph };
 const graphRoot = Graph.scene();
-// console.log("graphRoot: ",typeof(graphRoot));
-// console.log("graph: ",typeof(Graph));
 
 scene.add(graphRoot);
 graphRoot.position.y += 20;   // or any value you like
@@ -443,7 +421,6 @@ graphRoot.position.y += 20;   // or any value you like
 
 // shrink the graph by 50%
 graphRoot.scale.set(0.99, 0.99, 0.99);
-// const pathFinder = new PathFinder(Graph, adjacency, directLinksMap, colorScale);
 graphRoot.add(lineSegments);
 
 
@@ -466,10 +443,6 @@ const graphController = new GraphVisualController({
 // set dataset to controller
 graphController.setDataset(graphData);
 
-// Graph.onEngineStop(() => {
-//   graphController.setDataset(graphData);
-// });
-
 export let periodStack = null;
 
 // This lets other modules import the controller without circular dependency
@@ -477,6 +450,38 @@ export function getGraphController() {
   return graphController;
 }
 
+
+registerNetworkHandlers({
+  onNodeSelect: (nodeId) => {
+    graphController.highlightNode(nodeId);
+
+    // keep legacy UI side-effects
+    uiPanel.userData.updateSelectedNodeLabel?.(String(nodeId));
+  },
+
+  onGroupSelect: (groupName) => {
+    graphController.highlightGroup(groupName);
+  },
+
+  onPeriodChange: (period) => {
+    graphController.highlightPeriod(period);
+    updatePeroidLabel(period);
+  },
+
+  onGraphReset: () => {
+    console.log("MIGHT AS WELL REPLACE THIS WITH THE resetGraph() method to redue repetition")
+    resetGraph()
+    // graphController.clearGroupFilter()
+    // updatePeroidLabel('Default');
+    // uiPanel.userData.updateSelectedNodeLabel?.(null);
+    // graphController.resetAll()
+    // updateBarGauge(timeGauge, 0, "Default");
+  },
+
+  onPeriodStackToggle: (visible, context) => {
+    applyRemotePeriodStackToggle(visible, context);
+  }
+});
 
 
 function rebuildPeriodStack() {
@@ -493,9 +498,7 @@ function rebuildPeriodStack() {
     colorScale,
     spacing: 50,
     nodeSize: 1.2,
-    controller: graphController   // ✅
-    // selectionState,
-    // groupFilterState
+    controller: graphController
   });
 
   scene.add(periodStack.group);
@@ -558,31 +561,9 @@ function requestGraphUpdate(mode, nodeId) {
 setUIPanel(uiPanel);
 
 // DELETE LATER
-console.log("DELETE HIGHLIGHTSUBGRAPH AFTER FIXING THE DEPENDECY IN NETWORK.JS");
 export function highlightSubgraph(nodeId) {
   graphController.highlightNode(nodeId)
-
-
-  console.log("GET RID OF ME LATER WHEN YOU GET RID OF THE DEPENDENCIES :)");
-  // const clickedId = String(nodeId);
-  // uiPanel.userData.updateSelectedNodeLabel?.(clickedId);
-  // selectionState.isActive = true;
-  // selectionState.selectedNodeId = clickedId;
-
-  // const validNeighbors = new Set();
-  // const edges = Graph.graphData().links;
-  // for (const edge of edges) {
-  //   if (activePeriod && !edge.periods?.includes(activePeriod)) continue;
-
-  //   const source = String(edge.source?.id ?? edge.source);
-  //   const target = String(edge.target?.id ?? edge.target);
-
-  //   if (source === clickedId) validNeighbors.add(target);
-  //   else if (target === clickedId) validNeighbors.add(source);
-  // }
-  // selectionState.neighborIds = validNeighbors;
-
-  // // updateAllVisuals();
+  console.log("DELETE HIGHLIGHTSUBGRAPH AFTER FIXING THE DEPENDECY IN NETWORK.JS");
 }
 
 
@@ -592,46 +573,7 @@ function getEdgeKey(a, b) {
 
 export function highlightGroup(groupName) {
   graphController.highlightGroup(groupName)
-
-
-  // // Normalize and reset states
-  // const normalizedGroup = String(groupName).trim().toLowerCase();
-
-  // groupFilterState.isActive = true;
-  // groupFilterState.activeGroup = normalizedGroup;
-  // groupFilterState.nodeIds.clear();
-  // groupFilterState.edgeIds.clear();
-
-  // // Reset selection to avoid conflicts
-  // selectionState.isActive = false;
-  // selectionState.selectedNodeId = null;
-  // selectionState.neighborIds.clear();
-
-  // // Filter nodes
-  // for (const node of Graph.graphData().nodes) {
-  //   const nodeGroup = String(node.group).trim().toLowerCase();
-  //   const nodeId = String(node.id);
-  //   if (nodeGroup === normalizedGroup) {
-  //     groupFilterState.nodeIds.add(nodeId);
-  //   }
-  // }
-
-  // // Filter edges where both ends are in the group AND match current period (if any)
-  // for (const edge of Graph.graphData().links) {
-  //   const src = String(edge.source?.id ?? edge.source);
-  //   const tgt = String(edge.target?.id ?? edge.target);
-
-  //   const edgeInPeriod = !activePeriod || edge.periods?.includes(activePeriod);
-  //   if (
-  //     groupFilterState.nodeIds.has(src) &&
-  //     groupFilterState.nodeIds.has(tgt) &&
-  //     edgeInPeriod
-  //   ) {
-  //     groupFilterState.edgeIds.add(getEdgeKey(src, tgt));
-  //   }
-  // }
-
-  // // updateAllVisuals();
+  console.log("DELETE HIGHLIGHTSUBGRAPH AFTER FIXING THE DEPENDECY IN NETWORK.JS");
 }
 
 
@@ -651,50 +593,22 @@ resetBtn.addEventListener('click', () => {
 });
 
 export function resetGraph() {
-  // activePeriod = null;
-  // selectionState.isActive = false;
-  // selectionState.selectedNodeId = null;
-  // selectionState.neighborIds = new Set();
 
-  // clearGroupFilter();
   graphController.clearGroupFilter()
   updatePeroidLabel('Default');
   uiPanel.userData.updateSelectedNodeLabel?.(null);
 
-  // reset nodes as before (Graph.scene().traverse)
-
-  // reset edges (all white again)
-
-  // const alphas = lineSegments.geometry.attributes.alpha.array;
-  // for (let i = 0; i < alphas.length; i++) alphas[i] = 0.2;
-  // lineSegments.geometry.attributes.alpha.needsUpdate = true;
-
-
-
-  // Graph.graphData(Graph.graphData());
   graphController.resetAll()
-  // Graph.d3ReheatSimulation();
   updateBarGauge(timeGauge, 0, "Default");
 }
 
-// export function clearGroupFilter() {
-//   groupFilterState.isActive = false;
-//   groupFilterState.activeGroup = null;
-//   groupFilterState.nodeIds.clear();
-//   groupFilterState.edgeIds.clear();
-//   // updateAllVisuals();
-// }
 
 
 export function highlightPeriod(period) {
   graphController.highlightPeriod(period)
 
   console.log("GET RID OF ME LATER WHEN YOU GET RID OF THE DEPENDENCIES :)");
-  // activePeriod = period;
-  // selectionState.isActive = false; // clear selection on period change
-
   updatePeroidLabel(period);
-  // updateAllVisuals();
 
   currentPeriodIndex = schoolPeriods.indexOf(period);
 
@@ -806,16 +720,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
 
 
-  // TEST
-  // const plane = cameraGroup.getObjectByName("ReferencePlane");
-  // if (plane) {
-  //   plane.rotation.set(-Math.PI / 2, 0, 0); // keep it flat
-  // }
-
-
-  // TEST
-
-  // if (timestamp > 10000) graphRoot.scale.set(0.1, 0.1, 0.1);
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
   if (periodStack) periodStack.update(deltaTime);
@@ -956,14 +860,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         period: state.activePeriod,
         selectedNodeId: state.selectedNodeId
       };
-      // const context = {
-      //   groupName: groupFilterState.activeGroup,
-      //   period: activePeriod,
-      //   selectedNodeId: selectionState.selectedNodeId
-      //   // groupName: graphController.state.group.active,
-      //   // period: graphController.state.activePeriod,
-      //   // selectedNodeId: graphController.state.selection.selectedNodeId
-      // };
 
       if (!periodStack || periodStack.group.visible === false) {
         rebuildPeriodStack();

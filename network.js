@@ -9,6 +9,13 @@ import { highlightGroup, applyRemotePeriodStackToggle } from './main.js';
 import { handleUserList } from './voice.js';
 
 
+let injectedHandlers = null;
+
+export function registerNetworkHandlers(handlers) {
+  injectedHandlers = handlers;
+}
+
+
 
 const ROTATION_COMPRESSION_FACTOR = 1000;
 export const knownUsers = {}; // { socketId: name }
@@ -159,13 +166,6 @@ export function broadcastNodeSelection(nodeId, mode = 'DIRECT') {
   }, (ack) => { /* ... */ });
 }
 
-socket.on('node-select', ({ nodeId, mode }) => {
-  console.log('Received selection', nodeId, mode);
-  if (String(nodeId) !== String(currentHighlightId)) {
-    highlightSubgraph(nodeId, mode);
-    currentHighlightId = nodeId;
-  }
-});
 
 export function broadcastGraphReset() {
   console.log("Broadcasting graph reset");
@@ -174,9 +174,56 @@ export function broadcastGraphReset() {
   });
 }
 
+
+socket.on('node-select', ({ nodeId, mode }) => {
+  console.log('Received selection', nodeId, mode);
+
+  if (String(nodeId) === String(currentHighlightId)) return;
+  currentHighlightId = nodeId;
+
+  if (injectedHandlers?.onNodeSelect) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onNodeSelect(nodeId, mode);
+  } else {
+    highlightSubgraph(nodeId, mode); // fallback
+  }
+});
+
 socket.on('graph-reset', () => {
   console.log('Remote reset received');
-  resetGraph(); // Reuse central function
+
+  if (injectedHandlers?.onGraphReset) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onGraphReset();
+  } else {
+    resetGraph();
+  }
+
+});
+
+socket.on('group-select', ({ groupName }) => {
+  console.log("Received group selection:", groupName);
+
+  if (injectedHandlers?.onGroupSelect) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onGroupSelect(groupName);
+  } 
+  // else {
+  //   highlightGroup(groupName);
+  // }
+});
+
+
+socket.on('period-stack-toggle', ({ visible, context }) => {
+  console.log("Received period stack toggle:", visible, context);
+
+  if (injectedHandlers?.onPeriodStackToggle) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onPeriodStackToggle(visible, context);
+  } 
+  // else {
+  //   applyRemotePeriodStackToggle(visible, context);
+  // }
 });
 
 let currentPeriodIndex = 0;
@@ -187,6 +234,7 @@ export function getCurrentPeriodIndex() {
 export function setCurrentPeriodIndex(index, broadcast = true) {
   currentPeriodIndex = Math.max(0, Math.min(index, schoolPeriods.length - 1));
   const period = schoolPeriods[currentPeriodIndex];
+  console.warn("LEGACY HIGHLIGHTPERIOD METHOD STILL BEING USED :(")
   highlightPeriod(period);
   
   if (broadcast) {
@@ -194,29 +242,21 @@ export function setCurrentPeriodIndex(index, broadcast = true) {
   }
 }
 
-// export function setCurrentPeriodIndex(index, broadcast = true) {
-//   const clamped = Math.max(0, Math.min(index, schoolPeriods.length - 1));
-
-//   // 🛑 GUARD: no-op if already active
-//   if (clamped === currentPeriodIndex) return;
-
-//   currentPeriodIndex = clamped;
-//   const period = schoolPeriods[currentPeriodIndex];
-
-//   highlightPeriod(period);
-
-//   if (broadcast) {
-//     socket.emit('period-change', period);
-//   }
-// }
 
 export let squeezeRightNextPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() + 1, true);
 export let squeezeLefttPrevPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() - 1, true);
 
 socket.on('period-change', (period) => {
-  const index = schoolPeriods.indexOf(period);
-  if (index !== -1) {
-    setCurrentPeriodIndex(index, false);
+  console.log("Received period change:", period);
+
+  if (injectedHandlers?.onPeriodChange) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onPeriodChange(period);
+  } else {
+    const index = schoolPeriods.indexOf(period);
+    if (index !== -1) {
+      setCurrentPeriodIndex(index, false);
+    }
   }
 });
 
@@ -249,23 +289,11 @@ export function broadcastGroupSelection(groupName) {
   socket.emit('group-select', { groupName });
 }
 
-
-socket.on('group-select', ({ groupName }) => {
-  console.log("Received group selection:", groupName);
-  highlightGroup(groupName); // Apply group highlight locally
-});
-
-
-
-
 export function broadcastPeriodStackToggle(visible, context = {}) {
   console.log("Broadcasting period stack toggle:", visible, context);
   socket.emit('period-stack-toggle', { visible, context });
 }
 
 
-socket.on('period-stack-toggle', ({ visible, context }) => {
-  console.log("Received period stack toggle:", visible, context);
-  applyRemotePeriodStackToggle(visible, context);
-});
+
 
