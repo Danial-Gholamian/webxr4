@@ -1,7 +1,7 @@
 //vrSetup.js
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
-import { schoolPeriods } from './periodDefs';
+import { schoolPeriods } from './dataset/primarySchool/periodDefs.js';
 import { highlightPeriod } from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 
