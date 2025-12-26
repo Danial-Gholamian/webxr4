@@ -35,13 +35,22 @@ import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
-import { schoolPeriods } from './dataset/primarySchool/periodDefs.js';
+import { dataPeriods } from './dataset/primarySchool/periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DATASETS } from './dataset.js';
 
+// Graph data variables
+let dataset = null
+let periods = null
+
+
+// A getter for the periods
+export function getActivePeriods() {
+  return periods
+}
 // ========================
 //  Static Panel variables
 // ========================
@@ -61,7 +70,6 @@ let graphUpdateNodeId = null;
 const roomCenter = new THREE.Vector3();
 
 
-// now
 // ========================
 // Scene, Camera, Renderer
 // ========================
@@ -169,11 +177,11 @@ const cameraGroup = new THREE.Group();
 cameraGroup.add(camera);
 scene.add(cameraGroup);
 
+
 // ========================
 // User Guide Panel Setup 
 // in Camera Group
 // ========================
-// User Guide Panel
 const userGuidePanel = createUserGuidePanel();
 cameraGroup.add(userGuidePanel);
 
@@ -190,7 +198,6 @@ function toggleGuidePanel() {
 }
 
 
-// TEST
 const controller1 = renderer.xr.getController(0);
 const controller2 = renderer.xr.getController(1);
 
@@ -342,10 +349,10 @@ function buildBatchedEdges(graphData, nodesById) {
 // ========================
 
 function applyDataset(dataset, periods) {
-  // 1️⃣ Color scale
+  // 1️ Color scale
   colorScale.domain([...new Set(dataset.nodes.map(n => n.group))]);
 
-  // 2️⃣ Adjacency
+  // 2️ Adjacency
   adjacency.clear();
   directLinksMap.clear();
 
@@ -366,22 +373,16 @@ function applyDataset(dataset, periods) {
     if (s !== t) directLinksMap.get(t)?.push({ source: s, target: t });
   });
 
-  // 3️⃣ ForceGraph data
+  // 3️ ForceGraph data
   Graph.graphData(dataset);
   Graph.linkVisibility(false)   // disable built-in lines
-  Graph.nodeAutoColorBy('group')
-  Graph.nodeColor(d => colorScale(d.group))
-  Graph.nodeLabel(node => node.label || node.id)
-  Graph.onNodeClick((node, event) => {
-    graphController.highlightNode(node.id);
-    broadcastNodeSelection(node.id, 'DIRECT');
-  });
+  Graph.nodeAutoColorBy('group');
 
-  // 4️⃣ nodesById
+  // 4️ nodesById
   Object.keys(nodesById).forEach(k => delete nodesById[k]);
   dataset.nodes.forEach(n => nodesById[n.id] = n);
 
-  // 5️⃣ Edges
+  // 5️ Edges
   if (lineSegments) {
     graphRoot.remove(lineSegments);
     lineSegments.geometry.dispose();
@@ -394,12 +395,12 @@ function applyDataset(dataset, periods) {
 
   graphController.setEdgeLayer?.(lineSegments, edgeVertexMap);
 
-  // 6️⃣ Controller
+  // 6️ Controller
   graphController.setDataset(dataset);
   graphController.resetAll();
 
 
-  // 7️⃣ Period stack
+  // 7️ Period stack
   if (periodStack) {
     scene.remove(periodStack.group);
     periodStack = null;
@@ -412,6 +413,12 @@ function applyDataset(dataset, periods) {
 // colorScale.domain([...new Set(graphData.nodes.map(n => n.group))]);
 
 const Graph = ForceGraph3D()(document.body)
+Graph.nodeColor(d => colorScale(d.group))
+Graph.nodeLabel(node => node.label || node.id)
+Graph.onNodeClick((node, event) => {
+  graphController.highlightNode(node.id);
+  broadcastNodeSelection(node.id, 'DIRECT');
+})
 
 async function loadDataset(datasetKey) {
   const entry = DATASETS[datasetKey];
@@ -424,8 +431,10 @@ async function loadDataset(datasetKey) {
   const periodModule = await entry.periods();
 
   // 2️ Extract actual values
-  const dataset = dataModule.default ?? dataModule;
-  const periods = periodModule.schoolPeriods ?? periodModule.default;
+  dataset = dataModule.default ?? dataModule;
+  periods =
+    periodModule.default ??
+    periodModule.dataPeriods;
 
   // 3️ Validate
   if (!dataset?.nodes || !dataset?.links) {
@@ -437,9 +446,31 @@ async function loadDataset(datasetKey) {
     dataset.nodes.length,
     dataset.links.length
   );
+  console.log(
+    `-----Loaded periods----- "${periods}"`
+  )
 
-  // 4️ Apply to graph
+  return { datasetValues: dataset, periodLabelsValues: periods, key: datasetKey };
+
+  // // 4️ Apply to graph
+  // applyDataset(dataset, periods);
+}
+
+
+async function switchDataset(datasetKey) {
+  // 1️ Load data and Store current state in dataset and periods
+  const { datasetValues, periodLabelsValues, key } = await loadDataset(datasetKey);
+
+
+  // 2️ Store current state
+  dataset = datasetValues;
+  periods = periodLabelsValues;
+  const currentDatasetKey = key;
+  console.log("LOADED DATA AND PERIODS AS WELL AS KEY", dataset, periods, currentDatasetKey)
+  // 3️ Apply to graph
   applyDataset(dataset, periods);
+
+  console.log(`Dataset switched to: ${currentDatasetKey}`);
 }
 
 
@@ -478,7 +509,11 @@ const graphController = new GraphVisualController({
 });
 
 
-await loadDataset('school')
+// await loadDataset('school')
+// applyDataset(dataset, periods)
+
+await switchDataset('hospital')
+
 
 // shrink the graph by 50%
 graphRoot.scale.set(0.99, 0.99, 0.99);
@@ -554,11 +589,11 @@ function rebuildPeriodStack() {
     periodStack = null;
   }
 
-  const freshData = JSON.parse(JSON.stringify(graphData)); // deep clone
+  const freshData = JSON.parse(JSON.stringify(dataset)); // deep clone
   periodStack = createPeriodStack({
     Graph,
     graphData: freshData,
-    periods: schoolPeriods,
+    periods: periods,
     colorScale,
     spacing: 50,
     nodeSize: 1.2,
@@ -668,17 +703,17 @@ export function resetGraph() {
 
 
 
-export function highlightPeriod(period) {
-  graphController.highlightPeriod(period)
+export function highlightPeriod(periodValue) {
+  graphController.highlightPeriod(periodValue)
 
   console.log("GET RID OF ME LATER WHEN YOU GET RID OF THE DEPENDENCIES :)");
-  updatePeroidLabel(period);
+  updatePeroidLabel(periodValue);
 
-  currentPeriodIndex = schoolPeriods.indexOf(period);
+  currentPeriodIndex = periods.indexOf(periodValue);
 
-  const value = currentPeriodIndex / (schoolPeriods.length - 1);
+  const value = currentPeriodIndex / (periods.length - 1);
 
-  updateBarGauge(timeGauge, value, period);
+  updateBarGauge(timeGauge, value, periodValue);
 }
 
 
@@ -760,13 +795,9 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 
 
 
-
-
 // ========================
 // Animation Loop
 // ========================
-
-
 
 
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);

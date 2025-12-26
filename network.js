@@ -2,9 +2,9 @@
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
 import { highlightPeriod, AVATAR_UPDATE_INTERVAL } from './main.js';
-import { schoolPeriods } from './dataset/primarySchool/periodDefs.js';
+import { dataPeriods } from './dataset/primarySchool/periodDefs.js';
 import { createAvatar } from './avatars.js';
-import { myUsername } from './main.js';
+import { myUsername, getActivePeriods} from './main.js';
 import { handleUserList } from './voice.js';
 
 
@@ -233,8 +233,8 @@ export function getCurrentPeriodIndex() {
 }
 
 export function setCurrentPeriodIndex(index, broadcast = true) {
-  currentPeriodIndex = Math.max(0, Math.min(index, schoolPeriods.length - 1));
-  const period = schoolPeriods[currentPeriodIndex];
+  currentPeriodIndex = Math.max(0, Math.min(index, getActivePeriods().length - 1));
+  const period = getActivePeriods()[currentPeriodIndex];
   console.warn("LEGACY HIGHLIGHTPERIOD METHOD STILL BEING USED :(")
   highlightPeriod(period);
   
@@ -254,7 +254,7 @@ socket.on('period-change', (period) => {
     console.log('[network] using injected handler');
     injectedHandlers.onPeriodChange(period);
   } else {
-    const index = schoolPeriods.indexOf(period);
+    const index = getActivePeriods().indexOf(period);
     if (index !== -1) {
       setCurrentPeriodIndex(index, false);
     }

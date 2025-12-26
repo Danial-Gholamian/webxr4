@@ -1,8 +1,8 @@
 //vrSetup.js
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
-import { schoolPeriods } from './dataset/primarySchool/periodDefs.js';
-import { highlightPeriod } from './main.js';
+import { dataPeriods } from './dataset/primarySchool/periodDefs.js';
+import { highlightPeriod, getActivePeriods} from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 
 // --- Constants ---
@@ -56,8 +56,8 @@ function setupController(controller, index, renderer, cameraGroup) {
 
 // --- 1.2 Changing time slices ---
 function cyclePeriod(delta) {
-  currentPeriodIndex = (currentPeriodIndex + delta + schoolPeriods.length) % schoolPeriods.length;
-  const period = schoolPeriods[currentPeriodIndex];
+  currentPeriodIndex = (currentPeriodIndex + delta + getActivePeriods().length) % getActivePeriods().length;
+  const period = getActivePeriods()[currentPeriodIndex];
   highlightPeriod(period);
   console.log(`Period changed to: ${period}`);
 }

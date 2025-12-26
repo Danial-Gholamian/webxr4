@@ -1,4 +1,4 @@
-export const schoolPeriods = [
+export const dataPeriods = [
   "arrival",
   "class1",
   "break1",

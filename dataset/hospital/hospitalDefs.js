@@ -1,4 +1,4 @@
-export const hospitalPeriods = [
+export const dataPeriods = [
   "period 1",
   "period 2",
   "period 3",
