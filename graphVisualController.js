@@ -78,6 +78,12 @@ export class GraphVisualController {
         // WHEN Graph.onEnginestop is called in main.js
     }
 
+
+    setEdgeLayer(lineSegments, edgeVertexMap) {
+        this.lineSegments = lineSegments
+        this.edgeVertexMap = edgeVertexMap
+    }
+
     // =========================================================
     // Public API — Interaction methods
     // =========================================================
@@ -464,5 +470,6 @@ export class GraphVisualController {
 
         return neighbors;
     }
+
 
 }
