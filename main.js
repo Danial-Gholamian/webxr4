@@ -144,8 +144,6 @@ function clampCameraToRoom() {
 }
 
 
-
-
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
 setScene(scene);
@@ -200,11 +198,6 @@ setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
 
 
-
-
-
-
-
 // ========================
 // Graph Rotation State
 // ========================
@@ -254,30 +247,6 @@ let lineSegments = null
 export let periodStack = null;
 const colorScale = scaleOrdinal(schemeCategory10)
 
-
-// // Init adjacency maps
-// for (const node of graphData.nodes) {
-//   const id = String(node.id);
-//   adjacency.set(id, new Set());
-//   directLinksMap.set(id, []);
-// }
-
-// for (const link of graphData.links) {
-//   const srcId = String(link.source?.id ?? link.source);
-//   const tgtId = String(link.target?.id ?? link.target);
-//   adjacency.get(srcId).add(tgtId);
-//   adjacency.get(tgtId).add(srcId);
-//   const storedLink = { source: srcId, target: tgtId };
-//   directLinksMap.get(srcId).push(storedLink);
-//   if (srcId !== tgtId) directLinksMap.get(tgtId).push(storedLink);
-// }
-
-// Instead of creating thousands of individual line meshes (one per edge),
-// we build a single line made of many vertices. Each pair of vertices
-// represents one edge, and we store an "alpha" value per vertex. That way
-// we can fade out some edges by lowering their alpha while keeping others
-// fully visible, all in one draw call.
-
 function buildBatchedEdges(graphData, nodesById) {
   console.log("buildBatchedEdges called")
   // edgeVertexMap.clear()
@@ -304,11 +273,9 @@ function buildBatchedEdges(graphData, nodesById) {
     const y2 = Number.isFinite(tgt.y) ? tgt.y : 0;
     const z2 = Number.isFinite(tgt.z) ? tgt.z : 0;
 
+    // // positions
     positions.push(x1, y1, z1);
     positions.push(x2, y2, z2);
-    // // positions
-    // positions.push(src.x, src.y, src.z);
-    // positions.push(tgt.x, tgt.y, tgt.z);
 
     // default colors
     color.setRGB(1, 1, 1);
@@ -445,17 +412,6 @@ function applyDataset(dataset, periods) {
 // colorScale.domain([...new Set(graphData.nodes.map(n => n.group))]);
 
 const Graph = ForceGraph3D()(document.body)
-// .graphData(graphData)
-// .linkVisibility(false)   // disable built-in lines
-// .nodeAutoColorBy('group')
-// .nodeColor(d => colorScale(d.group))
-// .nodeLabel(node => node.label || node.id)
-// .onNodeClick((node, event) => {
-//   graphController.highlightNode(node.id);
-//   broadcastNodeSelection(node.id, 'DIRECT');
-// });
-
-
 
 async function loadDataset(datasetKey) {
   const entry = DATASETS[datasetKey];
@@ -463,15 +419,15 @@ async function loadDataset(datasetKey) {
     throw new Error(`Unknown dataset: ${datasetKey}`);
   }
 
-  // 1️⃣ Load modules
+  // 1️ Load modules
   const dataModule = await entry.data();
   const periodModule = await entry.periods();
 
-  // 2️⃣ Extract actual values
+  // 2️ Extract actual values
   const dataset = dataModule.default ?? dataModule;
   const periods = periodModule.schoolPeriods ?? periodModule.default;
 
-  // 3️⃣ Validate
+  // 3️ Validate
   if (!dataset?.nodes || !dataset?.links) {
     throw new Error("Invalid dataset shape");
   }
@@ -482,7 +438,7 @@ async function loadDataset(datasetKey) {
     dataset.links.length
   );
 
-  // 4️⃣ Apply to graph
+  // 4️ Apply to graph
   applyDataset(dataset, periods);
 }
 
@@ -507,24 +463,9 @@ initVoice();
 
 Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
 
-// Build line batch
-// lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
-// scene.add(lineSegments);
-
-
 
 const GraphRef = { current: Graph };
 const graphRoot = Graph.scene();
-
-
-
-
-
-// --- Period stack (lazy) ---
-
-const baseGraphData = structuredClone(graphData);
-
-
 
 
 // Create controller after graph init
@@ -536,8 +477,6 @@ const graphController = new GraphVisualController({
   adapter: SchoolTemporalGraphAdapter
 });
 
-// set dataset to controller
-// graphController.setDataset(graphData);
 
 await loadDataset('school')
 
@@ -547,8 +486,6 @@ graphRoot.add(lineSegments);
 
 scene.add(graphRoot);
 graphRoot.position.y += 20;   // or any value you like
-
-
 
 
 
@@ -575,16 +512,6 @@ Graph.onEngineTick(() => {
   });
 
   lineSegments.geometry.attributes.position.needsUpdate = true;
-  // const pos = lineSegments.geometry.attributes.position.array;
-  // let i = 0;
-  // Graph.graphData().links.forEach(link => {
-  //   const src = nodesById[link.source.id ?? link.source];
-  //   const tgt = nodesById[link.target.id ?? link.target];
-
-  //   pos[i++] = src.x; pos[i++] = src.y; pos[i++] = src.z;
-  //   pos[i++] = tgt.x; pos[i++] = tgt.y; pos[i++] = tgt.z;
-  // });
-  // lineSegments.geometry.attributes.position.needsUpdate = true;
 });
 
 // This lets other modules import the controller without circular dependency
@@ -613,11 +540,6 @@ registerNetworkHandlers({
   onGraphReset: () => {
     console.log("MIGHT AS WELL REPLACE THIS WITH THE resetGraph() method to redue repetition")
     resetGraph()
-    // graphController.clearGroupFilter()
-    // updatePeroidLabel('Default');
-    // uiPanel.userData.updateSelectedNodeLabel?.(null);
-    // graphController.resetAll()
-    // updateBarGauge(timeGauge, 0, "Default");
   },
 
   onPeriodStackToggle: (visible, context) => {
@@ -1027,11 +949,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     })
 
 
-
-
-
-
-
     if (!periodStack?.group?.visible) {
       detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
       detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
@@ -1057,5 +974,3 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   renderer.render(scene, camera);
 });
-
-// Today
