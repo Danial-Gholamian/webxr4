@@ -16,7 +16,6 @@ import { GraphVisualController } from "./graphVisualController.js";
 import { SchoolTemporalGraphAdapter } from "./schoolTemporalGraphAdapter.js";
 
 import ForceGraph3D from '3d-force-graph';
-import graphData from './dataset/primarySchool/graph-data-periods.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   setupController,
@@ -35,7 +34,6 @@ import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
-import { dataPeriods } from './dataset/primarySchool/periodDefs.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -494,7 +492,6 @@ initVoice();
 
 Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
 
-
 const GraphRef = { current: Graph };
 const graphRoot = Graph.scene();
 
@@ -798,8 +795,6 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 // ========================
 // Animation Loop
 // ========================
-
-
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
 setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup);
 // precomputePeriodData();

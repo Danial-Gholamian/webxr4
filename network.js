@@ -2,7 +2,6 @@
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
 import { highlightPeriod, AVATAR_UPDATE_INTERVAL } from './main.js';
-import { dataPeriods } from './dataset/primarySchool/periodDefs.js';
 import { createAvatar } from './avatars.js';
 import { myUsername, getActivePeriods} from './main.js';
 import { handleUserList } from './voice.js';
