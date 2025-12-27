@@ -2,15 +2,17 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 import { knownUsers } from './network.js';
-import {highlightGroup} from './main.js'
+import { highlightGroup, switchDataset } from './main.js'
 import { broadcastGroupSelection } from './network.js';
 
 
 const PANEL_SCALE = 0.3;       // 30% of view width
-const PANEL_MARGIN = 0.1;      // 10% margin from bottom
-const FONT_SIZE = 0.05;        // 5cm in VR units
+// const PANEL_MARGIN = 0.1;      // 10% margin from bottom
+const ITEM_SIZE = 0.055;   // Group names
+const TITLE_SIZE = 0.07;   // "Time of the day"
+// const FONT_SIZE = 0.05;        // 5cm in VR units
 const ROW_SPACING = 0.17;      // a12cm between rows
-const panelSize = new THREE.Vector3();
+// const panelSize = new THREE.Vector3();
 let periodTitle = null;
 let selectedNodeLabel = null;
 
@@ -19,18 +21,20 @@ const PANEL_LERP_FACTOR = 0.2;
 
 
 export function updatePeroidLabel(peroidname) {
-    if (periodTitle) {
-        periodTitle.text = `Time of the day: ${peroidname || 'Default'} 📚`;
-        periodTitle.sync();
-    }
+  if (periodTitle) {
+    periodTitle.text = `Time of the day: ${peroidname || 'Default'} 📚`;
+    periodTitle.sync();
+  }
 }
-export function createFilterPanel(options = { groupColors: [], camera: null }) {
+export async function createFilterPanel(options = { groupColors: [], camera: null, datasets: [] }) {
+  let cursorY = 0.75;   // top of panel (local space)
+  const SECTION_GAP = 0.12;
   const uiPanel = new THREE.Group();
   uiPanel.name = 'FilterUIPanel';
 
   const aspect = window.innerWidth / window.innerHeight;
   uiPanel.position.set(0, -0.3, -0.8);
-  uiPanel.scale.set(PANEL_SCALE * aspect, PANEL_SCALE, 1);
+  uiPanel.scale.set(PANEL_SCALE, PANEL_SCALE, 1);
 
   const userListGroup = new THREE.Group();
   userListGroup.position.set(0.4, 0.1, 0.01);
@@ -45,8 +49,8 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
       depthWrite: false
     })
   );
-    bgPlane.name = 'uiPanelBackground';
-    bgPlane.userData = {
+  bgPlane.name = 'uiPanelBackground';
+  bgPlane.userData = {
     interactive: true,
     isUIPanel: true,
     absorbsOnly: true // prevents hover effects
@@ -55,30 +59,76 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
   uiPanel.userData.bgPlane = bgPlane;
   uiPanel.add(bgPlane);
 
+
+
+  const datasetTitle = new Text();
+  datasetTitle.text = 'Dataset';
+  datasetTitle.fontSize = TITLE_SIZE * 0.85;
+  datasetTitle.color = 0xffffff;
+  datasetTitle.anchorX = 'center';
+  datasetTitle.position.set(0, cursorY, 0.01);
+  datasetTitle.sync();
+
+  uiPanel.add(datasetTitle);
+
+  // move cursor down
+  // cursorY -= SECTION_GAP;
+  cursorY -= SECTION_GAP * 1.2; 
+
+
+  let datasetStartY = 0.12;
+
+  options.datasets.forEach((ds, index) => {
+    const capsule = createCapsuleLabel(ds.id, {
+      fontSize: ITEM_SIZE,
+      color: 0x2a2a3d,
+      hoverColor: 0x444488,
+      padding: 0.03,
+      onClick: () => {
+        console.log(`Dataset selected: ${ds.id}`);
+        switchDataset(ds.key);
+      }
+    });
+
+    capsule.position.set(0, cursorY, 0.01);
+    uiPanel.add(capsule);
+
+    cursorY -= ROW_SPACING * 0.8;
+  });
+
+  cursorY -= SECTION_GAP * 0.5;
+
+
   periodTitle = new Text();
   periodTitle.text = 'Time of the day: Default 📚';
-  periodTitle.fontSize = FONT_SIZE;
+  periodTitle.fontSize = TITLE_SIZE;
   periodTitle.color = 0xffffff;
   periodTitle.anchorX = 'center';
-  periodTitle.position.set(0, 0.35, 0.01);
+  // periodTitle.position.set(0, 0.35, 0.01);
+  periodTitle.position.set(0, cursorY, 0.01);
+  cursorY -= SECTION_GAP * 0.7;
   periodTitle.sync();
-  
-  
+
+
   selectedNodeLabel = new Text();
   selectedNodeLabel.text = 'Selected node: None';
-  selectedNodeLabel.fontSize = FONT_SIZE * 0.9;
+  // selectedNodeLabel.fontSize = FONT_SIZE * 0.9;
+  selectedNodeLabel.fontSize = ITEM_SIZE;
   selectedNodeLabel.color = 0xffffff;
   selectedNodeLabel.anchorX = 'center';
-  selectedNodeLabel.position.set(0, 0.28, 0.01); // just below periodTitle
+  // selectedNodeLabel.position.set(0, 0.28, 0.01); // just below periodTitle
+  selectedNodeLabel.position.set(0, cursorY, 0.01);
+  cursorY -= SECTION_GAP;
   selectedNodeLabel.sync();
-  
+
   uiPanel.add(periodTitle);
   uiPanel.add(selectedNodeLabel);
 
   uiPanel.userData.updateSelectedNodeLabel = (nodeId) => {
-  selectedNodeLabel.text = `Selected node: ${nodeId ?? 'None'}`;
-  selectedNodeLabel.sync();
+    selectedNodeLabel.text = `Selected node: ${nodeId ?? 'None'}`;
+    selectedNodeLabel.sync();
   };
+
 
   options.groupColors
     .slice()
@@ -90,7 +140,8 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
       return a.name.localeCompare(b.name, undefined, { numeric: true });
     })
     .forEach((group, index) => {
-      const yPos = 0.1 - index * ROW_SPACING;
+      // const yPos = -0.25 - index * ROW_SPACING;
+      const yPos = cursorY - index * ROW_SPACING;
 
       const dot = new THREE.Mesh(
         new THREE.SphereGeometry(0.02),
@@ -101,7 +152,8 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
       uiPanel.add(dot);
 
       const capsule = createCapsuleLabel(group.name, {
-        fontSize: 0.045,
+        // fontSize: 0.045,
+        fontSize: ITEM_SIZE,
         color: 0x222244,
         hoverColor: 0x444488,
         padding: 0.03,
@@ -137,7 +189,8 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
       const label = id === selfId ? `${name} (you)` : name;
 
       const capsule = createCapsuleLabel(label, {
-        fontSize: 0.038,
+        // fontSize: 0.038,
+        fontSize: ITEM_SIZE,
         color: 0x333333,
         hoverColor: 0x555577,
         padding: 0.025,
@@ -157,13 +210,16 @@ export function createFilterPanel(options = { groupColors: [], camera: null }) {
 }
 
 
+
+
+
 // filterUIPanel.js
 
 // ... (keep all the code above this function the same)
 
 export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, controller, scene, inVR }) {
   if (!uiPanel) return;
-  
+
   const bgPlane = uiPanel.userData.bgPlane;
 
   const moveToCamera = () => {
@@ -205,7 +261,7 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
 
   else if (panelState === 'hiding') {
     // ✨ CHANGE: Ensure panel is visible during the hiding animation
-    uiPanel.visible = true; 
+    uiPanel.visible = true;
 
     if (bgPlane) {
       bgPlane.material.opacity = 0.6;
@@ -229,7 +285,7 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
   else if (panelState === 'hidden') {
 
     uiPanel.visible = false;
-    
+
     // console.warn("HIDDEN - Panel is now invisible");
   }
 
@@ -238,7 +294,7 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
     uiPanel.visible = true;
 
     if (bgPlane) {
-      bgPlane.visible = false;                     
+      bgPlane.visible = false;
       bgPlane.userData.isUIPanel = false;
     }
 
@@ -268,7 +324,8 @@ console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeStrin
 const DEBUG = true;
 
 export function createCapsuleLabel(text, {
-  fontSize = 0.045,
+  // fontSize = 0.045,
+  fontSize = ITEM_SIZE,
   color = 0x222244,
   hoverColor = 0x444488,
   textColor = 0xffffff,
@@ -320,16 +377,16 @@ export function createCapsuleLabel(text, {
     bg.userData.defaultColor = new THREE.Color(color);
     bg.userData.hoverColor = new THREE.Color(hoverColor);
     bg.userData.selectedColor = new THREE.Color(0x3366ff);
-    bg.userData.isSelected = false;                        
+    bg.userData.isSelected = false;
 
     group.add(bg);
 
-// filterUIPanel.js --> createCapsuleLabel()
+    // filterUIPanel.js --> createCapsuleLabel()
 
     const hitbox = new THREE.Mesh(
       new THREE.PlaneGeometry(width, height),
       // Fix: visible: false makes it invisible to the camera, but not the raycaster
-      new THREE.MeshBasicMaterial({ visible: false }) 
+      new THREE.MeshBasicMaterial({ visible: false })
     );
     hitbox.position.z = 0.02;
     hitbox.name = 'capsuleHitbox';

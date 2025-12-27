@@ -38,7 +38,7 @@ import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { DATASETS } from './dataset.js';
+import { DATASETS, getDatasetList } from './dataset.js';
 
 // Graph data variables
 let dataset = null
@@ -48,6 +48,10 @@ let periods = null
 // A getter for the periods
 export function getActivePeriods() {
   return periods
+}
+
+export function getDatasets() {
+  return dataset
 }
 // ========================
 //  Static Panel variables
@@ -455,7 +459,7 @@ async function loadDataset(datasetKey) {
 }
 
 
-async function switchDataset(datasetKey) {
+export async function switchDataset(datasetKey) {
   // 1️ Load data and Store current state in dataset and periods
   const { datasetValues, periodLabelsValues, key } = await loadDataset(datasetKey);
 
@@ -509,7 +513,7 @@ const graphController = new GraphVisualController({
 // await loadDataset('school')
 // applyDataset(dataset, periods)
 
-await switchDataset('hospital')
+await switchDataset('school')
 
 
 // shrink the graph by 50%
@@ -638,7 +642,8 @@ const groups = [...new Set(Graph.graphData().nodes.map(n => n.group))].map(group
   name: String(group),
   color: colorScale(group)
 }));
-export const uiPanel = createFilterPanel({ groupColors: groups, camera });
+
+export const uiPanel = await createFilterPanel({ groupColors: groups, camera, datasets: Object.values(DATASETS)});
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
