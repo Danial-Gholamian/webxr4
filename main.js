@@ -569,7 +569,7 @@ registerNetworkHandlers({
     graphController.highlightNode(nodeId);
 
     // keep legacy UI side-effects
-    uiPanel.userData.updateSelectedNodeLabel?.(String(nodeId));
+    // uiPanel.userData.updateSelectedNodeLabel?.(String(nodeId));
   },
 
   onGroupSelect: (groupName) => {

@@ -2,3 +2,5 @@ Current bugs
 - synchronizing the timeline barGauge
 - synchronizing grouplists and broadcast selected graph (=____=)
 - when x default button is pressed, selection in filterpanel is not reset
+- after switching dataset, the nodes don't have the hover effect
+- switched dataset is not broadcasted.
