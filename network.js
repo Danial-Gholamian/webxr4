@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import * as THREE from 'three';
 import { highlightPeriod, AVATAR_UPDATE_INTERVAL } from './main.js';
 import { createAvatar } from './avatars.js';
-import { myUsername, getActivePeriods} from './main.js';
+import { myUsername, getActivePeriods } from './main.js';
 import { handleUserList } from './voice.js';
 
 
@@ -32,19 +32,19 @@ export const userAvatars = {};
 export const avatarInterpolation = {
   factors: {
     position: 0.25,
-    rotation: 0.2 
+    rotation: 0.2
   },
-  
+
   update(avatars, deltaTime) {
     const frameFactor = Math.min(deltaTime * 60, 2.5);
     Object.values(avatars).forEach(avatar => {
       const posFactor = this.factors.position * frameFactor;
       const rotFactor = this.factors.rotation * frameFactor;
-      
+
       avatar.head.position.lerp(avatar.targetPosition.head, posFactor);
       avatar.left.position.lerp(avatar.targetPosition.left, posFactor);
       avatar.right.position.lerp(avatar.targetPosition.right, posFactor);
-      
+
       // CRITICAL: Add rotation interpolation
       avatar.head.quaternion.slerp(avatar.targetQuaternion.head, rotFactor);
       avatar.left.quaternion.slerp(avatar.targetQuaternion.left, rotFactor);
@@ -65,9 +65,9 @@ socket.on('connect', () => {
 });
 
 socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
-    const username = knownUsers[id] || id;
-    // console.log(`[RECEIVE] user-update from ${username}`, head);
-  
+  const username = knownUsers[id] || id;
+  // console.log(`[RECEIVE] user-update from ${username}`, head);
+
   // Skip self
   if (id === socket.id) return;
 
@@ -98,7 +98,7 @@ socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, right
 
   // Add decompression HERE
   const decompressRot = arr => arr.map(v => v / ROTATION_COMPRESSION_FACTOR);
-  
+
   avatar.targetQuaternion.head.fromArray(decompressRot(headRot));
   avatar.targetQuaternion.left.fromArray(decompressRot(leftRot));
   avatar.targetQuaternion.right.fromArray(decompressRot(rightRot));
@@ -158,8 +158,8 @@ export function broadcastAvatar(camera, controller1, controller2) {
 
 export function broadcastNodeSelection(nodeId, mode = 'DIRECT') {
   console.log("This node was broadcasted: ", nodeId)
-  socket.emit('node-select', { 
-    nodeId: String(nodeId), 
+  socket.emit('node-select', {
+    nodeId: String(nodeId),
     mode: mode.slice(0, 20)
   }, (ack) => { /* ... */ });
 }
@@ -182,7 +182,7 @@ socket.on('node-select', ({ nodeId, mode }) => {
   if (injectedHandlers?.onNodeSelect) {
     console.log('[network] using injected handler');
     injectedHandlers.onNodeSelect(nodeId, mode);
-  } 
+  }
   // else {
   //   highlightSubgraph(nodeId, mode); // fallback
   // }
@@ -201,13 +201,23 @@ socket.on('graph-reset', () => {
 
 });
 
+
+socket.on('dataset-change', (msg) => {
+  console.log('Received dataset-change', msg);
+  if (injectedHandlers?.onDatasetChange) {
+    console.log('Remote switch dataset received:', msg.datasetKey);
+    injectedHandlers.onDatasetChange(msg.datasetKey);
+  }
+});
+
+
 socket.on('group-select', ({ groupName }) => {
   console.log("Received group selection:", groupName);
 
   if (injectedHandlers?.onGroupSelect) {
     console.log('[network] using injected handler');
     injectedHandlers.onGroupSelect(groupName);
-  } 
+  }
   // else {
   //   highlightGroup(groupName);
   // }
@@ -220,7 +230,7 @@ socket.on('period-stack-toggle', ({ visible, context }) => {
   if (injectedHandlers?.onPeriodStackToggle) {
     console.log('[network] using injected handler');
     injectedHandlers.onPeriodStackToggle(visible, context);
-  } 
+  }
   // else {
   //   applyRemotePeriodStackToggle(visible, context);
   // }
@@ -236,7 +246,7 @@ export function setCurrentPeriodIndex(index, broadcast = true) {
   const period = getActivePeriods()[currentPeriodIndex];
   console.warn("LEGACY HIGHLIGHTPERIOD METHOD STILL BEING USED :(")
   highlightPeriod(period);
-  
+
   if (broadcast) {
     socket.emit('period-change', period);
   }
@@ -270,11 +280,11 @@ socket.on('user-list', (userArray) => {
     knownUsers[socketId] = name;
   });
 
-  
+
   Object.values(userAvatars).forEach(avatar => {
-  if (avatar.nameLabel) {
-    avatar.nameLabel.sync();
-  }
+    if (avatar.nameLabel) {
+      avatar.nameLabel.sync();
+    }
   });
 
   if (_uiPanel?.userData?.refreshUsers) {
@@ -293,6 +303,16 @@ export function broadcastPeriodStackToggle(visible, context = {}) {
   console.log("Broadcasting period stack toggle:", visible, context);
   socket.emit('period-stack-toggle', { visible, context });
 }
+
+export function broadcastDatasetChange(datasetKey) {
+  console.log('📡 broadcastDatasetChange called with', datasetKey);
+
+  socket.emit('dataset-change', {
+    datasetKey
+  });
+}
+
+
 
 
 

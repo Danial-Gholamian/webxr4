@@ -477,7 +477,7 @@ export async function switchDataset(datasetKey) {
   applyDataset(dataset, periods);
 
   // Update the rest of the visuals as well
-  // pdate Filter Panel using the created uiPanel at initialization
+  // Update Filter Panel using the created uiPanel at initialization
   updateGroupList(uiPanel, buildGroupColorList(Graph.graphData()))
 
   console.log(`Dataset switched to: ${currentDatasetKey}`);
@@ -587,8 +587,13 @@ registerNetworkHandlers({
 
   onPeriodStackToggle: (visible, context) => {
     applyRemotePeriodStackToggle(visible, context);
-  }
+  },
+  onDatasetChange: async (datasetKey) => {
+    console.log('[main] loading dataset from network:', datasetKey);
+    await switchDataset(datasetKey)
+  },
 });
+
 
 
 function rebuildPeriodStack() {

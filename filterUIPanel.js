@@ -1,7 +1,7 @@
 // filterUIPanel.js
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
-import { knownUsers } from './network.js';
+import { broadcastDatasetChange, knownUsers } from './network.js';
 import { buildGroupColorList, highlightGroup, switchDataset } from './main.js'
 import { broadcastGroupSelection } from './network.js';
 import { getGraphController } from './main.js';
@@ -89,7 +89,11 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
       padding: 0.03,
       onClick: () => {
         console.log(`Dataset selected: ${ds.id}`);
+        // local switch data set
         switchDataset(ds.key);
+
+        // broadcast it across :) 
+        broadcastDatasetChange(ds.key)
       }
     });
 
