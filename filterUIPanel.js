@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 import { knownUsers } from './network.js';
-import { highlightGroup, switchDataset } from './main.js'
+import { buildGroupColorList, highlightGroup, switchDataset } from './main.js'
 import { broadcastGroupSelection } from './network.js';
+import { getGraphController } from './main.js';
 
 
 const PANEL_SCALE = 0.3;       // 30% of view width
@@ -46,9 +47,11 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
       color: 0x000000,
       transparent: true,
       opacity: 0.6,
-      depthWrite: false
+      depthWrite: false,
+      depthTest: false
     })
   );
+  bgPlane.renderOrder = 0
   bgPlane.name = 'uiPanelBackground';
   bgPlane.userData = {
     interactive: true,
@@ -73,7 +76,7 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
 
   // move cursor down
   // cursorY -= SECTION_GAP;
-  cursorY -= SECTION_GAP * 1.2; 
+  cursorY -= SECTION_GAP * 1.2;
 
 
   let datasetStartY = 0.12;
@@ -129,44 +132,53 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
     selectedNodeLabel.sync();
   };
 
+  const nodeGroupList = new THREE.Group()
+  nodeGroupList.name = 'NodeGroupList'
+  uiPanel.add(nodeGroupList)
 
-  options.groupColors
-    .slice()
-    .sort((a, b) => {
-      const aStartsDigit = /^\d/.test(a.name);
-      const bStartsDigit = /^\d/.test(b.name);
-      if (aStartsDigit && !bStartsDigit) return -1;
-      if (!aStartsDigit && bStartsDigit) return 1;
-      return a.name.localeCompare(b.name, undefined, { numeric: true });
-    })
-    .forEach((group, index) => {
-      // const yPos = -0.25 - index * ROW_SPACING;
-      const yPos = cursorY - index * ROW_SPACING;
+  // store references
+  uiPanel.userData.nodeGroupList = nodeGroupList
+  uiPanel.userData.nodenodeGroupButtons = []
+  uiPanel.userData.nodeGroupListCursorY = cursorY
 
-      const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.02),
-        new THREE.MeshBasicMaterial({ color: group.color, depthTest: false })
-      );
-      dot.position.set(-0.4, yPos, 0.01);
-      dot.renderOrder = 2;
-      uiPanel.add(dot);
+  updateGroupList(uiPanel, buildGroupColorList(getGraphController().graph.graphData()))
+  // options.groupColors
+  //   .slice()
+  //   .sort((a, b) => {
+  //     const aStartsDigit = /^\d/.test(a.name);
+  //     const bStartsDigit = /^\d/.test(b.name);
+  //     if (aStartsDigit && !bStartsDigit) return -1;
+  //     if (!aStartsDigit && bStartsDigit) return 1;
+  //     return a.name.localeCompare(b.name, undefined, { numeric: true });
+  //   })
+  // .forEach((group, index) => {
+  //   // const yPos = -0.25 - index * ROW_SPACING;
+  //   const yPos = cursorY - index * ROW_SPACING;
 
-      const capsule = createCapsuleLabel(group.name, {
-        // fontSize: 0.045,
-        fontSize: ITEM_SIZE,
-        color: 0x222244,
-        hoverColor: 0x444488,
-        padding: 0.03,
-        onClick: () => {
-          console.log(`Clicked ${group.name}`);
-          highlightGroup(group.name);
-          broadcastGroupSelection(group.name); // broadcast the group selection
-        }
-      });
+  //   const dot = new THREE.Mesh(
+  //     new THREE.SphereGeometry(0.02),
+  //     new THREE.MeshBasicMaterial({ color: group.color, depthTest: false })
+  //   );
+  //   dot.position.set(-0.4, yPos, 0.01);
+  //   dot.renderOrder = 2;
+  //   uiPanel.add(dot);
 
-      capsule.position.set(-0.05, yPos, 0.01);
-      uiPanel.add(capsule);
-    });
+  //   const capsule = createCapsuleLabel(group.name, {
+  //     // fontSize: 0.045,
+  //     fontSize: ITEM_SIZE,
+  //     color: 0x222244,
+  //     hoverColor: 0x444488,
+  //     padding: 0.03,
+  //     onClick: () => {
+  //       console.log(`Clicked ${group.name}`);
+  //       highlightGroup(group.name);
+  //       broadcastGroupSelection(group.name); // broadcast the group selection
+  //     }
+  //   });
+
+  //   capsule.position.set(-0.05, yPos, 0.01);
+  //   uiPanel.add(capsule);
+  // });
 
   uiPanel.traverse(child => {
     if (child.material) {
@@ -207,6 +219,70 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
 
   uiPanel.userData.boundingBox = new THREE.Box3().setFromObject(uiPanel);
   return uiPanel;
+}
+
+export function updateGroupList(uiPanel, groupColors) {
+  if (!uiPanel?.userData?.nodeGroupList) return;
+
+  const nodeGroupList = uiPanel.userData.nodeGroupList;
+
+  // 1️ Remove old groups
+  nodeGroupList.children.forEach(child => {
+    if (child.geometry) child.geometry.dispose?.();
+    if (child.material) child.material.dispose?.();
+  });
+  nodeGroupList.clear();
+
+  uiPanel.userData.nodeGroupButtons = [];
+
+  // 2️ Sort groups (same logic you already had)
+  const sortedGroups = groupColors
+    .slice()
+    .sort((a, b) => {
+      const aStartsDigit = /^\d/.test(a.name);
+      const bStartsDigit = /^\d/.test(b.name);
+      if (aStartsDigit && !bStartsDigit) return -1;
+      if (!aStartsDigit && bStartsDigit) return 1;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    });
+
+  // 3️ Rebuild UI
+  let y = uiPanel.userData.nodeGroupListCursorY;
+
+  sortedGroups.forEach(group => {
+    const dot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.02),
+      new THREE.MeshBasicMaterial({
+        color: group.color,
+        depthTest: false,
+        depthWrite: false
+      })
+    );
+    dot.material.depthTest = false;
+    dot.material.depthWrite = false;
+    dot.renderOrder = 1000;
+
+    dot.position.set(-0.4, y, 0.01);
+    nodeGroupList.add(dot);
+
+    const capsule = createCapsuleLabel(group.name, {
+      fontSize: 0.055,
+      color: 0x222244,
+      hoverColor: 0x444488,
+      padding: 0.03,
+      onClick: () => {
+        highlightGroup(group.name);
+        broadcastGroupSelection(group.name);
+      }
+    });
+
+    capsule.position.set(-0.05, y, 0.01);
+    nodeGroupList.add(capsule);
+
+
+    uiPanel.userData.nodeGroupButtons.push(capsule);
+    y -= 0.17;
+  });
 }
 
 
@@ -369,7 +445,8 @@ export function createCapsuleLabel(text, {
       color,
       transparent: true,
       opacity,
-      depthWrite: false
+      depthWrite: false,
+      depthTest: false
     });
 
     const bg = new THREE.Mesh(geometry, bgMaterial);
@@ -378,6 +455,8 @@ export function createCapsuleLabel(text, {
     bg.userData.hoverColor = new THREE.Color(hoverColor);
     bg.userData.selectedColor = new THREE.Color(0x3366ff);
     bg.userData.isSelected = false;
+
+    // bg.renderOrder = 0
 
     group.add(bg);
 

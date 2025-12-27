@@ -31,7 +31,7 @@ import {
 } from './vrSetup.js';
 import { createUserGuidePanel } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
-import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
+import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
 import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
 import { createPeriodStack } from './periodStack.js';
@@ -408,6 +408,10 @@ function applyDataset(dataset, periods) {
     periodStack = null;
   }
 
+  // // 8 Update Filter Panel using the created uiPanel at initialization
+  // updateGroupList(uiPanel, buildGroupColorList())
+
+
   console.log('Dataset applied');
 }
 
@@ -443,14 +447,14 @@ async function loadDataset(datasetKey) {
     throw new Error("Invalid dataset shape");
   }
 
-  console.log(
-    `Loaded dataset "${entry.label}"`,
-    dataset.nodes.length,
-    dataset.links.length
-  );
-  console.log(
-    `-----Loaded periods----- "${periods}"`
-  )
+  // console.log(
+  //   `Loaded dataset "${entry.label}"`,
+  //   dataset.nodes.length,
+  //   dataset.links.length
+  // );
+  // console.log(
+  //   `-----Loaded periods----- "${periods}"`
+  // )
 
   return { datasetValues: dataset, periodLabelsValues: periods, key: datasetKey };
 
@@ -471,6 +475,10 @@ export async function switchDataset(datasetKey) {
   console.log("LOADED DATA AND PERIODS AS WELL AS KEY", dataset, periods, currentDatasetKey)
   // 3️ Apply to graph
   applyDataset(dataset, periods);
+
+  // Update the rest of the visuals as well
+  // pdate Filter Panel using the created uiPanel at initialization
+  updateGroupList(uiPanel, buildGroupColorList(Graph.graphData()))
 
   console.log(`Dataset switched to: ${currentDatasetKey}`);
 }
@@ -510,10 +518,10 @@ const graphController = new GraphVisualController({
 });
 
 
-// await loadDataset('school')
-// applyDataset(dataset, periods)
+await loadDataset('school')
+applyDataset(dataset, periods)
 
-await switchDataset('school')
+// await switchDataset('school')
 
 
 // shrink the graph by 50%
@@ -574,7 +582,6 @@ registerNetworkHandlers({
   },
 
   onGraphReset: () => {
-    console.log("MIGHT AS WELL REPLACE THIS WITH THE resetGraph() method to redue repetition")
     resetGraph()
   },
 
@@ -643,7 +650,18 @@ const groups = [...new Set(Graph.graphData().nodes.map(n => n.group))].map(group
   color: colorScale(group)
 }));
 
-export const uiPanel = await createFilterPanel({ groupColors: groups, camera, datasets: Object.values(DATASETS)});
+export function buildGroupColorList(dataset) {
+  console.log("HELLOSOSOFSDFDSIFISDF", dataset)
+  const map = new Map();
+  dataset.nodes.forEach(n => {
+    if (!map.has(n.group)) {
+      map.set(n.group, colorScale(n.group));
+    }
+  });
+  return [...map.entries()].map(([name, color]) => ({ name, color }));
+}
+
+export const uiPanel = await createFilterPanel({ groupColors: groups, camera, datasets: Object.values(DATASETS) });
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
@@ -661,7 +679,6 @@ function requestGraphUpdate(mode, nodeId) {
 
 setUIPanel(uiPanel);
 
-// DELETE LATER
 export function highlightSubgraph(nodeId) {
   graphController.highlightNode(nodeId)
   console.log("DELETE HIGHLIGHTSUBGRAPH AFTER FIXING THE DEPENDECY IN NETWORK.JS");
@@ -1004,4 +1021,5 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
 
   renderer.render(scene, camera);
+  // renderer.clearDepth();
 });

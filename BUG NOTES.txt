@@ -1,2 +1,4 @@
 Current bugs
 - synchronizing the timeline barGauge
+- synchronizing grouplists and broadcast selected graph (=____=)
+- when x default button is pressed, selection in filterpanel is not reset
