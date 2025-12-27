@@ -676,6 +676,10 @@ function requestGraphUpdate(mode, nodeId) {
   graphUpdateNeeded = true;
 }
 
+graphController.setSelectionListener((nodeId) => {
+  uiPanel.userData.updateSelectedNodeLabel?.(nodeId);
+});
+
 
 setUIPanel(uiPanel);
 

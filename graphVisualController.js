@@ -55,6 +55,8 @@ export class GraphVisualController {
 
         // --- Baseline edge opacity ---
         this.BASE_EDGE_ALPHA = 0.6;
+
+        this._onSelectionChange = null
     }
 
     // =========================================================
@@ -111,23 +113,13 @@ export class GraphVisualController {
             else if (tgt === id) this.state.selection.neighbors.add(src);
         });
 
+        this._onSelectionChange?.(nodeId)
+
         this.update();
-        // const id = String(nodeId);
+    }
 
-        // this.state.selection.active = true;
-        // this.state.selection.selectedNodeId = id;
-        // this.state.selection.neighbors.clear();
-
-        // // Compute neighbors using adapter semantics
-        // this.graph.graphData().links.forEach(link => {
-        //     const src = this.adapter.getEdgeSource(link);
-        //     const tgt = this.adapter.getEdgeTarget(link);
-
-        //     if (src === id) this.state.selection.neighbors.add(tgt);
-        //     else if (tgt === id) this.state.selection.neighbors.add(src);
-        // });
-
-        // this.update();
+    setSelectionListener(fn) {
+        this._onSelectionChange = fn;
     }
 
     clearNodeSelection() {
@@ -198,6 +190,8 @@ export class GraphVisualController {
             if (o.isLineSegments) lines.push(o);
         });
 
+        // Update selected node variable
+        this._onSelectionChange?.(null); 
         console.log('LineSegments in scene:', lines.length, lines);
         this.update();
     }
