@@ -146,43 +146,6 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   uiPanel.userData.nodeGroupListCursorY = cursorY
 
   updateGroupList(uiPanel, buildGroupColorList(getGraphController().graph.graphData()))
-  // options.groupColors
-  //   .slice()
-  //   .sort((a, b) => {
-  //     const aStartsDigit = /^\d/.test(a.name);
-  //     const bStartsDigit = /^\d/.test(b.name);
-  //     if (aStartsDigit && !bStartsDigit) return -1;
-  //     if (!aStartsDigit && bStartsDigit) return 1;
-  //     return a.name.localeCompare(b.name, undefined, { numeric: true });
-  //   })
-  // .forEach((group, index) => {
-  //   // const yPos = -0.25 - index * ROW_SPACING;
-  //   const yPos = cursorY - index * ROW_SPACING;
-
-  //   const dot = new THREE.Mesh(
-  //     new THREE.SphereGeometry(0.02),
-  //     new THREE.MeshBasicMaterial({ color: group.color, depthTest: false })
-  //   );
-  //   dot.position.set(-0.4, yPos, 0.01);
-  //   dot.renderOrder = 2;
-  //   uiPanel.add(dot);
-
-  //   const capsule = createCapsuleLabel(group.name, {
-  //     // fontSize: 0.045,
-  //     fontSize: ITEM_SIZE,
-  //     color: 0x222244,
-  //     hoverColor: 0x444488,
-  //     padding: 0.03,
-  //     onClick: () => {
-  //       console.log(`Clicked ${group.name}`);
-  //       highlightGroup(group.name);
-  //       broadcastGroupSelection(group.name); // broadcast the group selection
-  //     }
-  //   });
-
-  //   capsule.position.set(-0.05, yPos, 0.01);
-  //   uiPanel.add(capsule);
-  // });
 
   uiPanel.traverse(child => {
     if (child.material) {
