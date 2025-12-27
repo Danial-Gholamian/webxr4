@@ -13,7 +13,7 @@ import { schemeCategory10 } from 'd3-scale-chromatic';
 
 // Controller and Data Adapter
 import { GraphVisualController } from "./graphVisualController.js";
-import { SchoolTemporalGraphAdapter } from "./schoolTemporalGraphAdapter.js";
+import { graphAdapter } from './GraphAdapter.js';
 
 import ForceGraph3D from '3d-force-graph';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -514,7 +514,7 @@ const graphController = new GraphVisualController({
   scene: Graph.scene(),
   lineSegments: null,
   edgeVertexMap,
-  adapter: SchoolTemporalGraphAdapter
+  adapter: graphAdapter
 });
 
 

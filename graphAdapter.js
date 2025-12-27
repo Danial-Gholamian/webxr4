@@ -1,6 +1,6 @@
-// SchoolTemporalGraphAdapter.js
+// graphAdapter.js
 
-export const SchoolTemporalGraphAdapter = {
+export const graphAdapter = {
   // ---------- Node semantics ----------
   getNodeId(node) {
     return String(node.id);

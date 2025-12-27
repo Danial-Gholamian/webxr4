@@ -1,5 +1,3 @@
-import { SchoolTemporalGraphAdapter } from './schoolTemporalGraphAdapter.js';
-
 export const DATASETS = {
   school: {
     key: 'school',
