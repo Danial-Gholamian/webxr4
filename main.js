@@ -543,7 +543,7 @@ applyDataset(dataset, periods)
 
 
 const b = 4;
-const deltaMin = 8; // arbitrary test value
+const deltaMin = 50; // arbitrary test value
 // Use the ORIGINAL dataset, not ForceGraph-mutated data
 const allTimes = dataset.__allTimes ?? [];
 
@@ -561,94 +561,6 @@ const temporalPanel = createTemporalDrillPanel({
   graphController
 });
 
-
-
-//============
-
-
-// let hierarchy = null;
-
-// if (allTimes.length === 0) {
-//   console.error('[Temporal] Dataset has no timestamps. Autoplay aborted.');
-// } else {
-//   const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
-
-//   if (!Number.isFinite(T) || T <= 0) {
-//     console.error('[Temporal] Invalid T:', T);
-//   } else {
-//     hierarchy = buildTemporalHierarchy({ T, deltaMin, b });
-
-//     if (!hierarchy || hierarchy.length === 0) {
-//       console.warn('[Temporal] Empty hierarchy. Autoplay skipped.');
-//     } else {
-//       startTemporalAutoplay();
-//     }
-//   }
-// }
-
-
-
-// State for autoplay
-
-// function startTemporalAutoplay() {
-//   if (!hierarchy || hierarchy.length === 0) {
-//     console.warn('[Temporal] Autoplay aborted: no hierarchy');
-//     return;
-//   }
-
-//   if (autoplayInterval) clearInterval(autoplayInterval);
-
-//   console.log('[Temporal] Starting autoplay');
-//   console.log('[Temporal] Levels:', hierarchy.length);
-
-//   autoplayInterval = setInterval(() => {
-//   const level = hierarchy[levelIndex];
-
-//   if (!level || !Array.isArray(level.buckets)) {
-//     console.warn('[Temporal] Invalid level at index', levelIndex);
-//     clearInterval(autoplayInterval);
-//     return;
-//   }
-
-//   const buckets = level.buckets;
-
-
-//     // Initialize bucket index to rightmost
-//     if (bucketIndex === null) {
-//       bucketIndex = buckets.length - 1;
-
-//       // IMPORTANT: update controller cache for this level
-//       graphController.setBuckets(buckets);
-
-//       console.log(
-//         `[Temporal] Switched to level ${level.level} (Δ = ${level.delta.toFixed(2)})`
-//       );
-//     }
-
-//     const bucket = buckets[bucketIndex];
-
-//     console.log(
-//       `[Temporal] Level ${level.level} → Bucket ${bucket.index}`,
-//       `[${bucket.start.toFixed(0)}, ${bucket.end.toFixed(0)})`
-//     );
-
-//     graphController.highlightBucket(bucket);
-
-//     // Move left
-//     bucketIndex--;
-
-//     // If finished this level, move to next level
-//     if (bucketIndex < 0) {
-//       bucketIndex = null;
-//       levelIndex++;
-
-//       if (levelIndex >= hierarchy.length) {
-//         console.log('[Temporal] Autoplay finished all levels');
-//         clearInterval(autoplayInterval);
-//       }
-//     }
-//   }, 50000);
-// }
 
 
 
