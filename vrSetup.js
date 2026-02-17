@@ -118,7 +118,7 @@ function moveThumbstick(inputX, inputY, camera, cameraGroup, speed = movementSpe
   cameraGroup.position.add(moveVector);
 }
 
-// --- 4. Trigger Selection ---, today
+// --- 4. Trigger Selection (Updated for Generic UI) ---
 let vrNodeSelectionInitialized = false;
 let lastSelectedCapsule = null;
 
@@ -126,62 +126,78 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
   function onVRSelect(event) {
     const controller = event.target;
     const controllerSide = controller === controller1 ? 'left' : 'right';
-    console.log(` VR selectstart from ${controllerSide} Controller`);
+    // console.log(`[VR] Select from ${controllerSide}`);
 
     const raycaster = new THREE.Raycaster();
     const matrix = new THREE.Matrix4();
 
+    // 1. Setup Ray
     matrix.identity().extractRotation(controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
-    raycaster.far = laserDistance;
+    raycaster.far = laserDistance; // 2000
 
-    const uiPanel = scene.getObjectByName('FilterUIPanel') || cameraGroup.getObjectByName('FilterUIPanel');
+    // ============================================================
+    // 2. UI INTERACTION (Panel Buttons)
+    // ============================================================
+    // We check everything in cameraGroup (includes FilterPanel AND TemporalPanel)
+    const intersects = raycaster.intersectObject(cameraGroup, true);
 
-    if (uiPanel && uiPanel.userData.panelState === 'shown') {
-      const interactiveObjects = [];
-      uiPanel.traverse(obj => {
-        if (obj.isMesh && obj.userData?.interactive) {
-          interactiveObjects.push(obj);
+    // Filter hits to find the first actual "Button" (Object with onClick)
+    // We use a loop to "bubble up" from the hit point (e.g. text) to the button container
+    let uiHit = null;
+    
+    for (const hit of intersects) {
+      // Check if visible
+      if (!hit.object.visible) continue;
+
+      let target = hit.object;
+      
+      // Traverse up to find the clickable element
+      while (target) {
+        if (target.userData && target.userData.onClick) {
+          uiHit = target;
+          break;
         }
-      });
-
-      const hits = raycaster.intersectObjects(interactiveObjects, false);
-// now debugg
-      if (hits.length > 0) {
-        const hit = hits[0].object;
-        const { onClick, label, target } = hit.userData;
-
-        console.log('VR ray hit object:', hit.name);
-        console.log('hit.userData:', hit.userData);
-        console.log('hit target material:', target?.material?.color.getHexString());
-
-        // Reset previous selection
-        if (lastSelectedCapsule && lastSelectedCapsule !== target) {
-          console.log(' Deselecting previous capsule');
-          lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
-          lastSelectedCapsule.userData.isSelected = false;
-        }
-
-        // Set new selection
-        if (target?.material) {
-          const selectedColor = target.userData.selectedColor || new THREE.Color(0x3366ff);
-          console.log(' Selecting capsule:', label, 'Color:', selectedColor.getHexString());
-          target.material.color.copy(selectedColor);
-          target.userData.isSelected = true;
-          lastSelectedCapsule = target;
-        } else {
-          console.warn(' No target material found');
-        }
-
-        if (typeof onClick === 'function') onClick(label);
-        console.log(` Capsule clicked: ${label}`);
-        return;
+        // Stop if we hit the cameraGroup root
+        if (target === cameraGroup) break;
+        target = target.parent;
       }
-
+      
+      if (uiHit) break; // Found a button, stop looking
     }
 
-    // --- Fallback to graph node selection ---
+    if (uiHit) {
+      console.log(`[VR] Clicked Button: ${uiHit.userData.label || 'Unnamed'}`);
+      
+      // A. Fire the Click Handler
+      uiHit.userData.onClick(); 
+
+      // B. Haptic Feedback (Pulse)
+      const gamepad = controller.userData.inputSource?.gamepad;
+      if (gamepad && gamepad.hapticActuators && gamepad.hapticActuators[0]) {
+        gamepad.hapticActuators[0].pulse(0.8, 20); // Strength 0.8, 20ms
+      }
+
+      // C. Legacy Highlighting (Only for FilterUIPanel capsules that need manual color change)
+      // If the button handles its own re-render (like TemporalPanel), this part is ignored.
+      if (uiHit.material && uiHit.userData.selectedColor) {
+         if (lastSelectedCapsule && lastSelectedCapsule !== uiHit) {
+           // Reset previous
+           if(lastSelectedCapsule.userData.defaultColor) {
+              lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
+           }
+         }
+         uiHit.material.color.copy(uiHit.userData.selectedColor);
+         lastSelectedCapsule = uiHit;
+      }
+
+      return; // STOP HERE. Don't click through the UI to the graph behind it.
+    }
+
+    // ============================================================
+    // 3. GRAPH SELECTION (Fallback)
+    // ============================================================
     if (!GraphRef.current?.scene) return;
 
     const graphNodes = [];
@@ -192,10 +208,13 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     const hits = raycaster.intersectObjects(graphNodes, false);
     if (hits.length > 0) {
       const node = hits[0].object.__data;
-      console.log(" VR Selected node:", node);
+      console.log("[VR] Selected Graph Node:", node.id);
+      
+      // Haptics
+      const gamepad = controller.userData.inputSource?.gamepad;
+      if (gamepad?.hapticActuators?.[0]) gamepad.hapticActuators[0].pulse(0.5, 10);
+
       requestGraphUpdate('SUBGRAPH', node.id);
-    } else {
-      console.log(`HERE  [${controllerSide}] Button 0 pressed but hit nothing`);
     }
   }
 
@@ -203,7 +222,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     controller1.addEventListener('selectstart', onVRSelect);
     controller2.addEventListener('selectstart', onVRSelect);
     vrNodeSelectionInitialized = true;
-    console.log("setupVRNodeSelection: Listeners initialized.");
+    console.log("setupVRNodeSelection: Generic Interaction Initialized.");
   }
 }
 

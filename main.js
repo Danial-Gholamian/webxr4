@@ -13,7 +13,7 @@ import { schemeCategory10 } from 'd3-scale-chromatic';
 
 // Controller and Data Adapter
 import { GraphVisualController } from "./graphVisualController.js";
-import { graphAdapter } from './GraphAdapter.js';
+import { graphAdapter } from './graphAdapter.js';
 
 import ForceGraph3D from '3d-force-graph';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -39,6 +39,17 @@ import { initVoice } from './voice.js';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DATASETS, getDatasetList } from './dataset.js';
+import {
+  buildTemporalHierarchy,
+  buildTemporalTree,
+  createTemporalNavigator
+} from './temporalHierarchy.js';
+import { createTemporalDrillPanel } from './temporalDrillPanel.js';
+
+let levelIndex = 0;
+let bucketIndex = null;
+let autoplayInterval = null;
+
 
 // Graph data variables
 let dataset = null
@@ -438,9 +449,13 @@ async function loadDataset(datasetKey) {
 
   // 2️ Extract actual values
   dataset = dataModule.default ?? dataModule;
-  periods =
-    periodModule.default ??
-    periodModule.dataPeriods;
+  // Cache original timestamps BEFORE ForceGraph mutates links
+  dataset.__allTimes = dataset.links.flatMap(l =>
+    Array.isArray(l.times) ? l.times : []
+  );
+
+  periods = dataset.meta?.periods ?? [];
+
 
   // 3️ Validate
   if (!dataset?.nodes || !dataset?.links) {
@@ -520,6 +535,122 @@ const graphController = new GraphVisualController({
 
 await loadDataset('school')
 applyDataset(dataset, periods)
+
+// ========================
+// EXPERIMENTAL: Temporal Hierarchy Autoplay
+// ========================
+
+
+
+const b = 4;
+const deltaMin = 8; // arbitrary test value
+// Use the ORIGINAL dataset, not ForceGraph-mutated data
+const allTimes = dataset.__allTimes ?? [];
+
+// ==========
+const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
+
+const levels = buildTemporalHierarchy({ T, deltaMin, b: 4 });
+const root = buildTemporalTree(levels, 4);
+const navigator = createTemporalNavigator(root);
+
+const temporalPanel = createTemporalDrillPanel({
+  cameraGroup: cameraGroup, // Pass the group (scene graph location)
+  camera: camera,           // Pass camera (for positioning calculation)
+  navigator,
+  graphController
+});
+
+
+
+//============
+
+
+// let hierarchy = null;
+
+// if (allTimes.length === 0) {
+//   console.error('[Temporal] Dataset has no timestamps. Autoplay aborted.');
+// } else {
+//   const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
+
+//   if (!Number.isFinite(T) || T <= 0) {
+//     console.error('[Temporal] Invalid T:', T);
+//   } else {
+//     hierarchy = buildTemporalHierarchy({ T, deltaMin, b });
+
+//     if (!hierarchy || hierarchy.length === 0) {
+//       console.warn('[Temporal] Empty hierarchy. Autoplay skipped.');
+//     } else {
+//       startTemporalAutoplay();
+//     }
+//   }
+// }
+
+
+
+// State for autoplay
+
+// function startTemporalAutoplay() {
+//   if (!hierarchy || hierarchy.length === 0) {
+//     console.warn('[Temporal] Autoplay aborted: no hierarchy');
+//     return;
+//   }
+
+//   if (autoplayInterval) clearInterval(autoplayInterval);
+
+//   console.log('[Temporal] Starting autoplay');
+//   console.log('[Temporal] Levels:', hierarchy.length);
+
+//   autoplayInterval = setInterval(() => {
+//   const level = hierarchy[levelIndex];
+
+//   if (!level || !Array.isArray(level.buckets)) {
+//     console.warn('[Temporal] Invalid level at index', levelIndex);
+//     clearInterval(autoplayInterval);
+//     return;
+//   }
+
+//   const buckets = level.buckets;
+
+
+//     // Initialize bucket index to rightmost
+//     if (bucketIndex === null) {
+//       bucketIndex = buckets.length - 1;
+
+//       // IMPORTANT: update controller cache for this level
+//       graphController.setBuckets(buckets);
+
+//       console.log(
+//         `[Temporal] Switched to level ${level.level} (Δ = ${level.delta.toFixed(2)})`
+//       );
+//     }
+
+//     const bucket = buckets[bucketIndex];
+
+//     console.log(
+//       `[Temporal] Level ${level.level} → Bucket ${bucket.index}`,
+//       `[${bucket.start.toFixed(0)}, ${bucket.end.toFixed(0)})`
+//     );
+
+//     graphController.highlightBucket(bucket);
+
+//     // Move left
+//     bucketIndex--;
+
+//     // If finished this level, move to next level
+//     if (bucketIndex < 0) {
+//       bucketIndex = null;
+//       levelIndex++;
+
+//       if (levelIndex >= hierarchy.length) {
+//         console.log('[Temporal] Autoplay finished all levels');
+//         clearInterval(autoplayInterval);
+//       }
+//     }
+//   }, 50000);
+// }
+
+
 
 // await switchDataset('school')
 
@@ -834,11 +965,19 @@ export const AVATAR_UPDATE_INTERVAL = 16;
 
 let fpsAccum = 0;
 let frameCount = 0;
+
+// --- Reusable vectors for the "Behind" check ---
+const _panelDir = new THREE.Vector3();
+const _camForward = new THREE.Vector3();
+const _snapPos = new THREE.Vector3();
+
+
 renderer.setAnimationLoop((timestamp, xrFrame) => {
   scene.updateMatrixWorld(true);
   if (periodStack?.group?.visible) {
     periodStack.syncFromGraph?.(Graph);
   }
+
 
 
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
@@ -864,6 +1003,11 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       nameLabel.lookAt(camera.position);
     }
   });
+  //livesheer 
+
+  
+
+
 
   if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) {
     broadcastAvatar(camera, controller1, controller2);
@@ -904,6 +1048,11 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   });
   uiPanel?.userData?.update?.();
 
+// <--- NEW: FIX FOR "GOING BEHIND" (Snap Logic)
+  // ============================================================
+  temporalPanel.update();
+  // ============================================================
+
 
   if (uiPanel?.userData?.bgPlane) {
     const bg = uiPanel.userData.bgPlane;
@@ -940,7 +1089,9 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
     handleRightStickButton(xrFrame, () => {
       console.log("Right stick clicked")
+      // temporalPanel.toggle();
     });
+
 
     // Smoothly interpolate scale
     const currentScale = graphRoot.scale.x;
@@ -993,7 +1144,8 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleYButtonInput(xrFrame, () => {
-      toggleGuidePanel();
+      //toggleGuidePanel();
+      temporalPanel.toggle();
       [controller1, controller2].forEach(c => {
         const gp = c.userData.inputSource?.gamepad;
         const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;

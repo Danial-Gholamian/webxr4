@@ -20,6 +20,14 @@ export const graphAdapter = {
   },
 
   getEdgePeriods(edge) {
-    return edge.periods || [];
+    return edge.times || [];
+  },
+  /**
+   * 
+   * @param {*} edge 
+   * @returns 
+   */
+  getEdgeTimes(edge) {
+    return edge.times || [];
   }
 };

@@ -1,3 +1,4 @@
+//graph-data-periods.js
 export default {
   nodes: [
     { id: '1426', label: '1426', group: '5B' },

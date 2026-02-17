@@ -32,7 +32,8 @@ export class GraphVisualController {
 
         // --- Internal interaction state ---
         this.state = {
-            activePeriod: null,
+            activeBucket: null, // { id, start, end, level?, index? }
+
 
             selection: {
                 active: false,
@@ -48,7 +49,9 @@ export class GraphVisualController {
         };
 
         // --- Cached temporal data ---
-        this.periodActiveNodes = new Map();
+        this.bucketActiveNodes = new Map(); // bucketId -> Set(nodeId)
+        this._bucketIndex = null;           // { buckets: [], byId: Map }
+
 
         // --- Internal flags ---
         this._needsUpdate = false;
@@ -73,7 +76,8 @@ export class GraphVisualController {
         this.dataset = dataset;
 
         this._resetState();
-        this._precomputePeriodData();
+        this.bucketActiveNodes.clear();
+        this._bucketIndex = null;
 
         // this.update();
         // NOTE: UNCOMMENTING THIS MAKES THE GRAPH UPDATE EVERYTIME 
@@ -97,14 +101,11 @@ export class GraphVisualController {
         this.state.selection.selectedNodeId = id;
         this.state.selection.neighbors.clear();
 
-        const activePeriod = this.state.activePeriod;
+        const bucket = this.state.activeBucket;
 
         this.graph.graphData().links.forEach(link => {
-            // Enforce period constraint
-            if (activePeriod) {
-                const periods = this.adapter.getEdgePeriods(link) || [];
-                if (!periods.includes(activePeriod)) return;
-            }
+
+            if (bucket && !this._edgeInBucket(link, bucket)) return;
 
             const src = this.adapter.getEdgeSource(link);
             const tgt = this.adapter.getEdgeTarget(link);
@@ -168,18 +169,39 @@ export class GraphVisualController {
         this.update();
     }
 
-    highlightPeriod(periodId) {
-        this.state.activePeriod = periodId;
-        this.state.selection.active = false;
-        this.state.selection.selectedNodeId = null;
-        this.clearNodeSelection();
+    highlightBucket(bucket) {
+      if (bucket && !this.bucketActiveNodes.has(bucket.id)) {
+          // console.log(`[GraphController] Cache miss for bucket ${bucket.id}. Computing active nodes...`);
+          
+          const active = new Set();
+          
+          // Iterate all links to find which ones belong to this time slice
+          this.graph.graphData().links.forEach(link => {
+              if (this._edgeInBucket(link, bucket)) {
+                  // If link is active, its nodes must be active too
+                  const src = this.adapter.getEdgeSource(link);
+                  const tgt = this.adapter.getEdgeTarget(link);
+                  active.add(src);
+                  active.add(tgt);
+              }
+          });
+
+          // Save to cache so we don't do this work next frame
+          this.bucketActiveNodes.set(bucket.id, active);
+      }
+
+      // 2. Proceed as normal
+      this.state.activeBucket = bucket;
+      this.clearNodeSelection();
+      this.update();
+    }
+
+
+    clearBucketFilter() {
+        this.state.activeBucket = null;
         this.update();
     }
 
-    clearPeriodFilter() {
-        this.state.activePeriod = null;
-        this.update();
-    }
 
     resetAll() {
         console.log("edgeVertexMap size:", this.edgeVertexMap.size);
@@ -221,7 +243,7 @@ export class GraphVisualController {
 
     getState() {
         return {
-            activePeriod: this.state.activePeriod,
+            activeBucket: this.state.activeBucket,
             selectedNodeId: this.state.selection.selectedNodeId,
             activeGroup: this.state.group.active
         };
@@ -232,61 +254,48 @@ export class GraphVisualController {
     // =========================================================
 
     _buildVisibilityContext() {
-        return {
-            activePeriod: this.state.activePeriod,
-            periodNodes: this.state.activePeriod
-                ? this.periodActiveNodes.get(this.state.activePeriod)
-                : null,
-            selection: this.state.selection,
-            group: this.state.group
-        };
+      return {
+          activeBucket: this.state.activeBucket,
+          bucketNodes: this.state.activeBucket
+              ? this.bucketActiveNodes?.get(this.state.activeBucket.id)
+              : null,
+          selection: this.state.selection,
+          group: this.state.group
+      };
+
     }
 
-    // _isNodeVisible(nodeId, ctx) {
-    //     if (ctx.activePeriod && !ctx.periodNodes?.has(nodeId)) return false;
-    //     if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
-
-    //     if (ctx.selection.active) {
-    //         return (
-    //             nodeId === ctx.selection.selectedNodeId ||
-    //             ctx.selection.neighbors.has(nodeId)
-    //         );
-    //     }
-
-    //     return true;
-    // }
 
     _isNodeVisible(nodeId, ctx) {
-        // 1️⃣ Period constraint (hard)
-        if (ctx.activePeriod && !ctx.periodNodes?.has(nodeId)) {
+        // Period constraint (hard)
+        if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
             return false;
         }
 
-        // 2️⃣ Group constraint
+
+        // Group constraint
         if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) {
             return false;
         }
 
-        // 3️⃣ Selection constraint (period-aware!)
+        // election constraint (period-aware!)
         if (ctx.selection.active) {
             const selId = ctx.selection.selectedNodeId;
 
-            if (!ctx.activePeriod) {
+            if (!ctx.activeBucket) {
                 return (
                     nodeId === selId ||
                     ctx.selection.neighbors.has(nodeId)
                 );
             }
 
-            // 🔑 Period-scoped neighbors
-            const periodNeighbors = this._getPeriodNeighbors(
-                selId,
-                ctx.activePeriod
-            );
+            // Period-scoped neighbors
+            const bucketNeighbors = this._getBucketNeighbors(selId, ctx.activeBucket);
+
 
             return (
                 nodeId === selId ||
-                periodNeighbors.has(nodeId)
+                bucketNeighbors.has(nodeId)
             );
         }
 
@@ -298,10 +307,8 @@ export class GraphVisualController {
         const tgt = this.adapter.getEdgeTarget(link);
         const key = this._getEdgeKey(src, tgt);
 
-        if (ctx.activePeriod) {
-            const periods = this.adapter.getEdgePeriods(link);
-            if (!periods.includes(ctx.activePeriod)) return false;
-        }
+      if (ctx.activeBucket && !this._edgeInBucket(link, ctx.activeBucket)) return false;
+
 
         if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
 
@@ -378,29 +385,35 @@ export class GraphVisualController {
     }
 
     // =========================================================
-    // Internal helpers — Precomputation
+    // Internal helpers -- Precomputation
     // =========================================================
 
-    _precomputePeriodData() {
-        this.periodActiveNodes.clear();
+    _precomputeBucketData(buckets) {
+        // buckets: [{ id, start, end, level?, index? }, ...]
+        this.bucketActiveNodes.clear();
+        this._bucketIndex = {
+            buckets,
+            byId: new Map(buckets.map(b => [b.id, b]))
+        };
 
-        this.graph.graphData().links.forEach(link => {
-            const periods = this.adapter.getEdgePeriods(link) || [];
-            const src = this.adapter.getEdgeSource(link);
-            const tgt = this.adapter.getEdgeTarget(link);
+        // For each bucket, mark which nodes are active in it
+        for (const bucket of buckets) {
+            const active = new Set();
+            this.graph.graphData().links.forEach(link => {
+                if (!this._edgeInBucket(link, bucket)) return;
 
-            periods.forEach(period => {
-                if (!this.periodActiveNodes.has(period)) {
-                    this.periodActiveNodes.set(period, new Set());
-                }
-                this.periodActiveNodes.get(period).add(src);
-                this.periodActiveNodes.get(period).add(tgt);
+                const src = this.adapter.getEdgeSource(link);
+                const tgt = this.adapter.getEdgeTarget(link);
+                active.add(src);
+                active.add(tgt);
             });
-        });
+            this.bucketActiveNodes.set(bucket.id, active);
+        }
     }
 
+
     _resetState() {
-        this.state.activePeriod = null;
+        this.state.activeBucket = null;
         this.state.selection.active = false;
         this.state.selection.selectedNodeId = null;
         this.state.selection.neighbors.clear();
@@ -413,47 +426,53 @@ export class GraphVisualController {
         return [a, b].sort().join("--");
     }
 
+    _isTimeInBucket(t, bucket) {
+      return t >= bucket.start && t < bucket.end;
+      }
+
+    _edgeInBucket(link, bucket) {
+        if (!bucket) return true;
+        const times = this.adapter.getEdgePeriods(link) || []; // currently returns edge.times (compat)
+        for (const t of times) {
+            if (this._isTimeInBucket(t, bucket)) return true;
+        }
+        return false;
+      }
+
+
     /**
      * Query node visibility for an arbitrary period context
      * (used by secondary views like PeriodStack)
      */
-    isNodeVisibleInContext(nodeId, periodId) {
+    isNodeVisibleInContext(nodeId, bucket) {
         const ctx = {
-            activePeriod: periodId,
-            periodNodes: periodId
-                ? this.periodActiveNodes.get(periodId)
-                : null,
+            activeBucket: bucket,
+            bucketNodes: bucket ? this.bucketActiveNodes.get(bucket.id) : null,
             selection: this.state.selection,
             group: this.state.group
         };
-
         return this._isNodeVisible(String(nodeId), ctx);
-    }
+      }
 
     /**
      * Query edge visibility for an arbitrary period context
      */
-    isEdgeVisibleInContext(link, periodId) {
+    isEdgeVisibleInContext(link, bucket) {
         const ctx = {
-            activePeriod: periodId,
-            periodNodes: periodId
-                ? this.periodActiveNodes.get(periodId)
-                : null,
+            activeBucket: bucket,
+            bucketNodes: bucket ? this.bucketActiveNodes.get(bucket.id) : null,
             selection: this.state.selection,
             group: this.state.group
         };
-
         return this._isEdgeVisible(link, ctx);
     }
 
-
-    _getPeriodNeighbors(nodeId, periodId) {
+    _getBucketNeighbors(nodeId, bucket) {
         const neighbors = new Set();
-        if (!periodId) return neighbors;
+        if (!bucket) return neighbors;
 
         this.graph.graphData().links.forEach(link => {
-            const periods = this.adapter.getEdgePeriods(link) || [];
-            if (!periods.includes(periodId)) return;
+            if (!this._edgeInBucket(link, bucket)) return;
 
             const src = this.adapter.getEdgeSource(link);
             const tgt = this.adapter.getEdgeTarget(link);
@@ -463,6 +482,11 @@ export class GraphVisualController {
         });
 
         return neighbors;
+    }
+
+    setBuckets(buckets) {
+    this._precomputeBucketData(buckets);
+    this.update();
     }
 
 

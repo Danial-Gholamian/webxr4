@@ -1,3 +1,4 @@
+//periodDefs.js
 export const dataPeriods = [
   "arrival",
   "class1",

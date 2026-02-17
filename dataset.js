@@ -1,9 +1,10 @@
+//dataset.js
 export const DATASETS = {
   school: {
     key: 'school',
     id: 'School',
     label: 'School Temporal Graph',
-    data: () => import('./dataset/primarySchool/graph-data-periods.js'),
+    data: () => import('./dataset/primarySchool/graph-data-times.js'),
     periods: () => import('./dataset/primarySchool/periodDefs.js'),
   },
   hospital: {
