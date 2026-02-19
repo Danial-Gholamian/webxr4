@@ -33,7 +33,7 @@ import { createUserGuidePanel } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
-import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
+import { createBarGauge, updateBarGauge, updateBarGaugeHUD, updateBarGaugeForBucket } from './barGauge.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -561,6 +561,31 @@ const temporalPanel = createTemporalDrillPanel({
   graphController
 });
 
+// --- UNIFIED TEMPORAL DISPATCHER ---
+export function dispatchTemporalUpdate() {
+  const activeBucket = navigator.getCurrentNode();
+  if (!activeBucket) return;
+
+  // 1. Update Graph
+  graphController.highlightBucket(activeBucket);
+
+  // 2. Update Gauge
+  // We calculate total duration T (you already compute T in main.js)
+  const globalStart = 0; // Assuming time starts at 0, otherwise use min dataset time
+  updateBarGaugeForBucket(timeGauge, activeBucket, globalStart, T);
+
+  // 3. Update UI Panel (only re-render if it's currently showing)
+  if (temporalPanel.group.visible) {
+    temporalPanel.show(); 
+  }
+}
+
+export function handleTemporalShift(direction) {
+  const newNode = navigator.shiftSibling(direction);
+  if (newNode) {
+    dispatchTemporalUpdate();
+  }
+}
 
 
 
@@ -996,11 +1021,13 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
     // --- Graph scaling with stick buttons ---
     handleLeftStickButton(xrFrame, () => {
+      handleTemporalShift(-1);
       console.log("Left stick clicked")
     });
 
     handleRightStickButton(xrFrame, () => {
       console.log("Right stick clicked")
+      handleTemporalShift(1);
       // temporalPanel.toggle();
     });
 

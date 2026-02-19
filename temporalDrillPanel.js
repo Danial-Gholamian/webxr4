@@ -1,3 +1,4 @@
+//temporalDrillPanel.js
 import * as THREE from 'three';
 import { createCapsuleLabel } from './filterUIPanel.js';
 
@@ -156,6 +157,10 @@ export function createTemporalDrillPanel({
     if (panel.visible) hide();
     else show();
   }
+
+  
+
+  
 
   // Expose the group and interactables for the Raycaster
   return { 

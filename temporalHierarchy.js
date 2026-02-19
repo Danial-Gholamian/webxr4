@@ -92,6 +92,23 @@ export function createTemporalNavigator(root) {
       }
     },
 
+    shiftSibling(direction) {
+      const context = this.getContext(); // Uses the getContext method we already wrote
+      const siblings = context.siblings;
+      
+      const currentIndex = siblings.findIndex(n => n.id === currentNode.id);
+      if (currentIndex === -1) return null;
+
+      const newIndex = currentIndex + direction;
+      
+      // Check bounds so we don't crash at the ends of the timeline
+      if (newIndex >= 0 && newIndex < siblings.length) {
+        currentNode = siblings[newIndex];
+        return currentNode;
+      }
+      return null; 
+    },
+
     getContext() {
       if (!currentNode) {
         return {

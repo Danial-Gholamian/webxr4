@@ -95,3 +95,24 @@ export function updateBarGaugeHUD(gauge, camera, offset = new THREE.Vector3(0, 0
   gauge.position.copy(worldPos);
   gauge.quaternion.copy(camera.quaternion);
 }
+
+export function updateBarGaugeForBucket(gauge, bucket, globalStart, globalDuration) {
+  const fgBar = gauge.userData.fgBar;
+  const width = gauge.userData.width;
+  const label = gauge.userData.label;
+  if (!fgBar || !bucket) return;
+
+  const startRatio = (bucket.start - globalStart) / globalDuration;
+  const widthRatio = (bucket.end - bucket.start) / globalDuration;
+
+  const clampedStart = Math.max(0, Math.min(startRatio, 1));
+  const clampedWidth = Math.max(0, Math.min(widthRatio, 1));
+
+  fgBar.scale.x = clampedWidth;
+
+  const actualWidth = width * clampedWidth;
+  fgBar.position.x = (-width / 2) + (width * clampedStart) + (actualWidth / 2);
+
+  label.text = `${Math.floor(bucket.start)} - ${Math.floor(bucket.end)}`;
+  label.sync();
+}

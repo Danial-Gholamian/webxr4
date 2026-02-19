@@ -423,11 +423,10 @@ export function handleLeftStickButton(xrFrame, onPress) {
   handleStickButton(xrFrame, "left", leftStickButtonIndex, (isPressed) => {
     if (isPressed && !leftStickWasPressed) {
       console.log("Left stick clicked");
-      cyclePeriod(-1);
-      squeezeLefttPrevPeriod();
+      // REMOVED: cyclePeriod(-1);
+      // REMOVED: squeezeLefttPrevPeriod();
       if (onPress) onPress();
     }
-
     leftStickWasPressed = isPressed;
   });
 }
@@ -436,11 +435,10 @@ export function handleRightStickButton(xrFrame, onPress) {
   handleStickButton(xrFrame, "right", rightStickButtonIndex, (isPressed) => {
     if (isPressed && !rightStickWasPressed) {
       console.log("Right stick clicked");
-      cyclePeriod(1);
-      squeezeRightNextPeriod();
+      // REMOVED: cyclePeriod(1);
+      // REMOVED: squeezeRightNextPeriod();
       if (onPress) onPress();
     }
-
     rightStickWasPressed = isPressed;
   });
 }
