@@ -33,7 +33,7 @@ import { createUserGuidePanel } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
-import { createBarGauge, updateBarGauge, updateBarGaugeHUD, updateBarGaugeForBucket } from './barGauge.js';
+import { createHistogramGauge, updateBarGaugeForBucket } from './barGauge.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -550,6 +550,8 @@ const allTimes = dataset.__allTimes ?? [];
 // ==========
 const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
 
+
+
 const levels = buildTemporalHierarchy({ T, deltaMin, b: 4 });
 const root = buildTemporalTree(levels, 4);
 const navigator = createTemporalNavigator(root);
@@ -569,15 +571,15 @@ export function dispatchTemporalUpdate() {
   // 1. Update Graph
   graphController.highlightBucket(activeBucket);
 
-  // 2. Update Gauge
-  // We calculate total duration T (you already compute T in main.js)
-  const globalStart = 0; // Assuming time starts at 0, otherwise use min dataset time
-  updateBarGaugeForBucket(timeGauge, activeBucket, globalStart, T);
-
-  // 3. Update UI Panel (only re-render if it's currently showing)
+  // 2. Update the VR UI Panel
   if (temporalPanel.group.visible) {
     temporalPanel.show(); 
   }
+
+  // 3. Update the 3D Histogram Highlight Window
+  const globalStart = 0; 
+  const globalDuration = T - globalStart;
+  updateBarGaugeForBucket(timeGauge, activeBucket, globalStart, globalDuration);
 }
 
 export function handleTemporalShift(direction) {
@@ -586,7 +588,34 @@ export function handleTemporalShift(direction) {
     dispatchTemporalUpdate();
   }
 }
+// --- Histogram Helper ---
+function calculateHistogram(times, globalStart, globalDuration, numBins = 50) {
+  const bins = new Array(numBins).fill(0);
+  if (!times || times.length === 0) return bins;
 
+  times.forEach(t => {
+    // Prevent out-of-bounds math
+    const ratio = Math.max(0, Math.min((t - globalStart) / globalDuration, 0.999)); 
+    const binIndex = Math.floor(ratio * numBins);
+    bins[binIndex]++;
+  });
+
+  return bins;
+}
+
+const globalStart = 0; // Or math.min(...dataset.__allTimes) if it doesn't start at 0
+const globalDuration = T - globalStart;
+
+// Create 60 bars across the timeline
+const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
+
+export const timeGauge = createHistogramGauge(
+  histogramData, 
+  new THREE.Vector3(0, 1.4, -1.2), 
+  1.5, // Width of the whole gauge
+  0.2  // Max height of the tallest bar
+);
+cameraGroup.add(timeGauge);
 
 
 // await switchDataset('school')
@@ -738,8 +767,7 @@ export const uiPanel = await createFilterPanel({ groupColors: groups, camera, da
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
-export const timeGauge = createBarGauge(new THREE.Vector3(0, 1.4, -1.2));
-cameraGroup.add(timeGauge);
+
 // ========================
 // Graph Interaction + Reset
 // ========================
