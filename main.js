@@ -1,6 +1,15 @@
 // main.js
 export const myUsername = prompt("Enter your name:") || "Anonymous";
+// --- NEW: Ask the user for the minimum time granularity ---
+const deltaInput = prompt(
+  "Welcome to the Temporal Explorer!\n\n" +
+  "Please enter the minimum time step (delta_min) for your lowest drill-down level.\n" +
+  "(For example: 10, 50, or 100). If you leave this blank, it will default to 50:"
+);
 
+// Parse the input into a number. If they hit cancel, type letters, or enter 0, default to 50.
+const parsedDelta = parseFloat(deltaInput);
+export const userDeltaMin = (!isNaN(parsedDelta) && parsedDelta > 0) ? parsedDelta : 50;
 
 
 // ========================
@@ -543,7 +552,7 @@ applyDataset(dataset, periods)
 
 
 const b = 4;
-const deltaMin = 50; // arbitrary test value
+// const deltaMin = 50; // arbitrary test value
 // Use the ORIGINAL dataset, not ForceGraph-mutated data
 const allTimes = dataset.__allTimes ?? [];
 
@@ -552,7 +561,7 @@ const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
 
 
 
-const levels = buildTemporalHierarchy({ T, deltaMin, b: 4 });
+const levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
 const root = buildTemporalTree(levels, 4);
 const navigator = createTemporalNavigator(root);
 
