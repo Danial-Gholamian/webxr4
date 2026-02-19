@@ -54,6 +54,7 @@ import {
   createTemporalNavigator
 } from './temporalHierarchy.js';
 import { createTemporalDrillPanel } from './temporalDrillPanel.js';
+import { gridGeo, gridMaterial } from './skybox.js';
 
 let levelIndex = 0;
 let bucketIndex = null;
@@ -96,61 +97,72 @@ const roomCenter = new THREE.Vector3();
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
-const loader0 = new THREE.TextureLoader();
+// const loader0 = new THREE.TextureLoader();
 
-loader0.load('public/models/background.jpeg', (texture) => {
-  texture.mapping = THREE.EquirectangularReflectionMapping;
-  texture.colorSpace = THREE.SRGBColorSpace;
+// loader0.load('public/models/background.jpeg', (texture) => {
+//   texture.mapping = THREE.EquirectangularReflectionMapping;
+//   texture.colorSpace = THREE.SRGBColorSpace;
 
-  scene.environment = texture;
-  scene.background = texture;
-});
+//   scene.environment = texture;
+//   scene.background = texture;
+// });
+
+// scene.background = new THREE.Color(0x111827);
+scene.background = new THREE.Color(0x1a2638);
+scene.fog = new THREE.FogExp2(0x1a2638, 0.004);
+
+const grid = new THREE.Mesh(gridGeo, gridMaterial)
+scene.add(grid)
+grid.renderOrder = -1;
+
+
+
 // ======== LOAD VR ROOM / LAB ROOM ========
 const loader = new GLTFLoader();
 let labRoom;
 let roomHalfSize = new THREE.Vector2(); // XZ half size we allow the user to move in
 
-loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
-  labRoom = gltf.scene;
+// loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
+//   labRoom = gltf.scene;
 
-  labRoom.scale.set(35, 35, 35);
-  labRoom.position.set(0, -40, 0);
+//   labRoom.scale.set(35, 35, 35);
+//   labRoom.position.set(0, -40, 0);
 
-  labRoom.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-      if (child.material) {
-        child.material.roughness = 0.8;
-        child.material.metalness = 0.1;
-      }
-    }
-  });
+//   labRoom.traverse((child) => {
+//     if (child.isMesh) {
+//       child.castShadow = true;
+//       child.receiveShadow = true;
+//       if (child.material) {
+//         child.material.roughness = 0.8;
+//         child.material.metalness = 0.1;
+//       }
+//     }
+//   });
 
-  scene.add(labRoom);
-  console.log("Lab room loaded.");
+//   scene.add(labRoom);
+//   console.log("Lab room loaded.");
 
-  // Compute world-space bounding box
-  const box = new THREE.Box3().setFromObject(labRoom);
-  box.getCenter(roomCenter);
+//   // Compute world-space bounding box
+//   const box = new THREE.Box3().setFromObject(labRoom);
+//   box.getCenter(roomCenter);
 
-  const size = new THREE.Vector3();
-  box.getSize(size);
+//   const size = new THREE.Vector3();
+//   box.getSize(size);
 
-  // Define how close to the walls the player is allowed to get (in meters)
-  const margin = 2.0;
+//   // Define how close to the walls the player is allowed to get (in meters)
+//   const margin = 2.0;
 
-  // "Half size" of the allowed walk area in XZ
-  const shrinkFactor = 0.80;   // 80% of original size = tighter room
+//   // "Half size" of the allowed walk area in XZ
+//   const shrinkFactor = 0.80;   // 80% of original size = tighter room
 
-  roomHalfSize.set(
-    (size.x * 0.5) * shrinkFactor,
-    (size.z * 0.5) * shrinkFactor
-  );
+//   roomHalfSize.set(
+//     (size.x * 0.5) * shrinkFactor,
+//     (size.z * 0.5) * shrinkFactor
+//   );
 
 
 
-});
+// });
 
 
 function clampCameraToRoom() {
@@ -307,7 +319,7 @@ function buildBatchedEdges(graphData, nodesById) {
     positions.push(x2, y2, z2);
 
     // default colors
-    color.setRGB(1, 1, 1);
+    color.setRGB(0.65, 0.75, 0.9);
     colors.push(color.r, color.g, color.b);
     colors.push(color.r, color.g, color.b);
 
@@ -582,11 +594,11 @@ export function dispatchTemporalUpdate() {
 
   // 2. Update the VR UI Panel
   if (temporalPanel.group.visible) {
-    temporalPanel.show(); 
+    temporalPanel.show();
   }
 
   // 3. Update the 3D Histogram Highlight Window
-  const globalStart = 0; 
+  const globalStart = 0;
   const globalDuration = T - globalStart;
   updateBarGaugeForBucket(timeGauge, activeBucket, globalStart, globalDuration);
 }
@@ -604,7 +616,7 @@ function calculateHistogram(times, globalStart, globalDuration, numBins = 50) {
 
   times.forEach(t => {
     // Prevent out-of-bounds math
-    const ratio = Math.max(0, Math.min((t - globalStart) / globalDuration, 0.999)); 
+    const ratio = Math.max(0, Math.min((t - globalStart) / globalDuration, 0.999));
     const binIndex = Math.floor(ratio * numBins);
     bins[binIndex]++;
   });
@@ -619,8 +631,8 @@ const globalDuration = T - globalStart;
 const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 
 export const timeGauge = createHistogramGauge(
-  histogramData, 
-  new THREE.Vector3(0, 1.4, -1.2), 
+  histogramData,
+  new THREE.Vector3(0, 1.4, -1.2),
   1.5, // Width of the whole gauge
   0.2  // Max height of the tallest bar
 );
@@ -635,7 +647,7 @@ graphRoot.scale.set(0.99, 0.99, 0.99);
 graphRoot.add(lineSegments);
 
 scene.add(graphRoot);
-graphRoot.position.y += 20;   // or any value you like
+graphRoot.position.y +=40;   // or any value you like
 
 
 
@@ -947,6 +959,11 @@ const _snapPos = new THREE.Vector3();
 
 
 renderer.setAnimationLoop((timestamp, xrFrame) => {
+
+  // SKYBOX RENDERING 
+  grid.position.x = Math.floor(camera.position.x / 10) * 10;
+  grid.position.z = Math.floor(camera.position.z / 10) * 10;
+
   scene.updateMatrixWorld(true);
   if (periodStack?.group?.visible) {
     periodStack.syncFromGraph?.(Graph);
@@ -979,7 +996,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   });
   //livesheer 
 
-  
+
 
 
 
@@ -1022,7 +1039,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   });
   uiPanel?.userData?.update?.();
 
-// <--- NEW: FIX FOR "GOING BEHIND" (Snap Logic)
+  // <--- NEW: FIX FOR "GOING BEHIND" (Snap Logic)
   // ============================================================
   temporalPanel.update();
   // ============================================================
@@ -1052,7 +1069,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
-    clampCameraToRoom();
+    // clampCameraToRoom();
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 

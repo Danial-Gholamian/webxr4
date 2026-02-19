@@ -57,7 +57,7 @@ export class GraphVisualController {
         this._needsUpdate = false;
 
         // --- Baseline edge opacity ---
-        this.BASE_EDGE_ALPHA = 0.6;
+        this.BASE_EDGE_ALPHA = 0.45;
 
         this._onSelectionChange = null
     }
@@ -350,7 +350,7 @@ export class GraphVisualController {
         this.graph.scene().traverse(obj => {
             if (!obj.__data) return;
 
-            // // ✅ Only node meshes have __data.id
+            // // Only node meshes have __data.id
             // if (!obj.__data?.id) return;
 
             const nodeId = this.adapter.getNodeId(obj.__data);
