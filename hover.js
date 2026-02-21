@@ -279,6 +279,6 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     if (oldPanel) cameraGroup.remove(oldPanel);
 
     // 4. RESET LASER LENGTH 
-    if (line) line.scale.z = 5; 
+    // if (line) line.scale.z = 5; 
   }
 }
