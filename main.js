@@ -42,7 +42,7 @@ import { createUserGuidePanel } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
-import { calculateHistogram, createHistogramGauge, updateBarGaugeForBucket } from './histogram.js';
+import {  calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -584,13 +584,6 @@ const temporalPanel = createTemporalDrillPanel({
 
 // --- UNIFIED TEMPORAL DISPATCHER ---
 
-// Subscribe the histogram to the graphController
-graphController.subscribeToTimeChanges((bucket) => {
-  const globalStart = 0;
-  const globalDuration = T - globalStart;
-  updateBarGaugeForBucket(timeGauge, bucket, globalStart, globalDuration);
-})
-
 export function dispatchTemporalUpdate() {
   const activeBucket = navigator.getCurrentNode();
   if (!activeBucket) return;
@@ -603,11 +596,6 @@ export function dispatchTemporalUpdate() {
   if (temporalPanel.group.visible) {
     temporalPanel.show();
   }
-
-  // // 3. Update the 3D Histogram Highlight Window
-  // const globalStart = 0;
-  // const globalDuration = T - globalStart;
-  // updateBarGaugeForBucket(timeGauge, activeBucket, globalStart, globalDuration);
 }
 
 function handleTemporalShift(direction) {
@@ -621,20 +609,50 @@ function handleTemporalShift(direction) {
 
 const globalStart = 0; // Or math.min(...dataset.__allTimes) if it doesn't start at 0
 const globalDuration = T - globalStart;
-
-// Create 60 bars across the timeline
+// // Create 60 bars across the timeline
 const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 
-export const timeGauge = createHistogramGauge(
-  histogramData,
-  new THREE.Vector3(0, 1.4, -1.2),
-  1.5, // Width of the whole gauge
-  0.2  // Max height of the tallest bar
+
+// create the histogram UI Module class
+const histogram = new HistogramGauge({
+  bins: histogramData,
+  globalStart,
+  globalDuration,
+  onBucketSelected: (bucket) => {
+    graphController.highlightBucket(bucket);
+  }
+});
+
+// Add it to the VR camera space
+cameraGroup.add(histogram.getObject3D());
+
+
+// Subscribe to controller temporal updates
+graphController.subscribeToTimeChanges(
+  histogram.onTimeChange.bind(histogram)
 );
 
+// // Create 60 bars across the timeline
+// const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 
-// Add the histogram to the VR space 
-cameraGroup.add(timeGauge);
+// export const timeGauge = createHistogramGauge(
+//   histogramData,
+//   new THREE.Vector3(0, 1.4, -1.2),
+//   1.5, // Width of the whole gauge
+//   0.2  // Max height of the tallest bar
+// );
+
+
+// // Subscribe the histogram to the graphController
+// graphController.subscribeToTimeChanges((bucket) => {
+//   const globalStart = 0;
+//   const globalDuration = T - globalStart;
+//   updateBarGaugeForBucket(timeGauge, bucket, globalStart, globalDuration);
+// })
+
+
+// // Add the histogram to the VR space 
+// cameraGroup.add(timeGauge);
 
 
 
