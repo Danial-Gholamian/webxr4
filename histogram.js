@@ -91,3 +91,18 @@ export function updateBarGaugeForBucket(gauge, bucket, globalStart, globalDurati
   label.text = `${Math.floor(bucket.start)} - ${Math.floor(bucket.end)}`;
   label.sync();
 }
+
+// --- Histogram Helper ---
+export function calculateHistogram(times, globalStart, globalDuration, numBins = 50) {
+  const bins = new Array(numBins).fill(0);
+  if (!times || times.length === 0) return bins;
+
+  times.forEach(t => {
+    // Prevent out-of-bounds math
+    const ratio = Math.max(0, Math.min((t - globalStart) / globalDuration, 0.999));
+    const binIndex = Math.floor(ratio * numBins);
+    bins[binIndex]++;
+  });
+
+  return bins;
+}

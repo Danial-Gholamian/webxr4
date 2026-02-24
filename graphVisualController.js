@@ -29,6 +29,7 @@ export class GraphVisualController {
         this.lineSegments = lineSegments;
         this.edgeVertexMap = edgeVertexMap;
         this.adapter = adapter;
+        this.temporal_subscribers = new Set();
 
         // --- Internal interaction state ---
         this.state = {
@@ -190,10 +191,13 @@ export class GraphVisualController {
           this.bucketActiveNodes.set(bucket.id, active);
       }
 
-      // 2. Proceed as normal
+      // Proceed as normal
       this.state.activeBucket = bucket;
       this.clearNodeSelection();
       this.update();
+
+    //   Notify UI modules that are listening to temporal changes
+    this._notifyTimeChanges(bucket)
     }
 
 
@@ -487,6 +491,20 @@ export class GraphVisualController {
     setBuckets(buckets) {
     this._precomputeBucketData(buckets);
     this.update();
+    }
+
+    // This sections handles updating other UI modules that depend on the user
+    // changing/traversing through different time stamps
+    subscribeToTimeChanges(uiObject) {
+        this.temporal_subscribers.add(uiObject);
+    }
+
+    _unsubscribeToTimeChanges(uiObject) {
+        this.temporal_subscribers.delete(uiObject);
+    }
+
+    _notifyTimeChanges(bucket) {
+        this.temporal_subscribers.forEach(uiObject => uiObject(bucket))
     }
 
 

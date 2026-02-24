@@ -42,7 +42,7 @@ import { createUserGuidePanel } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
-import { createHistogramGauge, updateBarGaugeForBucket } from './barGauge.js';
+import { calculateHistogram, createHistogramGauge, updateBarGaugeForBucket } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -159,9 +159,6 @@ let roomHalfSize = new THREE.Vector2(); // XZ half size we allow the user to mov
 //     (size.x * 0.5) * shrinkFactor,
 //     (size.z * 0.5) * shrinkFactor
 //   );
-
-
-
 // });
 
 
@@ -544,7 +541,8 @@ const GraphRef = { current: Graph };
 const graphRoot = Graph.scene();
 
 
-// Create controller after graph init
+// Create controller after graph inititialization
+// Include the histogram as visual module updated by the controller
 const graphController = new GraphVisualController({
   graph: Graph,
   scene: Graph.scene(),
@@ -585,11 +583,20 @@ const temporalPanel = createTemporalDrillPanel({
 });
 
 // --- UNIFIED TEMPORAL DISPATCHER ---
+
+// Subscribe the histogram to the graphController
+graphController.subscribeToTimeChanges((bucket) => {
+  const globalStart = 0;
+  const globalDuration = T - globalStart;
+  updateBarGaugeForBucket(timeGauge, bucket, globalStart, globalDuration);
+})
+
 export function dispatchTemporalUpdate() {
   const activeBucket = navigator.getCurrentNode();
   if (!activeBucket) return;
 
-  // 1. Update Graph
+  // 1. Update Graph and dependent UI modules
+  // including the histogram - update 3D Histogram Highlight Window
   graphController.highlightBucket(activeBucket);
 
   // 2. Update the VR UI Panel
@@ -597,31 +604,19 @@ export function dispatchTemporalUpdate() {
     temporalPanel.show();
   }
 
-  // 3. Update the 3D Histogram Highlight Window
-  const globalStart = 0;
-  const globalDuration = T - globalStart;
-  updateBarGaugeForBucket(timeGauge, activeBucket, globalStart, globalDuration);
+  // // 3. Update the 3D Histogram Highlight Window
+  // const globalStart = 0;
+  // const globalDuration = T - globalStart;
+  // updateBarGaugeForBucket(timeGauge, activeBucket, globalStart, globalDuration);
 }
 
-export function handleTemporalShift(direction) {
+function handleTemporalShift(direction) {
+  // -1 to the left
+  //  1 to the right
   const newNode = navigator.shiftSibling(direction);
   if (newNode) {
     dispatchTemporalUpdate();
   }
-}
-// --- Histogram Helper ---
-function calculateHistogram(times, globalStart, globalDuration, numBins = 50) {
-  const bins = new Array(numBins).fill(0);
-  if (!times || times.length === 0) return bins;
-
-  times.forEach(t => {
-    // Prevent out-of-bounds math
-    const ratio = Math.max(0, Math.min((t - globalStart) / globalDuration, 0.999));
-    const binIndex = Math.floor(ratio * numBins);
-    bins[binIndex]++;
-  });
-
-  return bins;
 }
 
 const globalStart = 0; // Or math.min(...dataset.__allTimes) if it doesn't start at 0
@@ -647,7 +642,7 @@ graphRoot.scale.set(0.99, 0.99, 0.99);
 graphRoot.add(lineSegments);
 
 scene.add(graphRoot);
-graphRoot.position.y +=40;   // or any value you like
+graphRoot.position.y += 40;   // or any value you like
 
 
 
@@ -807,7 +802,6 @@ setUIPanel(uiPanel);
 
 export function highlightSubgraph(nodeId) {
   graphController.highlightNode(nodeId)
-  console.log("DELETE HIGHLIGHTSUBGRAPH AFTER FIXING THE DEPENDECY IN NETWORK.JS");
 }
 
 
@@ -817,7 +811,6 @@ function getEdgeKey(a, b) {
 
 export function highlightGroup(groupName) {
   graphController.highlightGroup(groupName)
-  console.log("DELETE HIGHLIGHTSUBGRAPH AFTER FIXING THE DEPENDECY IN NETWORK.JS");
 }
 
 
