@@ -64,6 +64,12 @@ export function createHistogramGauge(bins, position = new THREE.Vector3(0, 1.8, 
   gaugeGroup.userData.width = width;
   gaugeGroup.userData.label = label;
 
+  // increase the scale of the histogram
+  gaugeGroup.scale.set(1.3, 1.3, 1.3)
+  gaugeGroup.position.set(2.8, 1, -3.3);
+  // tilt the bar toward the user
+  gaugeGroup.rotation.y = -Math.PI / 2.95; 
+
   return gaugeGroup;
 }
 

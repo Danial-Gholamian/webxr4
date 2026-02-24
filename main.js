@@ -631,7 +631,11 @@ export const timeGauge = createHistogramGauge(
   1.5, // Width of the whole gauge
   0.2  // Max height of the tallest bar
 );
+
+
+// Add the histogram to the VR space 
 cameraGroup.add(timeGauge);
+
 
 
 // await switchDataset('school')
@@ -866,6 +870,7 @@ renderer.xr.addEventListener('sessionstart', () => {
 
   cameraGroup.position.set(0, 3.6, 230);  // Initial spawn position
   cameraGroup.position.y += 22.2;
+
 
   const session = renderer.xr.getSession();
   // startAutoHighlightCycle(); // Test 
