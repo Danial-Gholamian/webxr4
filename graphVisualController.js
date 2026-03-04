@@ -220,6 +220,7 @@ export class GraphVisualController {
         this._onSelectionChange?.(null); 
         console.log('LineSegments in scene:', lines.length, lines);
         this.update();
+        
     }
 
     // =========================================================

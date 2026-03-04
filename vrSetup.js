@@ -1,7 +1,7 @@
 //vrSetup.js
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
-import { highlightPeriod, getActivePeriods} from './main.js';
+import { highlightPeriod, getActivePeriods } from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 
 // --- Constants ---
@@ -69,9 +69,9 @@ function teleportFromController(controller, cameraGroup, teleportDistance = 5) {
   controller.getWorldDirection(direction);
   direction.y = 0;
   direction.normalize();
-  
+
   // Add this line to reverse direction
-  direction.multiplyScalar(-1); 
+  direction.multiplyScalar(-1);
   controller.getWorldPosition(position);
   const target = position.clone().add(direction.multiplyScalar(teleportDistance));
 
@@ -88,7 +88,7 @@ function handleJoystickInput(xrFrame, camera, cameraGroup) {
     const gamepad = source.gamepad;
     if (!gamepad || !source.handedness) continue;
 
-    const [ , , x, y ] = gamepad.axes;
+    const [, , x, y] = gamepad.axes;
 
     if (source.handedness === "left" && Math.abs(x) > deadZone) {
       cameraGroup.rotation.y -= x * rotationSpeed;
@@ -122,7 +122,11 @@ function moveThumbstick(inputX, inputY, camera, cameraGroup, speed = movementSpe
 let vrNodeSelectionInitialized = false;
 let lastSelectedCapsule = null;
 
-function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup) {
+function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup, histogram) {
+  // Hierarchy of selection
+  // Check UI buttons
+  // Check histogram bars
+  // Check graph nodes
   function onVRSelect(event) {
     const controller = event.target;
     const controllerSide = controller === controller1 ? 'left' : 'right';
@@ -140,19 +144,19 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     // ============================================================
     // 2. UI INTERACTION (Panel Buttons)
     // ============================================================
-    // We check everything in cameraGroup (includes FilterPanel AND TemporalPanel)
+    // We check everything in cameraGroup (includes FilterPanel, TemporalPanel AND histogram as well)
     const intersects = raycaster.intersectObject(cameraGroup, true);
 
     // Filter hits to find the first actual "Button" (Object with onClick)
     // We use a loop to "bubble up" from the hit point (e.g. text) to the button container
     let uiHit = null;
-    
+
     for (const hit of intersects) {
       // Check if visible
       if (!hit.object.visible) continue;
 
       let target = hit.object;
-      
+
       // Traverse up to find the clickable element
       while (target) {
         if (target.userData && target.userData.onClick) {
@@ -163,15 +167,15 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
         if (target === cameraGroup) break;
         target = target.parent;
       }
-      
+
       if (uiHit) break; // Found a button, stop looking
     }
 
     if (uiHit) {
       console.log(`[VR] Clicked Button: ${uiHit.userData.label || 'Unnamed'}`);
-      
+
       // A. Fire the Click Handler
-      uiHit.userData.onClick(); 
+      uiHit.userData.onClick();
 
       // B. Haptic Feedback (Pulse)
       const gamepad = controller.userData.inputSource?.gamepad;
@@ -182,19 +186,18 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
       // C. Legacy Highlighting (Only for FilterUIPanel capsules that need manual color change)
       // If the button handles its own re-render (like TemporalPanel), this part is ignored.
       if (uiHit.material && uiHit.userData.selectedColor) {
-         if (lastSelectedCapsule && lastSelectedCapsule !== uiHit) {
-           // Reset previous
-           if(lastSelectedCapsule.userData.defaultColor) {
-              lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
-           }
-         }
-         uiHit.material.color.copy(uiHit.userData.selectedColor);
-         lastSelectedCapsule = uiHit;
+        if (lastSelectedCapsule && lastSelectedCapsule !== uiHit) {
+          // Reset previous
+          if (lastSelectedCapsule.userData.defaultColor) {
+            lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
+          }
+        }
+        uiHit.material.color.copy(uiHit.userData.selectedColor);
+        lastSelectedCapsule = uiHit;
       }
 
       return; // STOP HERE. Don't click through the UI to the graph behind it.
     }
-
     // ============================================================
     // 3. GRAPH SELECTION (Fallback)
     // ============================================================
@@ -209,7 +212,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     if (hits.length > 0) {
       const node = hits[0].object.__data;
       console.log("[VR] Selected Graph Node:", node.id);
-      
+
       // Haptics
       const gamepad = controller.userData.inputSource?.gamepad;
       if (gamepad?.hapticActuators?.[0]) gamepad.hapticActuators[0].pulse(0.5, 10);
@@ -272,16 +275,16 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
     }
   }
 
-  
+
   function pollGamepadButtons() {
 
     if (controller1.userData.inputSource) {
       checkButtonPress(controller1, 'left');
-    } 
+    }
 
     if (controller2.userData.inputSource) {
       checkButtonPress(controller2, 'right');
-    } 
+    }
   }
 
   return pollGamepadButtons;
@@ -385,7 +388,7 @@ export function handleYButtonInput(xrFrame, onYPress) {
     }
   }
 
-  
+
   if (isPressed && !handleYButtonInput._wasPressed) {
     onYPress();
   }

@@ -632,6 +632,9 @@ graphController.subscribeToTimeChanges(
   histogram.onTimeChange.bind(histogram)
 );
 
+// Initialize the highlight of the histogram
+graphController.highlightBucket(null);
+
 // // Create 60 bars across the timeline
 // const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 
@@ -858,7 +861,8 @@ export function resetGraph() {
   uiPanel.userData.updateSelectedNodeLabel?.(null);
 
   graphController.resetAll()
-  updateBarGauge(timeGauge, 0, "Default");
+  histogram.reset()
+  // updateBarGauge(timeGauge, 0, "Default");
 }
 
 
@@ -960,7 +964,7 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 // Animation Loop
 // ========================
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
-setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup);
+setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup, histogram);
 // precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;
 // startPeriodPreviewCycle();

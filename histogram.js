@@ -137,7 +137,8 @@ export class HistogramGauge {
     this.highlightWindow = new THREE.Mesh(windowGeom, windowMat);
 
     // Start with zero width
-    this.highlightWindow.scale.x = 0;
+    this.highlightWindow.scale.x = 1;
+    this.highlightWindow.position.x = 0;
 
     // Vertically center it
     this.highlightWindow.position.y = this.maxHeight / 2;
@@ -166,7 +167,10 @@ export class HistogramGauge {
    * Updates highlight window and label.
    */
   onTimeChange(bucket) {
-    if (!bucket) return;
+    if (!bucket) {
+      this.reset();
+      return;
+    }
 
     const startRatio =
       (bucket.start - this.globalStart) / this.globalDuration;
@@ -194,35 +198,20 @@ export class HistogramGauge {
     this.label.sync();
   }
 
-  /**
-   * Handle raycast click intersection.
-   * Determines which bin was clicked and emits bucket.
-   */
-  handleClick(intersection) {
-    const mesh = intersection.object;
+/**
+ * Reset histogram to full-range default state.
+ * Highlight spans entire histogram.
+ */
+reset() {
+  // Cover full histogram width
+  this.highlightWindow.scale.x = 1;
+  this.highlightWindow.position.x = 0;
 
-    // Ensure clicked object is a bar
-    if (mesh.userData.binIndex === undefined) return;
+  // Reset label
+  this.label.text = 'All Time';
+  this.label.sync();
+}
 
-    const binIndex = mesh.userData.binIndex;
-
-    const binCount = this.binMeshes.length;
-    const bucketSize = this.globalDuration / binCount;
-
-    const start = this.globalStart + (binIndex * bucketSize);
-    const end = start + bucketSize;
-
-    if (this.onBucketSelected) {
-      this.onBucketSelected({ start, end });
-    }
-  }
-
-  /**
-   * Return all interactive meshes for raycasting.
-   */
-  getInteractiveMeshes() {
-    return this.binMeshes;
-  }
 }
 
 // --- Histogram Helper ---
