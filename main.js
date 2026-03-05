@@ -38,11 +38,11 @@ import {
   handleLeftStickButton,
   handleRightStickButton
 } from './vrSetup.js';
-import { createUserGuidePanel } from './userGuidePanel.js';
+import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
-import {  calculateHistogram, HistogramGauge } from './histogram.js';
+import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
@@ -890,6 +890,9 @@ renderer.xr.addEventListener('sessionstart', () => {
   Graph.enablePointerInteraction(false);
   inVR = true;
 
+  // Show guide panel when starting the tool
+  userGuidePanel.visible = true
+
   cameraGroup.position.set(0, 3.6, 230);  // Initial spawn position
   cameraGroup.position.y += 22.2;
 
@@ -1096,12 +1099,19 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     // --- Graph scaling with stick buttons ---
     handleLeftStickButton(xrFrame, () => {
       handleTemporalShift(-1);
+      if (userGuidePanel.visible) {
+        prevGuidePage(userGuidePanel);
+      };
+
       console.log("Left stick clicked")
     });
 
     handleRightStickButton(xrFrame, () => {
       console.log("Right stick clicked")
       handleTemporalShift(1);
+      if (userGuidePanel.visible) {
+        nextGuidePage(userGuidePanel);
+      };
       // temporalPanel.toggle();
     });
 
@@ -1138,26 +1148,28 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleBButtonInput(xrFrame, () => {
-      const state = graphController.getState();
+      // Show the user guide panel
+      toggleGuidePanel();
 
-      const context = {
-        groupName: state.activeGroup,
-        period: state.activePeriod,
-        selectedNodeId: state.selectedNodeId
-      };
+      // const state = graphController.getState();
 
-      if (!periodStack || periodStack.group.visible === false) {
-        rebuildPeriodStack();
-        periodStack.show();
-        broadcastPeriodStackToggle(true, context);
-      } else {
-        periodStack.hide();
-        broadcastPeriodStackToggle(false, context);
-      }
+      // const context = {
+      //   groupName: state.activeGroup,
+      //   period: state.activePeriod,
+      //   selectedNodeId: state.selectedNodeId
+      // };
+
+      // if (!periodStack || periodStack.group.visible === false) {
+      //   rebuildPeriodStack();
+      //   periodStack.show();
+      //   broadcastPeriodStackToggle(true, context);
+      // } else {
+      //   periodStack.hide();
+      //   broadcastPeriodStackToggle(false, context);
+      // }
     });
 
     handleYButtonInput(xrFrame, () => {
-      //toggleGuidePanel();
       temporalPanel.toggle();
       [controller1, controller2].forEach(c => {
         const gp = c.userData.inputSource?.gamepad;
