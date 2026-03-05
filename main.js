@@ -36,7 +36,9 @@ import {
   handleBButtonInput,
   handleYButtonInput,
   handleLeftStickButton,
-  handleRightStickButton
+  handleRightStickButton,
+  setupNinjaHands,
+  animatePuppetHands
 } from './vrSetup.js';
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
@@ -235,7 +237,7 @@ const controller2 = renderer.xr.getController(1);
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
 
-
+setupNinjaHands(scene, renderer);
 // ========================
 // Graph Rotation State
 // ========================
@@ -991,7 +993,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   if (periodStack?.group?.visible) {
     periodStack.syncFromGraph?.(Graph);
   }
-
+  //setupNinjaHands(scene, renderer)
 
 
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
@@ -1105,7 +1107,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
       console.log("Left stick clicked")
     });
-
+    animatePuppetHands(xrFrame, renderer);
     handleRightStickButton(xrFrame, () => {
       console.log("Right stick clicked")
       handleTemporalShift(1);

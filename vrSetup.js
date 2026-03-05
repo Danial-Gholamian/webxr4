@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import { highlightPeriod, getActivePeriods } from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // --- Constants ---
 const movementSpeed = 0.9;
@@ -458,3 +459,199 @@ export {
   setupGraphSwitchButtons,
   updateLaserPointer
 };
+
+
+// DISCOVER NAMES
+
+
+export function setupNinjaHands(scene, renderer) {
+  const loader = new GLTFLoader();
+
+  for (let i = 0; i < 2; i++) {
+    const controller = renderer.xr.getController(i);
+    const controllerGrip = renderer.xr.getControllerGrip(i);
+
+    // Wait for the controller to connect so we know EXACTLY which hand it is
+    controller.addEventListener('connected', (event) => {
+      const handedness = event.data.handedness; // "left" or "right"
+
+      loader.load('models/ninja_hands_-_rigged_for_animation__vr.glb', (gltf) => {
+        const handMesh = gltf.scene;
+        
+        const baseScale = 1; 
+        handMesh.scale.set(baseScale, baseScale, baseScale);
+        
+        // Alignment (Keep tweaking these to fix the offset!)
+        handMesh.rotation.set(0, Math.PI, 0); 
+        handMesh.position.set(0, -0.02, -0.05);
+
+        // The Anchor
+        const handAnchor = new THREE.Group();
+        controllerGrip.add(handAnchor);
+        handAnchor.add(handMesh);
+
+        // We only need to store one set of fingers now
+        const bones = { index: [], middle: [], ring: [], pinky: [], thumb: [] };
+
+        handMesh.traverse((child) => {
+          if (child.isBone && !child.name.includes('ignore')) {
+            // Grab the prefix that matches the physical controller
+            const prefix = handedness === 'left' ? 'handsb_l_' : 'handsb_r_';
+            
+            if (child.name.includes(prefix + 'index')) bones.index.push(child);
+            if (child.name.includes(prefix + 'middle')) bones.middle.push(child);
+            if (child.name.includes(prefix + 'ring')) bones.ring.push(child);
+            if (child.name.includes(prefix + 'pinky')) bones.pinky.push(child);
+            if (child.name.includes(prefix + 'thumb')) bones.thumb.push(child);
+          }
+        });
+
+        // Save bones to the grip so the animation loop can find them
+        controllerGrip.userData.bones = bones;
+
+        // Hide the hand we ARE NOT using (Scale it to 0)
+        const rightRoot = handMesh.getObjectByName('handsb_r_hand_02');
+        const leftRoot = handMesh.getObjectByName('handsb_l_hand_020');
+        
+        if (handedness === 'left' && rightRoot) rightRoot.scale.set(0, 0, 0);
+        if (handedness === 'right' && leftRoot) leftRoot.scale.set(0, 0, 0);
+      });
+    });
+  }
+}
+
+export function animatePuppetHands(xrFrame, renderer) {
+  if (!xrFrame) return;
+  const session = xrFrame.session;
+  let i = 0;
+
+  for (const source of session.inputSources) {
+    if (!source.gamepad) continue;
+
+    const grip = renderer.xr.getControllerGrip(i);
+    const bones = grip.userData.bones;
+    
+    // If bones aren't loaded yet, skip this frame
+    if (!bones) { i++; continue; }
+
+    const gamepad = source.gamepad;
+
+    // Read controller inputs
+    const triggerValue = gamepad.buttons[0]?.value || 0; // Index finger
+    const gripValue = gamepad.buttons[1]?.value || 0;    // Middle, Ring, Pinky
+    const thumbValue = (gamepad.buttons[3]?.touched || gamepad.buttons[4]?.touched) ? 1 : 0;
+
+    // Helper function to curl all joints in a finger
+    const curlFingers = (fingerArray, value, maxAngle) => {
+      fingerArray.forEach(bone => {
+        // IMPORTANT: If the fingers bend sideways, change 'z' to 'x' here!
+        bone.rotation.z = value * maxAngle; 
+      });
+    };
+
+    // Animate
+    curlFingers(bones.index, triggerValue, Math.PI / 4);
+    curlFingers(bones.middle, gripValue, Math.PI / 4);
+    curlFingers(bones.ring, gripValue, Math.PI / 4);
+    curlFingers(bones.pinky, gripValue, Math.PI / 4);
+    curlFingers(bones.thumb, thumbValue, Math.PI / 6);
+
+    i++;
+  }
+}
+
+// --- Bones for Hand Left ---
+// vrSetup.js:484 Found bone: _rootJoint
+// vrSetup.js:484 Found bone: handsr_hand_world_01
+// vrSetup.js:484 Found bone: handsb_r_hand_02
+// vrSetup.js:484 Found bone: handsb_r_thumb1_03
+// vrSetup.js:484 Found bone: handsb_r_thumb2_04
+// vrSetup.js:484 Found bone: handsb_r_thumb3_05
+// vrSetup.js:484 Found bone: handsb_r_index1_06
+// vrSetup.js:484 Found bone: handsb_r_index2_07
+// vrSetup.js:484 Found bone: handsb_r_index3_08
+// vrSetup.js:484 Found bone: handsb_r_middle1_09
+// vrSetup.js:484 Found bone: handsb_r_middle2_00
+// vrSetup.js:484 Found bone: handsb_r_middle3_010
+// vrSetup.js:484 Found bone: handsb_r_ring1_011
+// vrSetup.js:484 Found bone: handsb_r_ring2_012
+// vrSetup.js:484 Found bone: handsb_r_ring3_013
+// vrSetup.js:484 Found bone: handsb_r_pinky0_014
+// vrSetup.js:484 Found bone: handsb_r_pinky1_015
+// vrSetup.js:484 Found bone: handsb_r_pinky2_016
+// vrSetup.js:484 Found bone: handsb_r_pinky3_017
+// vrSetup.js:484 Found bone: handsb_r_grip_018
+// vrSetup.js:484 Found bone: handsl_hand_world_019
+// vrSetup.js:484 Found bone: handsb_l_hand_020
+// vrSetup.js:484 Found bone: handsb_l_thumb1_021
+// vrSetup.js:484 Found bone: handsb_l_thumb2_022
+// vrSetup.js:484 Found bone: handsb_l_thumb3_023
+// vrSetup.js:484 Found bone: handsb_l_thumb_ignore_024
+// vrSetup.js:484 Found bone: handsb_l_index1_025
+// vrSetup.js:484 Found bone: handsb_l_index2_026
+// vrSetup.js:484 Found bone: handsb_l_index3_027
+// vrSetup.js:484 Found bone: handsb_l_index_ignore_028
+// vrSetup.js:484 Found bone: handsb_l_middle1_029
+// vrSetup.js:484 Found bone: handsb_l_middle2_030
+// vrSetup.js:484 Found bone: handsb_l_middle3_031
+// vrSetup.js:484 Found bone: handsb_l_middle_ignore_032
+// vrSetup.js:484 Found bone: handsb_l_ring1_033
+// vrSetup.js:484 Found bone: handsb_l_ring2_034
+// vrSetup.js:484 Found bone: handsb_l_ring3_035
+// vrSetup.js:484 Found bone: handsb_l_ring_ignore_036
+// vrSetup.js:484 Found bone: handsb_l_pinky0_037
+// vrSetup.js:484 Found bone: handsb_l_pinky1_038
+// vrSetup.js:484 Found bone: handsb_l_pinky2_039
+// vrSetup.js:484 Found bone: handsb_l_pinky3_040
+// vrSetup.js:484 Found bone: handsb_l_pinky_ignore_041
+// vrSetup.js:484 Found bone: handsb_l_grip_042
+// vrSetup.js:481 --- Bones for Hand Right ---
+// vrSetup.js:484 Found bone: _rootJoint
+// vrSetup.js:484 Found bone: handsr_hand_world_01
+// vrSetup.js:484 Found bone: handsb_r_hand_02
+// vrSetup.js:484 Found bone: handsb_r_thumb1_03
+// vrSetup.js:484 Found bone: handsb_r_thumb2_04
+// vrSetup.js:484 Found bone: handsb_r_thumb3_05
+// vrSetup.js:484 Found bone: handsb_r_index1_06
+// vrSetup.js:484 Found bone: handsb_r_index2_07
+// vrSetup.js:484 Found bone: handsb_r_index3_08
+// vrSetup.js:484 Found bone: handsb_r_middle1_09
+// vrSetup.js:484 Found bone: handsb_r_middle2_00
+// vrSetup.js:484 Found bone: handsb_r_middle3_010
+// vrSetup.js:484 Found bone: handsb_r_ring1_011
+// vrSetup.js:484 Found bone: handsb_r_ring2_012
+// vrSetup.js:484 Found bone: handsb_r_ring3_013
+// vrSetup.js:484 Found bone: handsb_r_pinky0_014
+// vrSetup.js:484 Found bone: handsb_r_pinky1_015
+// vrSetup.js:484 Found bone: handsb_r_pinky2_016
+// vrSetup.js:484 Found bone: handsb_r_pinky3_017
+// vrSetup.js:484 Found bone: handsb_r_grip_018
+// vrSetup.js:484 Found bone: handsl_hand_world_019
+// vrSetup.js:484 Found bone: handsb_l_hand_020
+// vrSetup.js:484 Found bone: handsb_l_thumb1_021
+// vrSetup.js:484 Found bone: handsb_l_thumb2_022
+// vrSetup.js:484 Found bone: handsb_l_thumb3_023
+// vrSetup.js:484 Found bone: handsb_l_thumb_ignore_024
+// vrSetup.js:484 Found bone: handsb_l_index1_025
+// vrSetup.js:484 Found bone: handsb_l_index2_026
+// vrSetup.js:484 Found bone: handsb_l_index3_027
+// vrSetup.js:484 Found bone: handsb_l_index_ignore_028
+// vrSetup.js:484 Found bone: handsb_l_middle1_029
+// vrSetup.js:484 Found bone: handsb_l_middle2_030
+// vrSetup.js:484 Found bone: handsb_l_middle3_031
+// vrSetup.js:484 Found bone: handsb_l_middle_ignore_032
+// vrSetup.js:484 Found bone: handsb_l_ring1_033
+// vrSetup.js:484 Found bone: handsb_l_ring2_034
+// vrSetup.js:484 Found bone: handsb_l_ring3_035
+// vrSetup.js:484 Found bone: handsb_l_ring_ignore_036
+// vrSetup.js:484 Found bone: handsb_l_pinky0_037
+// vrSetup.js:484 Found bone: handsb_l_pinky1_038
+// vrSetup.js:484 Found bone: handsb_l_pinky2_039
+// vrSetup.js:484 Found bone: handsb_l_pinky3_040
+// vrSetup.js:484 Found bone: handsb_l_pinky_ignore_041
+// vrSetup.js:484 Found bone: handsb_l_grip_042
+// vrSetup.js:481 --- Bones for Hand Left ---
+// vrSetup.js:484 Found bone: _rootJoint
+// vrSetup.js:484 Found bone: handsr_hand_world_01
+// vrSetup.js:484 Found bone: handsb_r_hand_02
+// vrSetup.js:484 
