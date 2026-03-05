@@ -1,0 +1,32 @@
+const GUIDE_ITEMS = [
+  {
+    text: "Right Stick → Move"
+  },
+  {
+    text: "Left Stick → Rotate View"
+  },
+  {
+    text: "Grip (Squeeze) → Rotate Graph"
+  },
+  {
+    text: "Trigger → Select elements (nodes, groups, hierarchy levels, time snapshots)"
+  },
+  {
+    text: "Right Stick Press → Next Time Snapshot"
+  },
+  {
+    text: "Left Stick Press → Previous Time Snapshot"
+  },
+  {
+    text: "A → Toggle Filter Panel (select groups)"
+  },
+  {
+    text: "Y → Toggle Drill-Down Panel (zoom in / out of dataset)"
+  },
+  {
+    text: "X → Reset Graph to Default View (full aggregation)"
+  },
+  {
+    text: "B → Toggle User Guide Panel"
+  }
+];
