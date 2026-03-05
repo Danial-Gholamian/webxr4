@@ -42,35 +42,37 @@ function createPeerConnection(targetId) {
       // 1. STUN: Try direct Peer-to-Peer first (fastest/cheapest)
       { 
         urls: "stun:stun.relay.metered.ca:80" 
-      },
+      }
+      // Uncomment in case you need VoIP over secure netwrok like Eduroam
+      // ,
       
-      // 2. TURN (UDP): Relay via Port 80 if direct P2P is blocked
-      {
-        urls: "turn:global.relay.metered.ca:80",
-        username: "b66ba6fe364c651b2b5f1877",
-        credential: "wzMtCJAz32oU/lBO",
-      },
+      // // 2. TURN (UDP): Relay via Port 80 if direct P2P is blocked
+      // {
+      //   urls: "turn:global.relay.metered.ca:80",
+      //   username: "b66ba6fe364c651b2b5f1877",
+      //   credential: "wzMtCJAz32oU/lBO",
+      // },
       
-      // 3. TURN (TCP): Bypasses firewalls that block UDP traffic
-      {
-        urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        username: "b66ba6fe364c651b2b5f1877",
-        credential: "wzMtCJAz32oU/lBO",
-      },
+      // // 3. TURN (TCP): Bypasses firewalls that block UDP traffic
+      // {
+      //   urls: "turn:global.relay.metered.ca:80?transport=tcp",
+      //   username: "b66ba6fe364c651b2b5f1877",
+      //   credential: "wzMtCJAz32oU/lBO",
+      // },
       
-      // 4. TURN (TLS): Encrypted relay, looks like standard HTTPS traffic
-      {
-        urls: "turn:global.relay.metered.ca:443",
-        username: "b66ba6fe364c651b2b5f1877",
-        credential: "wzMtCJAz32oU/lBO",
-      },
+      // // 4. TURN (TLS): Encrypted relay, looks like standard HTTPS traffic
+      // {
+      //   urls: "turn:global.relay.metered.ca:443",
+      //   username: "b66ba6fe364c651b2b5f1877",
+      //   credential: "wzMtCJAz32oU/lBO",
+      // },
       
-      // 5. TURNS (TLS over TCP): The "Nuclear Option" for Eduroam/Corporate firewalls
-      {
-        urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        username: "b66ba6fe364c651b2b5f1877",
-        credential: "wzMtCJAz32oU/lBO",
-      },
+      // // 5. TURNS (TLS over TCP): The "Nuclear Option" for Eduroam/Corporate firewalls
+      // {
+      //   urls: "turns:global.relay.metered.ca:443?transport=tcp",
+      //   username: "b66ba6fe364c651b2b5f1877",
+      //   credential: "wzMtCJAz32oU/lBO",
+      // },
     ]
   });
   pc.onconnectionstatechange = () => {
