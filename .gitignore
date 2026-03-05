@@ -1,3 +1,6 @@
 localhost-key.pem
 localhost.pem
+node_modules
+node_modules
+./node_modules
 node_modules/
