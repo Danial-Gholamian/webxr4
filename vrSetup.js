@@ -471,9 +471,8 @@ export function setupNinjaHands(scene, renderer) {
     const controller = renderer.xr.getController(i);
     const controllerGrip = renderer.xr.getControllerGrip(i);
 
-    // Wait for the controller to connect so we know EXACTLY which hand it is
     controller.addEventListener('connected', (event) => {
-      const handedness = event.data.handedness; // "left" or "right"
+      const handedness = event.data.handedness;
 
       loader.load('models/ninja_hands_-_rigged_for_animation__vr.glb', (gltf) => {
         const handMesh = gltf.scene;
@@ -481,21 +480,39 @@ export function setupNinjaHands(scene, renderer) {
         const baseScale = 1; 
         handMesh.scale.set(baseScale, baseScale, baseScale);
         
-        // Alignment (Keep tweaking these to fix the offset!)
+        // Resetting alignment to a neutral starting point
         handMesh.rotation.set(0, Math.PI, 0); 
-        handMesh.position.set(0, -0.02, -0.05);
-
-        // The Anchor
+        handMesh.position.set(0, 0, 0);
         const handAnchor = new THREE.Group();
+                
+        if (handedness === 'left') {
+            // LEFT HAND: x: -0.4, z: 1.8 | Pos: -0.04, 0.08, -0.03
+            handAnchor.rotation.set(-0.4, 0, 1.8);
+            handAnchor.position.set(-0.04, 0.08, -0.03); 
+            window.leftHand = handAnchor;
+        } else {
+            // RIGHT HAND: x: -0.16, z: -1.8 | Pos: 0.05, 0.12, -0.03
+            handAnchor.rotation.set(-0.16, 0, -1.8);
+            handAnchor.position.set(0.05, 0.12, -0.03); 
+            window.rightHand = handAnchor;
+        }
         controllerGrip.add(handAnchor);
         handAnchor.add(handMesh);
 
-        // We only need to store one set of fingers now
+        // Expose to console for live alignment
+        if (handedness === 'left') {
+            window.leftHand = handAnchor;
+        } else {
+            window.rightHand = handAnchor;
+        }
+
         const bones = { index: [], middle: [], ring: [], pinky: [], thumb: [] };
 
         handMesh.traverse((child) => {
           if (child.isBone && !child.name.includes('ignore')) {
-            // Grab the prefix that matches the physical controller
+            // Save the artist's original resting pose!
+            child.userData.initialRotation = child.rotation.clone();
+
             const prefix = handedness === 'left' ? 'handsb_l_' : 'handsb_r_';
             
             if (child.name.includes(prefix + 'index')) bones.index.push(child);
@@ -506,12 +523,11 @@ export function setupNinjaHands(scene, renderer) {
           }
         });
 
-        // Save bones to the grip so the animation loop can find them
         controllerGrip.userData.bones = bones;
 
-        // Hide the hand we ARE NOT using (Scale it to 0)
-        const rightRoot = handMesh.getObjectByName('handsb_r_hand_02');
-        const leftRoot = handMesh.getObjectByName('handsb_l_hand_020');
+        // Hide the TRUE root bones so no floating pieces are left behind
+        const rightRoot = handMesh.getObjectByName('handsr_hand_world_01'); 
+        const leftRoot = handMesh.getObjectByName('handsl_hand_world_019'); 
         
         if (handedness === 'left' && rightRoot) rightRoot.scale.set(0, 0, 0);
         if (handedness === 'right' && leftRoot) leftRoot.scale.set(0, 0, 0);
@@ -531,25 +547,31 @@ export function animatePuppetHands(xrFrame, renderer) {
     const grip = renderer.xr.getControllerGrip(i);
     const bones = grip.userData.bones;
     
-    // If bones aren't loaded yet, skip this frame
     if (!bones) { i++; continue; }
 
     const gamepad = source.gamepad;
 
-    // Read controller inputs
-    const triggerValue = gamepad.buttons[0]?.value || 0; // Index finger
-    const gripValue = gamepad.buttons[1]?.value || 0;    // Middle, Ring, Pinky
-    const thumbValue = (gamepad.buttons[3]?.touched || gamepad.buttons[4]?.touched) ? 1 : 0;
+    const triggerValue = gamepad.buttons[0]?.value || 0; 
+    const gripValue = gamepad.buttons[1]?.value || 0;    
+    // const thumbValue = (gamepad.buttons[3]?.touched || gamepad.buttons[4]?.touched) ? 1 : 0;
 
-    // Helper function to curl all joints in a finger
+    const isThumbstickActive = gamepad.buttons[3]?.touched || gamepad.buttons[3]?.pressed;
+    const isBottomButtonActive = gamepad.buttons[4]?.touched || gamepad.buttons[4]?.pressed; // A or X
+    const isTopButtonActive = gamepad.buttons[5]?.touched || gamepad.buttons[5]?.pressed;    // B or Y
+
+    const thumbValue = (isThumbstickActive || isBottomButtonActive || isTopButtonActive) ? 1 : 0;
     const curlFingers = (fingerArray, value, maxAngle) => {
       fingerArray.forEach(bone => {
-        // IMPORTANT: If the fingers bend sideways, change 'z' to 'x' here!
-        bone.rotation.z = value * maxAngle; 
+        // ---> NEW: Safely animate without breaking the hand <---
+        // 1. Reset to the beautiful resting pose
+        bone.rotation.copy(bone.userData.initialRotation);
+        
+        // 2. Add the trigger curl on top of the resting pose
+        // NOTE: If the fingers bend sideways, change this to rotateX or rotateY
+        bone.rotateZ(value * maxAngle); 
       });
     };
 
-    // Animate
     curlFingers(bones.index, triggerValue, Math.PI / 4);
     curlFingers(bones.middle, gripValue, Math.PI / 4);
     curlFingers(bones.ring, gripValue, Math.PI / 4);

@@ -1008,7 +1008,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   fpsAccum += fps;
   frameCount++;
   if (frameCount % 60 === 0) { // log once every ~60 frames 
-    console.log("FPS:", Math.round(fpsAccum / frameCount));
+    // console.log("FPS:", Math.round(fpsAccum / frameCount));
     frameCount = 0;
     fpsAccum = 0;
   }
