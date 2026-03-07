@@ -11,7 +11,10 @@ export function createTemporalDrillPanel({
   cameraGroup,
   camera,
   navigator,
-  graphController
+  graphController,
+  onStateChange, // NEW
+  getDeltaMin,   // NEW
+  onDeltaChange  // NEW
 }) {
   const panel = new THREE.Group();
   panel.name = 'TemporalDrillPanel';
@@ -63,7 +66,40 @@ export function createTemporalDrillPanel({
     panel.add(header);
     interactables.push(header);
     yCursor -= 0.25;
+    // --- NEW: DELTA MIN CONTROLS ---
+    if (getDeltaMin) {
+      const currentDelta = getDeltaMin();
+      
+      // Label showing current value
+      const deltaLabel = createCapsuleLabel(`Resolution: ${currentDelta}`, {
+        fontSize: 0.05, width: 0.8, color: 0x222222
+      });
+      deltaLabel.position.set(0, yCursor, 0);
+      panel.add(deltaLabel);
+      interactables.push(deltaLabel);
 
+      // MINUS BUTTON
+      const minusBtn = createCapsuleLabel("- 10", {
+        fontSize: 0.05, width: 0.3, color: 0x882222, hoverColor: 0xaa4444,
+        onClick: () => { if (onDeltaChange) onDeltaChange(-10); }
+      });
+      minusBtn.position.set(-0.5, yCursor, 0);
+      minusBtn.userData.isInteractable = true;
+      panel.add(minusBtn);
+      interactables.push(minusBtn);
+
+      // PLUS BUTTON
+      const plusBtn = createCapsuleLabel("+ 10", {
+        fontSize: 0.05, width: 0.3, color: 0x228822, hoverColor: 0x44aa44,
+        onClick: () => { if (onDeltaChange) onDeltaChange(10); }
+      });
+      plusBtn.position.set(0.5, yCursor, 0);
+      plusBtn.userData.isInteractable = true;
+      panel.add(plusBtn);
+      interactables.push(plusBtn);
+
+      yCursor -= 0.25; // Move cursor down for the next buttons
+    }
     // --- B. "GO UP" BUTTON (If parent exists) ---
     if (parent) {
       const upBtn = createCapsuleLabel(` Go Up to ${formatBucketLabel(parent)}`, {
@@ -159,13 +195,16 @@ export function createTemporalDrillPanel({
   }
 
   
-
+  function setNavigator(newNav) {
+    navigator = newNav;
+    render(); // Redraw the UI with the new tree
+  }
   
 
   // Expose the group and interactables for the Raycaster
   return { 
     group: panel, 
-    show, hide, toggle, update, 
+    show, hide, toggle, update, setNavigator, // Added setNavigator here
     // We can expose the list of buttons if we want to optimize raycasting
     getInteractables: () => interactables 
   };

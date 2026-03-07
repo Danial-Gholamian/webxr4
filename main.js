@@ -9,7 +9,7 @@ const deltaInput = prompt(
 
 // Parse the input into a number. If they hit cancel, type letters, or enter 0, default to 50.
 const parsedDelta = parseFloat(deltaInput);
-export const userDeltaMin = (!isNaN(parsedDelta) && parsedDelta > 0) ? parsedDelta : 50;
+export let userDeltaMin = (!isNaN(parsedDelta) && parsedDelta > 0) ? parsedDelta : 50;
 
 
 // ========================
@@ -573,31 +573,50 @@ const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
 
 
 
-const levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
-const root = buildTemporalTree(levels, 4);
-const navigator = createTemporalNavigator(root);
+let levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
+let root = buildTemporalTree(levels, 4);
+let navigator = createTemporalNavigator(root);
 
 const temporalPanel = createTemporalDrillPanel({
-  cameraGroup: cameraGroup, // Pass the group (scene graph location)
-  camera: camera,           // Pass camera (for positioning calculation)
-  navigator,
-  graphController
+  cameraGroup: cameraGroup, 
+  camera: camera,           
+  navigator: navigator,
+  graphController: graphController,
+  onStateChange: dispatchTemporalUpdate,    // NEW
+  getDeltaMin: () => userDeltaMin,          // NEW
+  onDeltaChange: updateDeltaMin             // NEW
 });
 
 // --- UNIFIED TEMPORAL DISPATCHER ---
-
 export function dispatchTemporalUpdate() {
   const activeBucket = navigator.getCurrentNode();
   if (!activeBucket) return;
 
-  // 1. Update Graph and dependent UI modules
-  // including the histogram - update 3D Histogram Highlight Window
   graphController.highlightBucket(activeBucket);
 
-  // 2. Update the VR UI Panel
   if (temporalPanel.group.visible) {
     temporalPanel.show();
   }
+}
+
+// --- NEW: REBUILD TREE FUNCTION ---
+export function updateDeltaMin(amount) {
+  // 1. Calculate new delta, ensure it doesn't drop below 10
+  userDeltaMin = Math.max(10, userDeltaMin + amount);
+  console.log(`[Time] Rebuilding tree with new delta_min: ${userDeltaMin}`);
+
+  // 2. Rebuild the mathematical tree
+  levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
+  root = buildTemporalTree(levels, 4);
+  
+  // 3. Re-initialize the navigator
+  navigator = createTemporalNavigator(root);
+
+  // 4. Give the updated navigator to the drill panel
+  temporalPanel.setNavigator(navigator);
+
+  // 5. Reset the view to the new Root bucket
+  dispatchTemporalUpdate();
 }
 
 function handleTemporalShift(direction) {
@@ -865,6 +884,10 @@ export function resetGraph() {
   graphController.resetAll()
   histogram.reset()
   // updateBarGauge(timeGauge, 0, "Default");
+  if (navigator && root) {
+    navigator.selectNode(root); // Point the brain back to the top of the tree
+    dispatchTemporalUpdate();   // Force the Panel, Graph, and UI to sync to the root
+  }
 }
 
 

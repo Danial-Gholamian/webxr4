@@ -485,18 +485,19 @@ export function setupNinjaHands(scene, renderer) {
         handMesh.position.set(0, 0, 0);
         const handAnchor = new THREE.Group();
                 
-        if (handedness === 'left') {
-            // LEFT HAND: x: -0.4, z: 1.8 | Pos: -0.04, 0.08, -0.03
-            handAnchor.rotation.set(-0.4, 0, 1.8);
-            handAnchor.position.set(-0.04, 0.08, -0.03); 
-            window.leftHand = handAnchor;
-        } else {
-            // RIGHT HAND: x: -0.16, z: -1.8 | Pos: 0.05, 0.12, -0.03
-            handAnchor.rotation.set(-0.16, 0, -1.8);
-            handAnchor.position.set(0.05, 0.12, -0.03); 
-            window.rightHand = handAnchor;
-        }
-        controllerGrip.add(handAnchor);
+      if (handedness === 'left') {
+        // LEFT HAND
+        handAnchor.rotation.set(-0.5, 0, 1.8);
+        handAnchor.position.set(-0.02, 0.08, -0.03);
+        window.leftHand = handAnchor;
+
+      } else {
+        // RIGHT HAND
+        handAnchor.rotation.set(-0.38, 0, -1.8);
+        handAnchor.position.set(0.03, 0.12, -0.05);
+        window.rightHand = handAnchor;
+      }
+              controllerGrip.add(handAnchor);
         handAnchor.add(handMesh);
 
         // Expose to console for live alignment
