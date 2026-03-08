@@ -48,7 +48,7 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
       transparent: true,
       opacity: 0.6,
       depthWrite: false,
-      depthTest: false
+      depthTest: true
     })
   );
   bgPlane.renderOrder = 0
@@ -71,6 +71,9 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   datasetTitle.anchorX = 'center';
   datasetTitle.position.set(0, cursorY, 0.01);
   datasetTitle.sync();
+  datasetTitle.renderOrder = 10; // <--- Higher than the background (0)
+    
+  datasetTitle.material.depthWrite = false;
 
   uiPanel.add(datasetTitle);
 
@@ -113,8 +116,12 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   periodTitle.anchorX = 'center';
   // periodTitle.position.set(0, 0.35, 0.01);
   periodTitle.position.set(0, cursorY, 0.01);
+  periodTitle.renderOrder = 10; // <--- Higher than the background (0)
+    
+  periodTitle.material.depthWrite = false;
   cursorY -= SECTION_GAP * 0.7;
   periodTitle.sync();
+
 
 
   selectedNodeLabel = new Text();
@@ -125,6 +132,9 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   selectedNodeLabel.anchorX = 'center';
   // selectedNodeLabel.position.set(0, 0.28, 0.01); // just below periodTitle
   selectedNodeLabel.position.set(0, cursorY, 0.01);
+  selectedNodeLabel.renderOrder = 10; // <--- Higher than the background (0)
+    
+  selectedNodeLabel.material.depthWrite = false;
   cursorY -= SECTION_GAP;
   selectedNodeLabel.sync();
 
@@ -385,6 +395,9 @@ export function createCapsuleLabel(text, {
   label.anchorX = 'center';
   label.anchorY = 'middle';
   label.position.set(0, 0, 0.01);
+  label.renderOrder = 10; // <--- Higher than the background (0)
+    
+  label.material.depthWrite = false;
   group.add(label);
 
   label.sync(() => {

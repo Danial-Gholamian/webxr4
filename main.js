@@ -57,6 +57,8 @@ import {
 } from './temporalHierarchy.js';
 import { createTemporalDrillPanel } from './temporalDrillPanel.js';
 import { gridGeo, gridMaterial } from './skybox.js';
+import { calculateInsights } from './insightSystem.js';
+import { InsightPanel } from './insightPanel.js';
 
 let levelIndex = 0;
 let bucketIndex = null;
@@ -441,7 +443,15 @@ function applyDataset(dataset, periods) {
 
   // // 8 Update Filter Panel using the created uiPanel at initialization
   // updateGroupList(uiPanel, buildGroupColorList())
-
+  // FORCE INITIAL INSIGHTS CALCULATION
+    // This ensures the panel is populated the moment you enter VR
+    setTimeout(() => {
+        if (graphController && insightPanel) {
+            const { nodes, links } = graphController.getFilteredData();
+            const stats = calculateInsights(nodes, links, { type: 'NONE', id: null });
+            insightPanel.update(stats, colorScale);
+        }
+    }, 500); // Small delay to ensure ForceGraph has finished initial layout
 
   console.log('Dataset applied');
 }
@@ -598,6 +608,45 @@ export function dispatchTemporalUpdate() {
     temporalPanel.show();
   }
 }
+
+// experiment
+// window.getVRInsights = () => {
+//     const controller = getGraphController();
+    
+//     // 1. Get the data that the user is actually seeing right now
+//     const { nodes, links } = controller.getFilteredData();
+    
+//     // 2. Determine the current selection state
+//     const selection = {
+//         type: 'NONE',
+//         id: null
+//     };
+    
+//     if (controller.state.selection.active) {
+//         selection.type = 'NODE';
+//         selection.id = controller.state.selection.selectedNodeId;
+//     } else if (controller.state.group.active) {
+//         selection.type = 'GROUP';
+//         // Note: You might need to store the raw group name in state 
+//         // if you want to show group-specific insights later.
+//     }
+
+//     // 3. Calculate
+//     const stats = calculateInsights(nodes, links, selection);
+    
+//     // 4. Output to console for your testing
+//     console.log("%c--- INSIGHT REPORT ---", "color: #00ff00; font-weight: bold;");
+//     console.log(`Visible Nodes: ${nodes.length} | Visible Edges: ${links.length}`);
+//     console.log("Top 3 Active Students:", stats.topHubs);
+//     console.log("Top 3 Active Groups:", stats.topGroups);
+    
+//     if (selection.type === 'NODE') {
+//         console.log(`%cSelection (Node ${selection.id}): Rank ${stats.nodeRank}`, "color: #00aaff");
+//         console.log("Best Friends:", stats.bestFriends);
+//     }
+
+//     return stats;
+// };
 
 // --- NEW: REBUILD TREE FUNCTION ---
 export function updateDeltaMin(amount) {
@@ -829,6 +878,29 @@ export const uiPanel = await createFilterPanel({ groupColors: groups, camera, da
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
+//panel for insight 
+
+const insightPanel = new InsightPanel();
+cameraGroup.add(insightPanel.getObject3D());
+
+// Hook it into the controller's update loop
+const originalUpdate = graphController.update.bind(graphController);
+graphController.update = () => {
+    // 1. Run original visual updates
+    originalUpdate();
+    
+    // 2. Calculate new insights
+    const { nodes, links } = graphController.getFilteredData();
+    const selection = {
+        type: graphController.state.selection.active ? 'NODE' : 'NONE',
+        id: graphController.state.selection.selectedNodeId
+    };
+    
+    const stats = calculateInsights(nodes, links, selection);
+    
+    // 3. Update the Panel
+    insightPanel.update(stats, colorScale);
+};
 
 // ========================
 // Graph Interaction + Reset

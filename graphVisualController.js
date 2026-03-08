@@ -508,5 +508,20 @@ export class GraphVisualController {
         this.temporal_subscribers.forEach(uiObject => uiObject(bucket))
     }
 
+    /**
+     * Returns the subset of data currently passing all filters (Time, Group, etc.)
+     */
+    getFilteredData() {
+        const nodes = this.graph.graphData().nodes;
+        const links = this.graph.graphData().links;
+        
+        // Use the internal visibility logic to pick the "winners"
+        const ctx = this._buildVisibilityContext();
+        
+        const visibleLinks = links.filter(l => this._isEdgeVisible(l, ctx));
+        const visibleNodes = nodes.filter(n => this._isNodeVisible(n.id, ctx));
+
+        return { nodes: visibleNodes, links: visibleLinks };
+    }
 
 }
