@@ -37,7 +37,7 @@ export function calculateInsights(nodes, links, currentSelection = { type: 'NONE
   const sortedGroups = [...groupActivity.entries()].sort((a, b) => b[1] - a[1]);
 
   // ==========================================
-  // FIX 1: AVERAGE DENSITY
+  // AVERAGE DENSITY
   // Use the size of the global degree map (active nodes) instead of filtered nodes
   // ==========================================
   const totalActiveNodes = sortedGlobalNodes.length || 1; // Fallback to 1 to prevent divide-by-zero
@@ -55,10 +55,7 @@ export function calculateInsights(nodes, links, currentSelection = { type: 'NONE
     
     const globalRank = sortedGlobalNodes.findIndex(n => n[0] === targetId) + 1;
     
-    // ==========================================
-    // FIX 2: THE RANK DENOMINATOR
-    // It now shows out of "Total Active Students in this Time Slice"
-    // ==========================================
+
     stats.nodeRank = globalRank > 0 ? `${globalRank} / ${totalActiveNodes} Active` : `N/A`;
     
     // Find "Best Friends" within the current time bucket
