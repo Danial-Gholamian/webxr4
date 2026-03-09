@@ -1,0 +1,61 @@
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #ffffff; /* White background */
+            color: #333333; /* Dark grey text for readability */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #startPanel {
+            background-color: #f9f9f9; /* Light grey for the panel */
+            padding: 30px;
+            border-radius: 20px; /* Rounder corners */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 320px;
+        }
+
+        h2 {
+            margin-bottom: 15px;
+        }
+
+        p {
+            margin: 15px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        h3 {
+            margin: 15px 0 5px;
+        }
+
+        #datasetSelector {
+            margin-bottom: 20px;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 10px; /* Rounder corners for input */
+            border: 1px solid #cccccc; /* Light grey border */
+            background-color: #ffffff; /* White background for input */
+            color: #333333; /* Dark text color for input */
+        }
+
+        button {
+            background-color: #007bff; /* Bright blue button */
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 10px; /* Rounder corners for button */
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }

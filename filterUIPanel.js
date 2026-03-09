@@ -62,65 +62,65 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   uiPanel.userData.bgPlane = bgPlane;
   uiPanel.add(bgPlane);
 
+  // OLD SECTION FOR CHANGING DATASETS
 
-
-  const datasetTitle = new Text();
-  datasetTitle.text = 'Dataset';
-  datasetTitle.fontSize = TITLE_SIZE * 0.85;
-  datasetTitle.color = 0xffffff;
-  datasetTitle.anchorX = 'center';
-  datasetTitle.position.set(0, cursorY, 0.01);
-  datasetTitle.sync();
-  datasetTitle.renderOrder = 10; // <--- Higher than the background (0)
+  // const datasetTitle = new Text();
+  // datasetTitle.text = 'Dataset';
+  // datasetTitle.fontSize = TITLE_SIZE * 0.85;
+  // datasetTitle.color = 0xffffff;
+  // datasetTitle.anchorX = 'center';
+  // datasetTitle.position.set(0, cursorY, 0.01);
+  // datasetTitle.sync();
+  // datasetTitle.renderOrder = 10; // <--- Higher than the background (0)
     
-  datasetTitle.material.depthWrite = false;
+  // datasetTitle.material.depthWrite = false;
 
-  uiPanel.add(datasetTitle);
+  // uiPanel.add(datasetTitle);
 
-  // move cursor down
-  // cursorY -= SECTION_GAP;
-  cursorY -= SECTION_GAP * 1.2;
-
-
-  let datasetStartY = 0.12;
-
-  options.datasets.forEach((ds, index) => {
-    const capsule = createCapsuleLabel(ds.id, {
-      fontSize: ITEM_SIZE,
-      color: 0x2a2a3d,
-      hoverColor: 0x444488,
-      padding: 0.03,
-      onClick: () => {
-        console.log(`Dataset selected: ${ds.id}`);
-        // local switch data set
-        switchDataset(ds.key);
-
-        // broadcast it across :) 
-        broadcastDatasetChange(ds.key)
-      }
-    });
-
-    capsule.position.set(0, cursorY, 0.01);
-    uiPanel.add(capsule);
-
-    cursorY -= ROW_SPACING * 0.8;
-  });
-
-  cursorY -= SECTION_GAP * 0.5;
+  // // move cursor down
+  // // cursorY -= SECTION_GAP;
+  // cursorY -= SECTION_GAP * 1.2;
 
 
-  periodTitle = new Text();
-  periodTitle.text = 'Time of the day: Default 📚';
-  periodTitle.fontSize = TITLE_SIZE;
-  periodTitle.color = 0xffffff;
-  periodTitle.anchorX = 'center';
-  // periodTitle.position.set(0, 0.35, 0.01);
-  periodTitle.position.set(0, cursorY, 0.01);
-  periodTitle.renderOrder = 10; // <--- Higher than the background (0)
+  // let datasetStartY = 0.12;
+
+  // options.datasets.forEach((ds, index) => {
+  //   const capsule = createCapsuleLabel(ds.id, {
+  //     fontSize: ITEM_SIZE,
+  //     color: 0x2a2a3d,
+  //     hoverColor: 0x444488,
+  //     padding: 0.03,
+  //     onClick: () => {
+  //       console.log(`Dataset selected: ${ds.id}`);
+  //       // local switch data set
+  //       switchDataset(ds.key);
+
+  //       // broadcast it across :) 
+  //       broadcastDatasetChange(ds.key)
+  //     }
+  //   });
+
+  //   capsule.position.set(0, cursorY, 0.01);
+  //   uiPanel.add(capsule);
+
+  //   cursorY -= ROW_SPACING * 0.8;
+  // });
+
+  // cursorY -= SECTION_GAP * 0.5;
+
+
+  // periodTitle = new Text();
+  // periodTitle.text = 'Time of the day: Default 📚';
+  // periodTitle.fontSize = TITLE_SIZE;
+  // periodTitle.color = 0xffffff;
+  // periodTitle.anchorX = 'center';
+  // // periodTitle.position.set(0, 0.35, 0.01);
+  // periodTitle.position.set(0, cursorY, 0.01);
+  // periodTitle.renderOrder = 10; // <--- Higher than the background (0)
     
-  periodTitle.material.depthWrite = false;
-  cursorY -= SECTION_GAP * 0.7;
-  periodTitle.sync();
+  // periodTitle.material.depthWrite = false;
+  // cursorY -= SECTION_GAP * 0.7;
+  // periodTitle.sync();
 
 
 
