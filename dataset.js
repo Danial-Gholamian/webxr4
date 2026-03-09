@@ -11,15 +11,17 @@ export const DATASETS = {
     key: 'hospital',
     id: 'Hospital',
     label: 'Hospital Temporal Graph',
-    data: () => import('./dataset/hospital/hospital-data-period.js'),
+    data: () => import('./dataset/hospital/graph-data-times.js'),
     periods: () => import('./dataset/hospital/hospitalDefs.js'),
   },
 };
 
 export function getDatasetList() {
-  let datasetList = []
+  let datasetList = [];
+
   for (const datasetKey in DATASETS) {
-    datasetList.push(datasetKey.id)
+    datasetList.push(DATASETS[datasetKey].id);
   }
-  return datasetList
+
+  return datasetList;
 }
