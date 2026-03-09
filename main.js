@@ -905,8 +905,11 @@ graphController.update = () => {
         type: graphController.state.selection.active ? 'NODE' : 'NONE',
         id: graphController.state.selection.selectedNodeId
     };
-    
-    const stats = calculateInsights(nodes, links, selection);
+    const currentBucket = graphController.state.activeBucket;
+    const globalBucketLinks = dataset.links.filter(l => 
+        graphController._edgeInBucket(l, currentBucket)
+    );
+    const stats = calculateInsights(nodes, links, selection, globalBucketLinks);
     
     // 3. Update the Panel
     insightPanel.update(stats, colorScale);
