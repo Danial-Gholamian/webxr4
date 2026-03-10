@@ -57,10 +57,8 @@ export function createTemporalDrillPanel({
 
     // --- A. HEADER (Current Selection) ---
     const header = createCapsuleLabel(`Selected: ${currentLabel}`, {
-      fontSize: 0.08,
       width: 1.2,
-      color: 0xffaa00, // Gold header
-      textColor: 0x000000
+      color: 0xffaa00 // Gold header
     });
     header.position.set(0, yCursor, 0);
     panel.add(header);
@@ -72,7 +70,7 @@ export function createTemporalDrillPanel({
       
       // Label showing current value
       const deltaLabel = createCapsuleLabel(`Resolution: ${currentDelta}`, {
-        fontSize: 0.05, width: 0.8, color: 0x222222
+        width: 0.8, color: 0x222222
       });
       deltaLabel.position.set(0, yCursor, 0);
       panel.add(deltaLabel);
@@ -80,7 +78,7 @@ export function createTemporalDrillPanel({
 
       // MINUS BUTTON
       const minusBtn = createCapsuleLabel("- 10", {
-        fontSize: 0.05, width: 0.3, color: 0x882222, hoverColor: 0xaa4444,
+        width: 0.3, color: 0x882222, hoverColor: 0xaa4444,
         onClick: () => { if (onDeltaChange) onDeltaChange(-10); }
       });
       minusBtn.position.set(-0.5, yCursor, 0);
@@ -90,7 +88,7 @@ export function createTemporalDrillPanel({
 
       // PLUS BUTTON
       const plusBtn = createCapsuleLabel("+ 10", {
-        fontSize: 0.05, width: 0.3, color: 0x228822, hoverColor: 0x44aa44,
+        width: 0.3, color: 0x228822, hoverColor: 0x44aa44,
         onClick: () => { if (onDeltaChange) onDeltaChange(10); }
       });
       plusBtn.position.set(0.5, yCursor, 0);
@@ -103,7 +101,7 @@ export function createTemporalDrillPanel({
     // --- B. "GO UP" BUTTON (If parent exists) ---
     if (parent) {
       const upBtn = createCapsuleLabel(` Go Up to ${formatBucketLabel(parent)}`, {
-        fontSize: 0.06,
+        
         width: 1.0,
         color: 0x444444,
         hoverColor: 0x666666,
@@ -127,7 +125,7 @@ export function createTemporalDrillPanel({
     // --- C. CHILDREN LIST (Drill Down) ---
     if (children && children.length > 0) {
       // Label for list
-      const subLabel = createCapsuleLabel("Drill Down:", { fontSize: 0.04, color: 0x000000, opacity: 0 });
+      const subLabel = createCapsuleLabel("Drill Down:", {color: 0x000000, opacity: 0 });
       subLabel.position.set(-0.4, yCursor, 0);
       panel.add(subLabel);
       interactables.push(subLabel);
@@ -135,7 +133,7 @@ export function createTemporalDrillPanel({
 
       children.forEach(child => {
         const btn = createCapsuleLabel(formatBucketLabel(child), {
-          fontSize: 0.06,
+          
           width: 0.9,
           color: 0x222255, // Dark Blue
           hoverColor: 0x4444aa,
@@ -155,7 +153,7 @@ export function createTemporalDrillPanel({
         yCursor -= ITEM_SPACING;
       });
     } else {
-        const leafMsg = createCapsuleLabel("(Lowest Level - No Children)", { fontSize: 0.04, color: 0x222222 });
+        const leafMsg = createCapsuleLabel("(Lowest Level - No Children)", { color: 0x222222 });
         leafMsg.position.set(0, yCursor, 0);
         panel.add(leafMsg);
         interactables.push(leafMsg);

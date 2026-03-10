@@ -179,7 +179,6 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
 
       const capsule = createCapsuleLabel(label, {
         // fontSize: 0.038,
-        fontSize: ITEM_SIZE,
         color: 0x333333,
         hoverColor: 0x555577,
         padding: 0.025,
@@ -243,7 +242,6 @@ export function updateGroupList(uiPanel, groupColors) {
     nodeGroupList.add(dot);
 
     const capsule = createCapsuleLabel(group.name, {
-      fontSize: 0.055,
       color: 0x222244,
       hoverColor: 0x444488,
       padding: 0.03,
@@ -377,7 +375,7 @@ console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeStrin
 const DEBUG = true;
 
 export function createCapsuleLabel(text, {
-  fontSize = 80,
+  fontSize = 72,
   color = "#222244",
   hoverColor = "#444488",
   textColor = "#ffffff",
@@ -397,7 +395,7 @@ export function createCapsuleLabel(text, {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  ctx.font = "bold 72px Arial";
+  ctx.font = `bold ${fontSize}px Arial`;
   const metrics = ctx.measureText(text);
   const textWidth = metrics.width;
 
@@ -410,8 +408,15 @@ export function createCapsuleLabel(text, {
   canvas.width = width;
   canvas.height = height;
 
+  // ----------------------------
+  // Texture
+  // ----------------------------
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+
   function drawCapsule(bgColor) {
-    ctx.fillRect(0,0,width,height);
+    console.log("REDRAW CAPSULE COLOR:", bgColor)
 
     ctx.globalAlpha = 1;
 
@@ -419,7 +424,8 @@ export function createCapsuleLabel(text, {
 
     const radius = height / 2;
 
-    ctx.fillStyle = bgColor;
+    const cssColor = "#" + new THREE.Color(bgColor).getHexString();
+    ctx.fillStyle = cssColor;
     ctx.globalAlpha = opacity;
 
     ctx.beginPath();
@@ -442,22 +448,18 @@ export function createCapsuleLabel(text, {
     ctx.globalAlpha = 1;
     ctx.fillStyle = textColor;
 
-    ctx.font = "bold 72px Arial";   // fixed pixel size
+    ctx.font = `bold ${fontSize}px Arial`;   // fixed pixel size
     const metrics = ctx.measureText(text);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     ctx.fillText(text, width / 2, height / 2);
+
+    texture.needsUpdate = true;
   }
 
   drawCapsule(color);
 
-  // ----------------------------
-  // Texture
-  // ----------------------------
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
 
 const material = new THREE.MeshBasicMaterial({
   map: texture,
