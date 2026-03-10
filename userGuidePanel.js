@@ -1,3 +1,5 @@
+// userGuidePanel.js 
+
 import * as THREE from 'three';
 
 const ITEMS_PER_PAGE = 4;

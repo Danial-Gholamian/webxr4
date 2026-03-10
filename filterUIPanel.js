@@ -377,91 +377,223 @@ console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeStrin
 const DEBUG = true;
 
 export function createCapsuleLabel(text, {
-  // fontSize = 0.045,
-  fontSize = ITEM_SIZE,
-  color = 0x222244,
-  hoverColor = 0x444488,
-  textColor = 0xffffff,
-  padding = 0.03,
+  fontSize = 80,
+  color = "#222244",
+  hoverColor = "#444488",
+  textColor = "#ffffff",
   opacity = 0.9,
   onClick = null
 } = {}) {
+
   const group = new THREE.Group();
 
-  const label = new Text();
-  label.text = text;
-  label.fontSize = fontSize;
-  label.color = textColor;
-  label.anchorX = 'center';
-  label.anchorY = 'middle';
-  label.position.set(0, 0, 0.01);
-  label.renderOrder = 10; // <--- Higher than the background (0)
-    
-  label.material.depthWrite = false;
-  group.add(label);
+  // ----------------------------
+  // Canvas setup
+  // ----------------------------
 
-  label.sync(() => {
-    const info = label.textRenderInfo;
-    const textWidth = info?.width ?? 0.3;
-    const textHeight = info?.height ?? 0.1;
+  const canvas = document.createElement("canvas");
 
-    const width = textWidth + padding * 2;
-    const height = textHeight + padding * 2;
-    const radius = Math.min(height / 2, 0.1);
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
-    const shape = new THREE.Shape();
-    shape.moveTo(-width / 2 + radius, -height / 2);
-    shape.lineTo(width / 2 - radius, -height / 2);
-    shape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
-    shape.lineTo(width / 2, height / 2 - radius);
-    shape.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
-    shape.lineTo(-width / 2 + radius, height / 2);
-    shape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
-    shape.lineTo(-width / 2, -height / 2 + radius);
-    shape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
+  ctx.font = "bold 72px Arial";
+  const metrics = ctx.measureText(text);
+  const textWidth = metrics.width;
 
-    const geometry = new THREE.ShapeGeometry(shape);
-    const bgMaterial = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity,
-      depthWrite: false,
-      depthTest: false
-    });
+  const paddingX = 60;
+  const paddingY = 40;
 
-    const bg = new THREE.Mesh(geometry, bgMaterial);
-    bg.position.z = 0;
-    bg.userData.defaultColor = new THREE.Color(color);
-    bg.userData.hoverColor = new THREE.Color(hoverColor);
-    bg.userData.selectedColor = new THREE.Color(0x3366ff);
-    bg.userData.isSelected = false;
+  const width = textWidth + paddingX * 2;
+  const height = 120;
 
-    // bg.renderOrder = 0
+  canvas.width = width;
+  canvas.height = height;
 
-    group.add(bg);
+  function drawCapsule(bgColor) {
+    ctx.fillRect(0,0,width,height);
 
-    // filterUIPanel.js --> createCapsuleLabel()
+    ctx.globalAlpha = 1;
 
-    const hitbox = new THREE.Mesh(
-      new THREE.PlaneGeometry(width, height),
-      // Fix: visible: false makes it invisible to the camera, but not the raycaster
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    hitbox.position.z = 0.02;
-    hitbox.name = 'capsuleHitbox';
-    hitbox.userData = {
-      interactive: true,
-      label: text,
-      onClick,
-      target: bg
-    };
+    ctx.clearRect(0, 0, width, height);
 
-    group.userData.hitbox = hitbox;
-    group.add(hitbox);
-  });
+    const radius = height / 2;
+
+    ctx.fillStyle = bgColor;
+    ctx.globalAlpha = opacity;
+
+    ctx.beginPath();
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(width - radius, 0);
+    ctx.quadraticCurveTo(width, 0, width, radius);
+    ctx.lineTo(width, height - radius);
+    ctx.quadraticCurveTo(width, height, width - radius, height);
+    ctx.lineTo(radius, height);
+    ctx.quadraticCurveTo(0, height, 0, height - radius);
+    ctx.lineTo(0, radius);
+    ctx.quadraticCurveTo(0, 0, radius, 0);
+    ctx.closePath();
+
+    ctx.fill();
+
+    // ----------------------------
+    // Text
+    // ----------------------------
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = textColor;
+
+    ctx.font = "bold 72px Arial";   // fixed pixel size
+    const metrics = ctx.measureText(text);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(text, width / 2, height / 2);
+  }
+
+  drawCapsule(color);
+
+  // ----------------------------
+  // Texture
+  // ----------------------------
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+
+const material = new THREE.MeshBasicMaterial({
+  map: texture,
+  transparent: true,
+  depthTest: false,
+  toneMapped: false
+});
+
+  const aspect = canvas.width / canvas.height;
+
+  const geometry = new THREE.PlaneGeometry(
+    0.1 * aspect,
+    0.14
+  );
+
+  const mesh = new THREE.Mesh(geometry, material);
+
+  mesh.userData.defaultColor = color;
+  mesh.userData.hoverColor = hoverColor;
+  mesh.userData.selectedColor = "#3366ff";
+  mesh.userData.isSelected = false;
+
+  group.add(mesh);
+
+  // ----------------------------
+  // Hitbox for interaction
+  // ----------------------------
+  const hitbox = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.35, 0.14),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+
+  hitbox.position.z = 0.01;
+
+  hitbox.userData = {
+    interactive: true,
+    label: text,
+    onClick,
+    target: mesh,
+    redraw: drawCapsule,
+    texture
+  };
+
+  group.userData.hitbox = hitbox;
+
+  group.add(hitbox);
 
   return group;
 }
 
+// export function createCapsuleLabel(text, {
+//   // fontSize = 0.045,
+//   fontSize = ITEM_SIZE,
+//   color = 0x222244,
+//   hoverColor = 0x444488,
+//   textColor = 0xffffff,
+//   padding = 0.03,
+//   opacity = 0.9,
+//   onClick = null
+// } = {}) {
+//   const group = new THREE.Group();
 
-//This is today
+//   const label = new Text();
+//   label.text = text;
+//   label.fontSize = fontSize;
+//   label.color = textColor;
+//   label.anchorX = 'center';
+//   label.anchorY = 'middle';
+//   label.position.set(0, 0, 0.01);
+//   label.renderOrder = 10; // <--- Higher than the background (0)
+    
+//   label.material.depthWrite = false;
+//   group.add(label);
+
+//   label.sync(() => {
+//     const info = label.textRenderInfo;
+//     const textWidth = info?.width ?? 0.3;
+//     const textHeight = info?.height ?? 0.1;
+
+//     const width = textWidth + padding * 2;
+//     const height = textHeight + padding * 2;
+//     const radius = Math.min(height / 2, 0.1);
+
+//     const shape = new THREE.Shape();
+//     shape.moveTo(-width / 2 + radius, -height / 2);
+//     shape.lineTo(width / 2 - radius, -height / 2);
+//     shape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
+//     shape.lineTo(width / 2, height / 2 - radius);
+//     shape.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
+//     shape.lineTo(-width / 2 + radius, height / 2);
+//     shape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
+//     shape.lineTo(-width / 2, -height / 2 + radius);
+//     shape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
+
+//     const geometry = new THREE.ShapeGeometry(shape);
+//     const bgMaterial = new THREE.MeshBasicMaterial({
+//       color,
+//       transparent: true,
+//       opacity,
+//       depthWrite: false,
+//       depthTest: false
+//     });
+
+//     const bg = new THREE.Mesh(geometry, bgMaterial);
+//     bg.position.z = 0;
+//     bg.userData.defaultColor = new THREE.Color(color);
+//     bg.userData.hoverColor = new THREE.Color(hoverColor);
+//     bg.userData.selectedColor = new THREE.Color(0x3366ff);
+//     bg.userData.isSelected = false;
+
+//     // bg.renderOrder = 0
+
+//     group.add(bg);
+
+//     // filterUIPanel.js --> createCapsuleLabel()
+
+//     const hitbox = new THREE.Mesh(
+//       new THREE.PlaneGeometry(width, height),
+//       // Fix: visible: false makes it invisible to the camera, but not the raycaster
+//       new THREE.MeshBasicMaterial({ visible: false })
+//     );
+//     hitbox.position.z = 0.02;
+//     hitbox.name = 'capsuleHitbox';
+//     hitbox.userData = {
+//       interactive: true,
+//       label: text,
+//       onClick,
+//       target: bg
+//     };
+
+//     group.userData.hitbox = hitbox;
+//     group.add(hitbox);
+//   });
+
+//   return group;
+// }
+
+
+// //This is today

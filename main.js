@@ -49,7 +49,7 @@ import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
 
 // INTIALIZE THE START MENU AND GLOBAL VARIABLES
-const { datasetKey, deltaMin, username} = await initStartMenu();
+const { datasetKey, deltaMin, username } = await initStartMenu();
 export let userDeltaMin = deltaMin;
 let selectedDatasetKey = datasetKey;
 setUsername(username)
@@ -441,14 +441,14 @@ function applyDataset(dataset, periods) {
   // // 8 Update Filter Panel using the created uiPanel at initialization
   // updateGroupList(uiPanel, buildGroupColorList())
   // FORCE INITIAL INSIGHTS CALCULATION
-    // This ensures the panel is populated the moment you enter VR
-    setTimeout(() => {
-        if (graphController && insightPanel) {
-            const { nodes, links } = graphController.getFilteredData();
-            const stats = calculateInsights(nodes, links, { type: 'NONE', id: null });
-            insightPanel.update(stats, colorScale);
-        }
-    }, 500); // Small delay to ensure ForceGraph has finished initial layout
+  // This ensures the panel is populated the moment you enter VR
+  setTimeout(() => {
+    if (graphController && insightPanel) {
+      const { nodes, links } = graphController.getFilteredData();
+      const stats = calculateInsights(nodes, links, { type: 'NONE', id: null });
+      insightPanel.update(stats, colorScale);
+    }
+  }, 500); // Small delay to ensure ForceGraph has finished initial layout
 
   console.log('Dataset applied');
 }
@@ -586,8 +586,8 @@ let root = buildTemporalTree(levels, 4);
 let navigator = createTemporalNavigator(root);
 
 const temporalPanel = createTemporalDrillPanel({
-  cameraGroup: cameraGroup, 
-  camera: camera,           
+  cameraGroup: cameraGroup,
+  camera: camera,
   navigator: navigator,
   graphController: graphController,
   onStateChange: dispatchTemporalUpdate,    // NEW
@@ -610,16 +610,16 @@ export function dispatchTemporalUpdate() {
 // experiment
 // window.getVRInsights = () => {
 //     const controller = getGraphController();
-    
+
 //     // 1. Get the data that the user is actually seeing right now
 //     const { nodes, links } = controller.getFilteredData();
-    
+
 //     // 2. Determine the current selection state
 //     const selection = {
 //         type: 'NONE',
 //         id: null
 //     };
-    
+
 //     if (controller.state.selection.active) {
 //         selection.type = 'NODE';
 //         selection.id = controller.state.selection.selectedNodeId;
@@ -631,13 +631,13 @@ export function dispatchTemporalUpdate() {
 
 //     // 3. Calculate
 //     const stats = calculateInsights(nodes, links, selection);
-    
+
 //     // 4. Output to console for your testing
 //     console.log("%c--- INSIGHT REPORT ---", "color: #00ff00; font-weight: bold;");
 //     console.log(`Visible Nodes: ${nodes.length} | Visible Edges: ${links.length}`);
 //     console.log("Top 3 Active Students:", stats.topHubs);
 //     console.log("Top 3 Active Groups:", stats.topGroups);
-    
+
 //     if (selection.type === 'NODE') {
 //         console.log(`%cSelection (Node ${selection.id}): Rank ${stats.nodeRank}`, "color: #00aaff");
 //         console.log("Best Friends:", stats.bestFriends);
@@ -655,7 +655,7 @@ export function updateDeltaMin(amount) {
   // 2. Rebuild the mathematical tree
   levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
   root = buildTemporalTree(levels, 4);
-  
+
   // 3. Re-initialize the navigator
   navigator = createTemporalNavigator(root);
 
@@ -884,23 +884,23 @@ cameraGroup.add(insightPanel.getObject3D());
 // Hook it into the controller's update loop
 const originalUpdate = graphController.update.bind(graphController);
 graphController.update = () => {
-    // 1. Run original visual updates
-    originalUpdate();
-    
-    // 2. Calculate new insights
-    const { nodes, links } = graphController.getFilteredData();
-    const selection = {
-        type: graphController.state.selection.active ? 'NODE' : 'NONE',
-        id: graphController.state.selection.selectedNodeId
-    };
-    const currentBucket = graphController.state.activeBucket;
-    const globalBucketLinks = dataset.links.filter(l => 
-        graphController._edgeInBucket(l, currentBucket)
-    );
-    const stats = calculateInsights(nodes, links, selection, globalBucketLinks);
-    
-    // 3. Update the Panel
-    insightPanel.update(stats, colorScale);
+  // 1. Run original visual updates
+  originalUpdate();
+
+  // 2. Calculate new insights
+  const { nodes, links } = graphController.getFilteredData();
+  const selection = {
+    type: graphController.state.selection.active ? 'NODE' : 'NONE',
+    id: graphController.state.selection.selectedNodeId
+  };
+  const currentBucket = graphController.state.activeBucket;
+  const globalBucketLinks = dataset.links.filter(l =>
+    graphController._edgeInBucket(l, currentBucket)
+  );
+  const stats = calculateInsights(nodes, links, selection, globalBucketLinks);
+
+  // 3. Update the Panel
+  insightPanel.update(stats, colorScale);
 };
 
 // ========================
