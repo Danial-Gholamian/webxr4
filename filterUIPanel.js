@@ -138,7 +138,7 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   cursorY -= SECTION_GAP;
   selectedNodeLabel.sync();
 
-  uiPanel.add(periodTitle);
+  // uiPanel.add(periodTitle);
   uiPanel.add(selectedNodeLabel);
 
   uiPanel.userData.updateSelectedNodeLabel = (nodeId) => {

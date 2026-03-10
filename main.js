@@ -1,17 +1,4 @@
 // main.js
-export const myUsername = prompt("Enter your name:") || "Anonymous";
-// --- NEW: Ask the user for the minimum time granularity ---
-// const deltaInput = prompt(
-//   "Welcome to the Temporal Explorer!\n\n" +
-//   "Please enter the minimum time step (delta_min) for your lowest drill-down level.\n" +
-//   "(For example: 10, 50, or 100). If you leave this blank, it will default to 50:"
-// );
-
-// // Parse the input into a number. If they hit cancel, type letters, or enter 0, default to 50.
-// const parsedDelta = parseFloat(deltaInput);
-// export let userDeltaMin = (!isNaN(parsedDelta) && parsedDelta > 0) ? parsedDelta : 50;
-
-
 // ========================
 // Imports and Setup
 // ========================
@@ -43,7 +30,7 @@ import {
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
-import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
+import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle, setUsername } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
@@ -62,11 +49,12 @@ import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
 
 // INTIALIZE THE START MENU AND GLOBAL VARIABLES
-
-
-const { datasetKey, deltaMin } = await initStartMenu();
+const { datasetKey, deltaMin, username} = await initStartMenu();
 export let userDeltaMin = deltaMin;
 let selectedDatasetKey = datasetKey;
+setUsername(username)
+export const myUsername = username
+
 
 
 let levelIndex = 0;

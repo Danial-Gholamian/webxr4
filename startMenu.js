@@ -8,6 +8,7 @@ export function initStartMenu() {
     const datasetSelector = document.getElementById("datasetSelector");
     const startBtn = document.getElementById("startBtn");
     const deltaInput = document.getElementById("deltaInput");
+    const usernameInput = document.getElementById("usernameInput")
 
     const datasetKeys = Object.keys(DATASETS);
 
@@ -29,22 +30,29 @@ export function initStartMenu() {
       datasetSelector.appendChild(label);
     });
 
-    startBtn.addEventListener("click", () => {
-
+    const startApp = () => {
       const selectedDataset =
         document.querySelector('input[name="dataset"]:checked').value;
 
       const parsedDelta = parseFloat(deltaInput.value);
       const deltaMin = (!isNaN(parsedDelta) && parsedDelta > 0) ? parsedDelta : 50;
+      const username = usernameInput.value.trim() || "Anonymous";
 
       startPanel.style.display = "none";
 
       resolve({
         datasetKey: selectedDataset,
-        deltaMin: deltaMin
+        deltaMin: deltaMin,
+        username
       });
+    }
 
-    });
+    startBtn.addEventListener("click", startApp)
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        startApp();
+      }
+    })
 
   });
 }

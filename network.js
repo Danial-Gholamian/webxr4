@@ -59,9 +59,16 @@ export function setScene(s) {
   scene = s;
 }
 
+
+let username = "Anonymous";
+
+export function setUsername(name) {
+  username = name;
+}
+
 socket.on('connect', () => {
   console.log('Connected as', socket.id);
-  socket.emit('user-join', { id: socket.id, name: myUsername });
+  socket.emit('user-join', { id: socket.id, name: username });
 });
 
 socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
