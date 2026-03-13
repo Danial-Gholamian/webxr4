@@ -8,7 +8,7 @@ const raycaster = new THREE.Raycaster();
 // this is tesyt
 
 
-export let hoverLabel = null;  
+export let hoverLabel = null;
 
 let nodeMeshesCache = [];
 let cacheNeedsUpdate = true;
@@ -37,7 +37,7 @@ export function initLabels(nodeId, groupNum, camera, cameraGroup) {
   idLabel.anchorX = 'center';
   idLabel.anchorY = 'middle';
   idLabel.position.set(0, 0, 0.01);
-  
+
   // Critical rendering settings (same as working uiPanel)
   idLabel.sync(() => {
     if (idLabel.mesh) {
@@ -128,14 +128,22 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
   // --- HELPER: Restore Color (Respects Selection) ---
   const restoreButtonColor = (btn) => {
-    const targetColor = btn.userData.isSelected ? btn.userData.selectedColor : btn.userData.defaultColor;
-    if (targetColor) btn.material.color.copy(targetColor);
+    const targetColor = btn.userData.isSelected
+      ? btn.userData.selectedColor
+      : btn.userData.defaultColor;
+
+    if (targetColor && btn.userData.redraw) {
+      btn.userData.redraw(targetColor);
+    }
+    // REMOVED SINCE THE BUTTONS ARE DRAWN IN CANVAS TEXTURE NOW
+    // const targetColor = btn.userData.isSelected ? btn.userData.selectedColor : btn.userData.defaultColor;
+    // if (targetColor) btn.material.color.copy(targetColor);
   };
 
   // --- HELPER: Trigger Haptic Pulse ---
   const triggerHaptic = () => {
-     const gp = controller.userData.inputSource?.gamepad;
-     if (gp?.hapticActuators?.[0]?.pulse) gp.hapticActuators[0].pulse(0.8, 40);
+    const gp = controller.userData.inputSource?.gamepad;
+    if (gp?.hapticActuators?.[0]?.pulse) gp.hapticActuators[0].pulse(0.8, 40);
   };
 
   if (intersections.length > 0) {
@@ -149,29 +157,30 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       if (line) line.scale.z = dist; // Shorten laser to touch button
 
       if (hit.userData.target) {
-         const btnMesh = hit.userData.target;
+        const btnMesh = hit.userData.target;
 
-         // 1. Un-hover previous button
-         if (controller.userData.lastHoveredButton && 
-             controller.userData.lastHoveredButton !== btnMesh) {
-             restoreButtonColor(controller.userData.lastHoveredButton);
-         }
+        // 1. Un-hover previous button
+        if (controller.userData.lastHoveredButton &&
+          controller.userData.lastHoveredButton !== btnMesh) {
+          restoreButtonColor(controller.userData.lastHoveredButton);
+        }
 
-         // 2. Hover current button
-         if (controller.userData.lastHoveredButton !== btnMesh) {
-             // Change Color
-             if (btnMesh.userData.hoverColor) {
-                 btnMesh.material.color.copy(btnMesh.userData.hoverColor);
-             }
-             // Trigger Vibration (New!)
-             triggerHaptic();
-         }
-         
-         controller.userData.lastHoveredButton = btnMesh;
+        // 2. Hover current button
+        if (controller.userData.lastHoveredButton !== btnMesh) {
+          // Change Color
+          if (btnMesh.userData.hoverColor) {
+            //  btnMesh.material.color.copy(btnMesh.userData.hoverColor);
+            btnMesh.userData.redraw(btnMesh.userData.hoverColor);
+          }
+          // Trigger Vibration (New!)
+          triggerHaptic();
+        }
+
+        controller.userData.lastHoveredButton = btnMesh;
       }
-      
-      controller.userData.lastHoveredObject = hit; 
-      controller.userData.lastHoveredNodeId = null; 
+
+      controller.userData.lastHoveredObject = hit;
+      controller.userData.lastHoveredNodeId = null;
       return; // Stop here
     }
 
@@ -184,7 +193,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
         restoreButtonColor(controller.userData.lastHoveredButton);
         controller.userData.lastHoveredButton = null;
       }
-      return; 
+      return;
     }
 
     // ------------------------------------------------
@@ -227,13 +236,13 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     const groupNum = String(hit.__data.group);
     const now = performance.now();
     if (nodeId !== controller.userData.lastHoveredNodeId &&
-        now - controller.userData.lastPulseTime > 500) {
+      now - controller.userData.lastPulseTime > 500) {
       triggerHaptic();
       controller.userData.lastPulseTime = now;
     }
 
     if (nodeId !== controller.userData.lastHoveredNodeId) {
-       initLabels(nodeId, groupNum, camera, cameraGroup);
+      initLabels(nodeId, groupNum, camera, cameraGroup);
     }
     controller.userData.lastHoveredObject = hit;
     controller.userData.lastHoveredNodeId = nodeId;
@@ -242,7 +251,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     // ------------------------------------------------
     // CASE D: NO HIT (Reset All)
     // ------------------------------------------------
-    
+
     // 1. Reset UI Button
     if (controller.userData.lastHoveredButton) {
       restoreButtonColor(controller.userData.lastHoveredButton);
@@ -274,7 +283,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
     controller.userData.lastHoveredObject = null;
     controller.userData.lastHoveredNodeId = null;
-    
+
     const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
     if (oldPanel) cameraGroup.remove(oldPanel);
 

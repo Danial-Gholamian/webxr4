@@ -7,7 +7,9 @@ import { broadcastGroupSelection } from './network.js';
 import { getGraphController } from './main.js';
 
 
-const PANEL_SCALE = 0.3;       // 30% of view width
+const PANEL_SCALE = 0.35;       // 30% of view width
+const PANEL_WIDTH = 1.5;
+const PANEL_HEIGHT = 2.5; // Taller to fit list
 // const PANEL_MARGIN = 0.1;      // 10% margin from bottom
 const ITEM_SIZE = 0.055;   // Group names
 const TITLE_SIZE = 0.07;   // "Time of the day"
@@ -28,7 +30,7 @@ export function updatePeroidLabel(peroidname) {
   }
 }
 export async function createFilterPanel(options = { groupColors: [], camera: null, datasets: [] }) {
-  let cursorY = 0.75;   // top of panel (local space)
+  let cursorY = 1;   // top of panel (local space)
   const SECTION_GAP = 0.12;
   const uiPanel = new THREE.Group();
   uiPanel.name = 'FilterUIPanel';
@@ -42,14 +44,8 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   uiPanel.add(userListGroup);
 
   const bgPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.2, 1.8),
-    new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      opacity: 0.6,
-      depthWrite: false,
-      depthTest: true
-    })
+    new THREE.PlaneGeometry(PANEL_WIDTH, PANEL_HEIGHT),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false })
   );
   bgPlane.renderOrder = 0
   bgPlane.name = 'uiPanelBackground';
@@ -124,29 +120,39 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
 
 
 
-  selectedNodeLabel = new Text();
-  selectedNodeLabel.text = 'Selected node: None';
-  // selectedNodeLabel.fontSize = FONT_SIZE * 0.9;
-  selectedNodeLabel.fontSize = ITEM_SIZE;
-  selectedNodeLabel.color = 0xffffff;
-  selectedNodeLabel.anchorX = 'center';
-  // selectedNodeLabel.position.set(0, 0.28, 0.01); // just below periodTitle
-  selectedNodeLabel.position.set(0, cursorY, 0.01);
-  selectedNodeLabel.renderOrder = 10; // <--- Higher than the background (0)
+  // selectedNodeLabel = new Text();
+  // selectedNodeLabel.text = 'Selected node: None';
+  // // selectedNodeLabel.fontSize = FONT_SIZE * 0.9;
+  // selectedNodeLabel.fontSize = ITEM_SIZE;
+  // selectedNodeLabel.color = 0xffffff;
+  // selectedNodeLabel.anchorX = 'center';
+  // // selectedNodeLabel.position.set(0, 0.28, 0.01); // just below periodTitle
+  // selectedNodeLabel.position.set(0, cursorY, 0.01);
+  // selectedNodeLabel.renderOrder = 10; // <--- Higher than the background (0)
     
-  selectedNodeLabel.material.depthWrite = false;
-  cursorY -= SECTION_GAP;
-  selectedNodeLabel.sync();
+  // selectedNodeLabel.material.depthWrite = false;
+  // cursorY -= SECTION_GAP;
+  // selectedNodeLabel.sync();
 
+  selectedNodeLabel = createCapsuleLabel('Selected node: None', {
+    color: 0xffaa00,
+    hoverColor: 0xffaa00
+  })
+    selectedNodeLabel.position.set(0, cursorY, 0.01);
   // uiPanel.add(periodTitle);
   uiPanel.add(selectedNodeLabel);
 
+
   uiPanel.userData.updateSelectedNodeLabel = (nodeId) => {
-    selectedNodeLabel.text = `Selected node: ${nodeId ?? 'None'}`;
-    selectedNodeLabel.sync();
+  selectedNodeLabel.userData.setText(
+    `Selected node: ${nodeId ?? 'None'}`
+  );
   };
 
+  cursorY -= ROW_SPACING * 1.2;
+
   const nodeGroupList = new THREE.Group()
+  // nodeGroupList.position.set(0, 0, 0.01);
   nodeGroupList.name = 'NodeGroupList'
   uiPanel.add(nodeGroupList)
 
@@ -211,7 +217,7 @@ export function updateGroupList(uiPanel, groupColors) {
 
   uiPanel.userData.nodeGroupButtons = [];
 
-  // 2️ Sort groups (same logic you already had)
+  // 2️ Sort groups 
   const sortedGroups = groupColors
     .slice()
     .sort((a, b) => {
@@ -222,24 +228,27 @@ export function updateGroupList(uiPanel, groupColors) {
       return a.name.localeCompare(b.name, undefined, { numeric: true });
     });
 
-  // 3️ Rebuild UI
+  // 3️ Rebuild UI for the group list
   let y = uiPanel.userData.nodeGroupListCursorY;
 
   sortedGroups.forEach(group => {
-    const dot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.02),
-      new THREE.MeshBasicMaterial({
-        color: group.color,
-        depthTest: false,
-        depthWrite: false
-      })
-    );
+    // const dot = new THREE.Mesh(
+    //   new THREE.SphereGeometry(0.02),
+    //   new THREE.MeshBasicMaterial({
+    //     color: group.color,
+    //     depthTest: false,
+    //     depthWrite: false
+    //   })
+    // );
+
+    const dot = createColorDot(group.color);
+    
     dot.material.depthTest = false;
     dot.material.depthWrite = false;
     dot.renderOrder = 1000;
 
-    dot.position.set(-0.4, y, 0.01);
-    nodeGroupList.add(dot);
+    // dot.position.set(-0.4, y, 0.01);
+    // nodeGroupList.add(dot);
 
     const capsule = createCapsuleLabel(group.name, {
       color: 0x222244,
@@ -251,9 +260,30 @@ export function updateGroupList(uiPanel, groupColors) {
       }
     });
 
-    capsule.position.set(-0.05, y, 0.01);
-    nodeGroupList.add(capsule);
+    // Each row consists of the color swatch and the corresponding group
+    const row = new THREE.Group();
+    dot.position.set(-0.25, 0, 0);
+    capsule.position.set(0.1, 0, 0);
 
+    row.add(dot);
+    row.add(capsule);
+
+    nodeGroupList.add(row);
+
+    // capsule.position.set(-0.05, y, 0.01);
+    // dot.position.set(-0.42, y, 0.01);
+    // capsule.position.set(-0.04, y, 0.01);
+    // dot.position.set(-0.28, y, 0);
+    // capsule.position.set(0.08, y, 0);
+    // nodeGroupList.add(capsule);
+
+    layoutVertical(nodeGroupList, uiPanel.userData.nodeGroupListCursorY, ROW_SPACING);
+
+    // // Center the groups in panel
+    // const rowCount = nodeGroupList.children.length;
+    // const totalHeight = rowCount * ROW_SPACING;
+
+    // nodeGroupList.position.y = totalHeight / 2;
 
     uiPanel.userData.nodeGroupButtons.push(capsule);
     y -= 0.17;
@@ -416,7 +446,7 @@ export function createCapsuleLabel(text, {
   texture.needsUpdate = true;
 
   function drawCapsule(bgColor) {
-    console.log("REDRAW CAPSULE COLOR:", bgColor)
+    let labelText = text;
 
     ctx.globalAlpha = 1;
 
@@ -453,9 +483,16 @@ export function createCapsuleLabel(text, {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    ctx.fillText(text, width / 2, height / 2);
+    ctx.fillText(labelText, width / 2, height / 2);
 
     texture.needsUpdate = true;
+
+    group.userData.setText = (newText) => {
+      labelText = newText;
+
+      ctx.clearRect(0, 0, width, height);
+      drawCapsule(mesh.userData.defaultColor);
+    };
   }
 
   drawCapsule(color);
@@ -481,6 +518,7 @@ const material = new THREE.MeshBasicMaterial({
   mesh.userData.hoverColor = hoverColor;
   mesh.userData.selectedColor = "#3366ff";
   mesh.userData.isSelected = false;
+  mesh.userData.redraw = drawCapsule;
 
   group.add(mesh);
 
@@ -492,6 +530,7 @@ const material = new THREE.MeshBasicMaterial({
     new THREE.MeshBasicMaterial({ visible: false })
   );
 
+  hitbox.name = "capsuleHitbox";
   hitbox.position.z = 0.01;
 
   hitbox.userData = {
@@ -509,6 +548,103 @@ const material = new THREE.MeshBasicMaterial({
 
   return group;
 }
+
+// Create the color dot for the groups
+export function createColorDot(color, width = 80, height = 40) {
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext("2d");
+
+  const radius = height / 2;
+
+  const cssColor = "#" + new THREE.Color(color).getHexString();
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = cssColor;
+
+  ctx.beginPath();
+  ctx.moveTo(radius, 0);
+  ctx.lineTo(width - radius, 0);
+  ctx.quadraticCurveTo(width, 0, width, radius);
+  ctx.lineTo(width, height - radius);
+  ctx.quadraticCurveTo(width, height, width - radius, height);
+  ctx.lineTo(radius, height);
+  ctx.quadraticCurveTo(0, height, 0, height - radius);
+  ctx.lineTo(0, radius);
+  ctx.quadraticCurveTo(0, 0, radius, 0);
+  ctx.closePath();
+
+  ctx.fill();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    toneMapped: false
+  });
+
+  const aspect = width / height;
+
+  const geometry = new THREE.PlaneGeometry(
+    0.06 * aspect,
+    0.06
+  );
+
+  const mesh = new THREE.Mesh(geometry, material);
+
+  return mesh;
+}
+
+function layoutVertical(container, startY, spacing) {
+
+  let y = startY;
+
+  container.children.forEach(child => {
+    child.position.y = y;
+    y -= spacing;
+  });
+
+}
+// export function createColorDot(color, size = 64) {
+
+//   const canvas = document.createElement("canvas");
+//   canvas.width = size;
+//   canvas.height = size;
+
+//   const ctx = canvas.getContext("2d");
+
+//   ctx.clearRect(0, 0, size, size);
+
+//   const cssColor = "#" + new THREE.Color(color).getHexString();
+
+//   ctx.fillStyle = cssColor;
+
+//   ctx.beginPath();
+//   ctx.arc(size / 2, size / 2, size * 0.4, 0, Math.PI * 2);
+//   ctx.fill();
+
+//   const texture = new THREE.CanvasTexture(canvas);
+//   texture.colorSpace = THREE.SRGBColorSpace;
+
+//   const material = new THREE.MeshBasicMaterial({
+//     map: texture,
+//     transparent: true,
+//     depthTest: false,
+//     toneMapped: false
+//   });
+
+//   const geometry = new THREE.PlaneGeometry(0.04, 0.04);
+
+//   const mesh = new THREE.Mesh(geometry, material);
+
+//   return mesh;
+// }
 
 // export function createCapsuleLabel(text, {
 //   // fontSize = 0.045,
