@@ -36,10 +36,11 @@ export class InsightPanel {
         // 3. Title (Bright & Bold)
         this.title = this._createText("LIVE INSIGHTS", 80, 0.4, 0x00ff00);
         this.title.fontWeight = 'bold';
+        this.group.add(this.title)
 
         // 4. Columns
         this.leftTextGroup = new THREE.Group();
-        this.leftTextGroup.position.x = -0.75;
+        this.leftTextGroup.position.x = 0;
 
         this.rightTextGroup = new THREE.Group();
         this.rightTextGroup.position.x = 0.1;
@@ -49,9 +50,9 @@ export class InsightPanel {
 
 
 
-        this.leftColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
+        // this.leftColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
 
-        this.rightColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
+        // this.rightColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
 
         // Position above the Histogram
         this.group.position.set(2.8, 1.9, -3.3);
@@ -69,8 +70,6 @@ export class InsightPanel {
         });
 
         label.position.set(0, y, 0.01);
-
-        this.group.add(label);
 
         label.traverse(obj => {
             if (obj.material) {
@@ -100,6 +99,7 @@ export class InsightPanel {
 
         const header = this._createText("TOP NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
         header.position.x = -0.4;
+        this.leftTextGroup.add(header)
 
         y -= HEADER_SPACING;
 
@@ -107,20 +107,21 @@ export class InsightPanel {
             const row = this._createText(`${i + 1}. ID ${h.id} (${h.count})`, FONT_SIZE, y, 0xffffff);
             row.position.x = -0.4;
             y -= ROW_SPACING;
-
+            this.leftTextGroup.add(row)
         });
 
         y -= SECTION_GAP;
 
         const quietHeader = this._createText("QUIET NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
         quietHeader.position.x = -0.4;
-
+        this.leftTextGroup.add(quietHeader)
         y -= HEADER_SPACING;
 
         stats.bottomNodes.forEach((n, i) => {
             const row = this._createText(`${i + 1}. ID ${n.id} (${n.count})`, FONT_SIZE, y, 0xffffff);
             row.position.x = -0.4;
             y -= ROW_SPACING;
+            this.leftTextGroup.add(row)
         });
 
 
@@ -129,6 +130,7 @@ export class InsightPanel {
 
         const groupHeader = this._createText("TOP GROUPS", SUB_HEADING_FONT_SIZE, yRight, 0xffffff);
         groupHeader.position.x = 0.25;
+        this.rightTextGroup.add(groupHeader)
 
         yRight -= HEADER_SPACING;
 
@@ -137,6 +139,7 @@ export class InsightPanel {
             const row = this._createText(`${g.name} (${g.count})`, FONT_SIZE, yRight, 0xffffff);
 
             row.position.x = 0.30;
+            this.rightTextGroup.add(row)
 
             const dotColor = colorScale ? colorScale(g.name) : 0xffffff;
             const dot = createColorDot(dotColor, 20);
