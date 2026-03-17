@@ -81,12 +81,16 @@ export function setUsername(name) {
   }
 }
 
+// network.js
+
 socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
   const username = knownUsers[id] || id;
-  // console.log(`[RECEIVE] user-update from ${username}`, head);
 
   // Skip self
   if (id === socket.id) return;
+
+  // SAFETY GATE: If scene isn't ready yet, we can't spawn the 3D meshes
+  if (!scene) return; 
 
   if (!userAvatars[id]) {
     const avatar = await createAvatar(knownUsers[id] || '');
@@ -104,11 +108,13 @@ socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, right
         right: new THREE.Quaternion()
       }
     };
+    
+    // Now this won't crash because we checked 'scene' above
     scene.add(avatar.head, avatar.left, avatar.right);
   }
 
-
   const avatar = userAvatars[id];
+
   avatar.targetPosition.head.fromArray(head);
   avatar.targetPosition.left.fromArray(left);
   avatar.targetPosition.right.fromArray(right);
@@ -287,20 +293,59 @@ socket.on('period-change', (period) => {
   }
 });
 
-socket.on('user-list', (userArray) => {
+socket.on('user-list', async (userArray) => {
   console.log('[RECEIVE] user-list', userArray);
 
-
+  // 1. Update the metadata map for names
   Object.keys(knownUsers).forEach(k => delete knownUsers[k]);
-
   userArray.forEach(({ socketId, name }) => {
     knownUsers[socketId] = name;
   });
 
+  // SAFETY CHECK: If the Three.js scene isn't initialized yet, stop here.
+  // The users are recorded in knownUsers, so they will spawn once the first 
+  // 'user-update' arrives OR when the next 'user-list' fires after scene is set.
+  if (!scene) {
+    console.warn('[Network] Received user-list but scene is not ready. Skipping avatar spawn.');
+    return; 
+  }
 
-  Object.values(userAvatars).forEach(avatar => {
-    if (avatar.nameLabel) {
-      avatar.nameLabel.sync();
+  // 2. Sync Avatars
+  for (const { socketId, name } of userArray) {
+    if (socketId === socket.id) continue;
+
+    if (!userAvatars[socketId]) {
+      console.log(`[Network] Spawning avatar for existing user: ${name}`);
+      
+      const avatar = await createAvatar(name || 'Anonymous');
+      
+      userAvatars[socketId] = {
+        ...avatar,
+        name: name,
+        targetPosition: {
+          head: new THREE.Vector3(0, 1.6, 0), 
+          left: new THREE.Vector3(-0.2, 1.5, 0),
+          right: new THREE.Vector3(0.2, 1.5, 0)
+        },
+        targetQuaternion: {
+          head: new THREE.Quaternion(),
+          left: new THREE.Quaternion(),
+          right: new THREE.Quaternion()
+        }
+      };
+
+      scene.add(avatar.head, avatar.left, avatar.right);
+    }
+  }
+
+  // 3. Optional: Cleanup "Zombies" 
+  // If someone is in userAvatars but NOT in the new userArray, remove them
+  const currentSocketIds = userArray.map(u => u.socketId);
+  Object.keys(userAvatars).forEach(id => {
+    if (!currentSocketIds.includes(id)) {
+      const avatar = userAvatars[id];
+      scene.remove(avatar.head, avatar.left, avatar.right);
+      delete userAvatars[id];
     }
   });
 
@@ -308,7 +353,6 @@ socket.on('user-list', (userArray) => {
     _uiPanel.userData.refreshUsers(socket.id);
   }
   handleUserList(userArray);
-
 });
 
 export function broadcastGroupSelection(groupName) {
