@@ -534,7 +534,7 @@ unsubscribeFromSelection(fn) {
 }
 
 _notifyInsights(stats) {
-    this.selection_subscribers.forEach(fn => fn(stats));
+    this.selection_subscribers.forEach(fn => fn(stats, this.state.selection.active));
 }
 
 /**

@@ -882,8 +882,8 @@ cameraGroup.add(insightPanel.getObject3D());
 
 // Add the insight panel to the controller subscribers
 // This allows them to listen to any selection done in the graph and update
-graphController.subscribeToSelection((stats) => {
-  insightPanel.update(stats, colorScale);
+graphController.subscribeToSelection((stats, nodeSelected) => {
+  insightPanel.update(stats, colorScale, nodeSelected);
 });
 
 // // Hook it into the controller's update loop

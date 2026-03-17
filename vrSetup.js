@@ -30,7 +30,7 @@ function setupController(controller, index, renderer, cameraGroup) {
     new THREE.Vector3(0, 0, 0),
     new THREE.Vector3(0, 0, -1)
   ]);
-  const laserMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
+  const laserMaterial = new THREE.LineBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.75 });
   const laser = new THREE.Line(laserGeometry, laserMaterial);
   laser.name = 'laser';
   laser.scale.z = laserDistance;

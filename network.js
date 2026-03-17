@@ -81,50 +81,69 @@ export function setUsername(name) {
   }
 }
 
-// network.js
 
-socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
-  const username = knownUsers[id] || id;
+// 1. Helper function to create the yellow laser mesh
+const createRemoteLaser = () => {
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0), 
+    new THREE.Vector3(0, 0, -1)
+  ]);
+  const mat = new THREE.LineBasicMaterial({ 
+    color: 0xffff00, 
+    transparent: true, 
+    opacity: 0.8,
+    depthTest: false 
+  });
+  const line = new THREE.Line(geo, mat);
+  line.name = "remoteLaser";
+  return line;
+};
 
-  // Skip self
-  if (id === socket.id) return;
+socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot, leftLaserL, rightLaserL }) => {
+  if (id === socket.id || !scene) return;
 
-  // SAFETY GATE: If scene isn't ready yet, we can't spawn the 3D meshes
-  if (!scene) return; 
-
+  // 2. If avatar doesn't exist at all, create it
   if (!userAvatars[id]) {
     const avatar = await createAvatar(knownUsers[id] || '');
     userAvatars[id] = {
       ...avatar,
-      name: knownUsers[id],
-      targetPosition: {
-        head: new THREE.Vector3(),
-        left: new THREE.Vector3(),
-        right: new THREE.Vector3()
-      },
-      targetQuaternion: {
-        head: new THREE.Quaternion(),
-        left: new THREE.Quaternion(),
-        right: new THREE.Quaternion()
-      }
+      targetPosition: { head: new THREE.Vector3(), left: new THREE.Vector3(), right: new THREE.Vector3() },
+      targetQuaternion: { head: new THREE.Quaternion(), left: new THREE.Quaternion(), right: new THREE.Quaternion() }
     };
-    
-    // Now this won't crash because we checked 'scene' above
     scene.add(avatar.head, avatar.left, avatar.right);
   }
 
   const avatar = userAvatars[id];
 
+  // 3. THE CRITICAL FIX: Ensure lasers exist even if avatar was spawned via user-list
+  if (!avatar.leftLaser) {
+    avatar.leftLaser = createRemoteLaser();
+    avatar.left.add(avatar.leftLaser);
+  }
+  if (!avatar.rightLaser) {
+    avatar.rightLaser = createRemoteLaser();
+    avatar.right.add(avatar.rightLaser);
+  }
+
+  // 4. Standard interpolation and scaling
   avatar.targetPosition.head.fromArray(head);
   avatar.targetPosition.left.fromArray(left);
   avatar.targetPosition.right.fromArray(right);
-
-  // Add decompression HERE
+  
   const decompressRot = arr => arr.map(v => v / ROTATION_COMPRESSION_FACTOR);
-
   avatar.targetQuaternion.head.fromArray(decompressRot(headRot));
   avatar.targetQuaternion.left.fromArray(decompressRot(leftRot));
   avatar.targetQuaternion.right.fromArray(decompressRot(rightRot));
+
+  // 5. Update Laser Scales
+  if (avatar.leftLaser) {
+    avatar.leftLaser.scale.z = leftLaserL || 0;
+    avatar.leftLaser.visible = (leftLaserL > 0.1);
+  }
+  if (avatar.rightLaser) {
+    avatar.rightLaser.scale.z = rightLaserL || 0;
+    avatar.rightLaser.visible = (rightLaserL > 0.1);
+  }
 });
 
 socket.on('user-disconnect', id => {
@@ -154,15 +173,17 @@ export function broadcastAvatar(camera, controller1, controller2) {
     Math.round(q.w * ROTATION_COMPRESSION_FACTOR)
   ];
 
-
   const headPos = new THREE.Vector3();
   const leftPos = new THREE.Vector3();
   const rightPos = new THREE.Vector3();
 
-  // Then populate
   camera.getWorldPosition(headPos);
   controller1.getWorldPosition(leftPos);
   controller2.getWorldPosition(rightPos);
+
+  // Get laser lengths
+  const leftLaser = controller1.userData.laser?.scale.z || 0;
+  const rightLaser = controller2.userData.laser?.scale.z || 0;
 
   socket.emit('user-update', {
     id: socket.id,
@@ -171,7 +192,9 @@ export function broadcastAvatar(camera, controller1, controller2) {
     right: rightPos.toArray(),
     headRot: compressRot(camera.quaternion),
     leftRot: compressRot(controller1.quaternion),
-    rightRot: compressRot(controller2.quaternion)
+    rightRot: compressRot(controller2.quaternion),
+    leftLaserL: leftLaser,  // <--- NEW
+    rightLaserL: rightLaser // <--- NEW
   });
 
   lastAvatarUpdate = now;

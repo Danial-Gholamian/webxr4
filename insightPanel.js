@@ -12,8 +12,8 @@ export class InsightPanel {
     constructor() {
         this.group = new THREE.Group();
         this.group.name = "InsightLegendPanel";
-        this.groupDots = new THREE.Group(); // Separate group for dots
-        this.group.add(this.groupDots);
+        // this.groupDots = new THREE.Group(); // Separate group for dots
+        // this.group.add(this.groupDots);
 
         // 1. Opaque Background for high contrast
         const bg = new THREE.Mesh(
@@ -78,15 +78,14 @@ export class InsightPanel {
 
     }
 
-    update(stats, colorScale) {
+    update(stats, colorScale, nodeSelected) {
 
         if (!stats) return;
         this.leftTextGroup.clear();
         this.rightTextGroup.clear();
-        this.groupDots.clear();
 
         // 1. Clear existing dots
-        this.groupDots.clear();
+        // this.rowGroup.clear();
 
         // 2. Generate Node Text (Left)
         let y = 0.25;
@@ -128,26 +127,34 @@ export class InsightPanel {
 
         yRight -= HEADER_SPACING;
 
+        // GROUP OBJECT TO HOLD COLOR DOTS AND CORRESPONDING GROUPS
+        const rowGroup = new THREE.Group();
+
         stats.topGroups.forEach((g, i) => {
 
+            // TEXT
             const row = this._createText(`${g.name} (${g.count})`, FONT_SIZE, yRight, 0xffffff);
+            row.position.x = 0.15; // relative to rowGroup
+            rowGroup.add(row);
 
-            row.position.x = 0.30;
-            this.rightTextGroup.add(row)
-
+            // DOT
             const dotColor = colorScale ? colorScale(g.name) : 0xffffff;
             const dot = createColorDot(dotColor, 20);
 
-            dot.position.set(0.13, yRight, 0.02);
+            dot.position.set(0, yRight, 0.02); // relative to rowGroup
 
             dot.material.depthTest = false;
             dot.material.depthWrite = false;
             dot.renderOrder = 11;
 
-            this.groupDots.add(dot);
             yRight -= ROW_SPACING;
+            rowGroup.add(dot);
+
 
         });
+        // POSITION THE WHOLE ROW
+        rowGroup.position.x = (0.1);
+        this.rightTextGroup.add(rowGroup)
 
         yRight -= SECTION_GAP;
 
@@ -165,7 +172,23 @@ export class InsightPanel {
                 0xffffff
             );
 
-            friends.position.x = 0.25;
+            friends.position.x = 0.30;
+            this.rightTextGroup.add(friends)
+        }
+
+        yRight -= SECTION_GAP;
+
+        // ADD THE RANKING OF THE SELECTED NODE AMONG THE OTHER NODES
+        if (stats.nodeRank) {
+            const rank = this._createText(`RANK: ${stats.nodeRank}`, FONT_SIZE, yRight, 0xffffff);
+            rank.position.x = 0.30
+            this.rightTextGroup.add(rank)
+        }
+
+        //  IF NODE IS SELECTED CLEAR THE RIGHT COLUMN, TOP NODES AND QUIET NODES INFO NOT NEEDED
+        if (nodeSelected) {
+            this.leftTextGroup.clear()
+            this.rightTextGroup.position.x = -0.25
         }
     }
 
