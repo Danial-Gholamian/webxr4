@@ -256,7 +256,7 @@ export function updateGroupList(uiPanel, groupColors) {
       padding: 0.03,
       onClick: () => {
         highlightGroup(group.name);
-        broadcastGroupSelection(group.name);
+        // broadcastGroupSelection(group.name);
       }
     });
 
