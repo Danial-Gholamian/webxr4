@@ -1,0 +1,8 @@
+Current bugs
+- synchronizing the timeline barGauge
+- when x default button is pressed, selection in filterpanel is not reset
+- after switching dataset, the nodes don't have the hover effect
+- when b is pressed, sometimes the periodstacks don't match
+- Fix the filterpanel UI element arrangement 
+- Logic for periodstacks might need to be revisited
+- synchronizing the space in the server so that when users join the space they immediately synced

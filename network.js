@@ -1,12 +1,17 @@
 // network.js
 import { io } from 'socket.io-client';
 import * as THREE from 'three';
-import { highlightSubgraph, resetGraph, highlightPeriod, periodActiveNodes, AVATAR_UPDATE_INTERVAL } from './main.js';
-import { schoolPeriods } from './periodDefs';
+import { highlightPeriod, AVATAR_UPDATE_INTERVAL } from './main.js';
 import { createAvatar } from './avatars.js';
-import { myUsername } from './main.js';
-import { highlightGroup, applyRemotePeriodStackToggle } from './main.js';
+import { myUsername, getActivePeriods } from './main.js';
 import { handleUserList } from './voice.js';
+
+
+let injectedHandlers = null;
+
+export function registerNetworkHandlers(handlers) {
+  injectedHandlers = handlers;
+}
 
 
 
@@ -27,19 +32,19 @@ export const userAvatars = {};
 export const avatarInterpolation = {
   factors: {
     position: 0.25,
-    rotation: 0.2 
+    rotation: 0.2
   },
-  
+
   update(avatars, deltaTime) {
     const frameFactor = Math.min(deltaTime * 60, 2.5);
     Object.values(avatars).forEach(avatar => {
       const posFactor = this.factors.position * frameFactor;
       const rotFactor = this.factors.rotation * frameFactor;
-      
+
       avatar.head.position.lerp(avatar.targetPosition.head, posFactor);
       avatar.left.position.lerp(avatar.targetPosition.left, posFactor);
       avatar.right.position.lerp(avatar.targetPosition.right, posFactor);
-      
+
       // CRITICAL: Add rotation interpolation
       avatar.head.quaternion.slerp(avatar.targetQuaternion.head, rotFactor);
       avatar.left.quaternion.slerp(avatar.targetQuaternion.left, rotFactor);
@@ -54,15 +59,22 @@ export function setScene(s) {
   scene = s;
 }
 
+
+let username = "Anonymous";
+
+export function setUsername(name) {
+  username = name;
+}
+
 socket.on('connect', () => {
   console.log('Connected as', socket.id);
-  socket.emit('user-join', { id: socket.id, name: myUsername });
+  socket.emit('user-join', { id: socket.id, name: username });
 });
 
 socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
-    const username = knownUsers[id] || id;
-    // console.log(`[RECEIVE] user-update from ${username}`, head);
-  
+  const username = knownUsers[id] || id;
+  // console.log(`[RECEIVE] user-update from ${username}`, head);
+
   // Skip self
   if (id === socket.id) return;
 
@@ -93,7 +105,7 @@ socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, right
 
   // Add decompression HERE
   const decompressRot = arr => arr.map(v => v / ROTATION_COMPRESSION_FACTOR);
-  
+
   avatar.targetQuaternion.head.fromArray(decompressRot(headRot));
   avatar.targetQuaternion.left.fromArray(decompressRot(leftRot));
   avatar.targetQuaternion.right.fromArray(decompressRot(rightRot));
@@ -153,19 +165,12 @@ export function broadcastAvatar(camera, controller1, controller2) {
 
 export function broadcastNodeSelection(nodeId, mode = 'DIRECT') {
   console.log("This node was broadcasted: ", nodeId)
-  socket.emit('node-select', { 
-    nodeId: String(nodeId), 
+  socket.emit('node-select', {
+    nodeId: String(nodeId),
     mode: mode.slice(0, 20)
   }, (ack) => { /* ... */ });
 }
 
-socket.on('node-select', ({ nodeId, mode }) => {
-  console.log('Received selection', nodeId, mode);
-  if (String(nodeId) !== String(currentHighlightId)) {
-    highlightSubgraph(nodeId, mode);
-    currentHighlightId = nodeId;
-  }
-});
 
 export function broadcastGraphReset() {
   console.log("Broadcasting graph reset");
@@ -174,9 +179,68 @@ export function broadcastGraphReset() {
   });
 }
 
+
+socket.on('node-select', ({ nodeId, mode }) => {
+  console.log('Received selection', nodeId, mode);
+
+  if (String(nodeId) === String(currentHighlightId)) return;
+  currentHighlightId = nodeId;
+
+  if (injectedHandlers?.onNodeSelect) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onNodeSelect(nodeId, mode);
+  }
+  // else {
+  //   highlightSubgraph(nodeId, mode); // fallback
+  // }
+});
+
 socket.on('graph-reset', () => {
   console.log('Remote reset received');
-  resetGraph(); // Reuse central function
+
+  if (injectedHandlers?.onGraphReset) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onGraphReset();
+  }
+  //  else {
+  //   resetGraph();
+  // }
+
+});
+
+
+socket.on('dataset-change', (msg) => {
+  console.log('Received dataset-change', msg);
+  if (injectedHandlers?.onDatasetChange) {
+    console.log('Remote switch dataset received:', msg.datasetKey);
+    injectedHandlers.onDatasetChange(msg.datasetKey);
+  }
+});
+
+
+socket.on('group-select', ({ groupName }) => {
+  console.log("Received group selection:", groupName);
+
+  if (injectedHandlers?.onGroupSelect) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onGroupSelect(groupName);
+  }
+  // else {
+  //   highlightGroup(groupName);
+  // }
+});
+
+
+socket.on('period-stack-toggle', ({ visible, context }) => {
+  console.log("Received period stack toggle:", visible, context);
+
+  if (injectedHandlers?.onPeriodStackToggle) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onPeriodStackToggle(visible, context);
+  }
+  // else {
+  //   applyRemotePeriodStackToggle(visible, context);
+  // }
 });
 
 let currentPeriodIndex = 0;
@@ -185,22 +249,31 @@ export function getCurrentPeriodIndex() {
 }
 
 export function setCurrentPeriodIndex(index, broadcast = true) {
-  currentPeriodIndex = Math.max(0, Math.min(index, schoolPeriods.length - 1));
-  const period = schoolPeriods[currentPeriodIndex];
+  currentPeriodIndex = Math.max(0, Math.min(index, getActivePeriods().length - 1));
+  const period = getActivePeriods()[currentPeriodIndex];
+  console.warn("LEGACY HIGHLIGHTPERIOD METHOD STILL BEING USED :(")
   highlightPeriod(period);
-  
+
   if (broadcast) {
     socket.emit('period-change', period);
   }
 }
 
+
 export let squeezeRightNextPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() + 1, true);
 export let squeezeLefttPrevPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() - 1, true);
 
 socket.on('period-change', (period) => {
-  const index = schoolPeriods.indexOf(period);
-  if (index !== -1) {
-    setCurrentPeriodIndex(index, false);
+  console.log("Received period change:", period);
+
+  if (injectedHandlers?.onPeriodChange) {
+    console.log('[network] using injected handler');
+    injectedHandlers.onPeriodChange(period);
+  } else {
+    const index = getActivePeriods().indexOf(period);
+    if (index !== -1) {
+      setCurrentPeriodIndex(index, false);
+    }
   }
 });
 
@@ -214,11 +287,11 @@ socket.on('user-list', (userArray) => {
     knownUsers[socketId] = name;
   });
 
-  
+
   Object.values(userAvatars).forEach(avatar => {
-  if (avatar.nameLabel) {
-    avatar.nameLabel.sync();
-  }
+    if (avatar.nameLabel) {
+      avatar.nameLabel.sync();
+    }
   });
 
   if (_uiPanel?.userData?.refreshUsers) {
@@ -233,23 +306,16 @@ export function broadcastGroupSelection(groupName) {
   socket.emit('group-select', { groupName });
 }
 
-
-socket.on('group-select', ({ groupName }) => {
-  console.log("Received group selection:", groupName);
-  highlightGroup(groupName); // Apply group highlight locally
-});
-
-
-
-
 export function broadcastPeriodStackToggle(visible, context = {}) {
   console.log("Broadcasting period stack toggle:", visible, context);
   socket.emit('period-stack-toggle', { visible, context });
 }
 
+export function broadcastDatasetChange(datasetKey) {
+  console.log('📡 broadcastDatasetChange called with', datasetKey);
 
-socket.on('period-stack-toggle', ({ visible, context }) => {
-  console.log("Received period stack toggle:", visible, context);
-  applyRemotePeriodStackToggle(visible, context);
-});
+  socket.emit('dataset-change', {
+    datasetKey
+  });
+}
 

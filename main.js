@@ -1,7 +1,4 @@
 // main.js
-export const myUsername = prompt("Enter your name:") || "Anonymous";
-
-
 // ========================
 // Imports and Setup
 // ========================
@@ -9,8 +6,12 @@ import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { scaleOrdinal } from 'd3-scale';
 import { schemeCategory10 } from 'd3-scale-chromatic';
+
+// Controller and Data Adapter
+import { GraphVisualController } from "./graphVisualController.js";
+import { graphAdapter } from './graphAdapter.js';
+
 import ForceGraph3D from '3d-force-graph';
-import graphData from './graph-data-periods.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   setupController,
@@ -20,21 +21,60 @@ import {
   setupGraphSwitchButtons,
   handleAButtonInput,
   handleBButtonInput,
+  handleYButtonInput,
   handleLeftStickButton,
-  handleRightStickButton
+  handleRightStickButton,
+  setupNinjaHands,
+  animatePuppetHands
 } from './vrSetup.js';
-import { detectHover, initLabels,markHoverCacheDirty, hoverLabel } from './hover.js';
-import { createFilterPanel, updatePeroidLabel, updatePanelPosition } from './filterUIPanel.js';
-import { PathFinder } from './pathFinder.js';
-import { broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars,avatarInterpolation, setUIPanel, broadcastPeriodStackToggle } from './network.js';
-import { createBarGauge, updateBarGauge, updateBarGaugeHUD } from './barGauge.js';
-import {schoolPeriods} from './periodDefs.js';
+import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
+import { detectHover } from './hover.js';
+import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
+import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle, setUsername } from './network.js';
+import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DATASETS, getDatasetList } from './dataset.js';
+import {
+  buildTemporalHierarchy,
+  buildTemporalTree,
+  createTemporalNavigator
+} from './temporalHierarchy.js';
+import { createTemporalDrillPanel } from './temporalDrillPanel.js';
+import { gridGeo, gridMaterial } from './skybox.js';
+import { calculateInsights } from './insightSystem.js';
+import { InsightPanel } from './insightPanel.js';
+import { initStartMenu } from './startMenu.js';
+
+// INTIALIZE THE START MENU AND GLOBAL VARIABLES
+const { datasetKey, deltaMin, username } = await initStartMenu();
+export let userDeltaMin = deltaMin;
+let selectedDatasetKey = datasetKey;
+setUsername(username)
+export const myUsername = username
 
 
+
+let levelIndex = 0;
+let bucketIndex = null;
+let autoplayInterval = null;
+
+
+// Graph data variables
+let dataset = null
+let periods = null
+
+
+// A getter for the periods
+export function getActivePeriods() {
+  return periods
+}
+
+export function getDatasets() {
+  return dataset
+}
 // ========================
 //  Static Panel variables
 // ========================
@@ -42,26 +82,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
 const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
 
-let activePeriod = null;
 let currentPeriodIndex = 0;
-
-let selectionState = {
-  isActive: false,
-  selectedNodeId: null,
-  neighborIds: new Set()
-};
-
-let periodStackInstance = null;
-
-const groupFilterState = {
-  isActive: false,
-  activeGroup: null,
-  nodeIds: new Set(),
-  edgeIds: new Set()
-};
-
-const minScale = 0.01;
-const maxScale = 1.0;
 let targetScale = 0.1;      // starting size
 const scaleLerpSpeed = 0.05; // how smooth it feels
 
@@ -73,66 +94,73 @@ let graphUpdateNodeId = null;
 const roomCenter = new THREE.Vector3();
 
 
-// now
 // ========================
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
-const loader0 = new THREE.TextureLoader();
+// const loader0 = new THREE.TextureLoader();
 
-loader0.load('public/models/background.jpeg', (texture) => {
-  texture.mapping = THREE.EquirectangularReflectionMapping;
-  texture.colorSpace = THREE.SRGBColorSpace;
+// loader0.load('public/models/background.jpeg', (texture) => {
+//   texture.mapping = THREE.EquirectangularReflectionMapping;
+//   texture.colorSpace = THREE.SRGBColorSpace;
 
-  scene.environment = texture;
-  scene.background = texture;
-});
+//   scene.environment = texture;
+//   scene.background = texture;
+// });
+
+// scene.background = new THREE.Color(0x111827);
+scene.background = new THREE.Color(0x1a2638);
+scene.fog = new THREE.FogExp2(0x1a2638, 0.004);
+
+const grid = new THREE.Mesh(gridGeo, gridMaterial)
+scene.add(grid)
+grid.renderOrder = -1;
+
+
+
 // ======== LOAD VR ROOM / LAB ROOM ========
 const loader = new GLTFLoader();
 let labRoom;
 let roomHalfSize = new THREE.Vector2(); // XZ half size we allow the user to move in
 
-loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
-  labRoom = gltf.scene;
+// loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
+//   labRoom = gltf.scene;
 
-  labRoom.scale.set(35, 35, 35);
-  labRoom.position.set(0, -40, 0);
+//   labRoom.scale.set(35, 35, 35);
+//   labRoom.position.set(0, -40, 0);
 
-  labRoom.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-      if (child.material) {
-        child.material.roughness = 0.8;
-        child.material.metalness = 0.1;
-      }
-    }
-  });
+//   labRoom.traverse((child) => {
+//     if (child.isMesh) {
+//       child.castShadow = true;
+//       child.receiveShadow = true;
+//       if (child.material) {
+//         child.material.roughness = 0.8;
+//         child.material.metalness = 0.1;
+//       }
+//     }
+//   });
 
-  scene.add(labRoom);
-  console.log("Lab room loaded.");
+//   scene.add(labRoom);
+//   console.log("Lab room loaded.");
 
-  // Compute world-space bounding box
-  const box = new THREE.Box3().setFromObject(labRoom);
-  box.getCenter(roomCenter);
+//   // Compute world-space bounding box
+//   const box = new THREE.Box3().setFromObject(labRoom);
+//   box.getCenter(roomCenter);
 
-  const size = new THREE.Vector3();
-  box.getSize(size);
+//   const size = new THREE.Vector3();
+//   box.getSize(size);
 
-  // Define how close to the walls the player is allowed to get (in meters)
-  const margin = 2.0;
+//   // Define how close to the walls the player is allowed to get (in meters)
+//   const margin = 2.0;
 
-  // "Half size" of the allowed walk area in XZ
-const shrinkFactor = 0.80;   // 80% of original size = tighter room
+//   // "Half size" of the allowed walk area in XZ
+//   const shrinkFactor = 0.80;   // 80% of original size = tighter room
 
-roomHalfSize.set(
-  (size.x * 0.5) * shrinkFactor,
-  (size.z * 0.5) * shrinkFactor
-);
-
-
-
-});
+//   roomHalfSize.set(
+//     (size.x * 0.5) * shrinkFactor,
+//     (size.z * 0.5) * shrinkFactor
+//   );
+// });
 
 
 function clampCameraToRoom() {
@@ -156,8 +184,6 @@ function clampCameraToRoom() {
 }
 
 
-
-
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(0, 1.6, 5);
 setScene(scene);
@@ -165,7 +191,7 @@ const renderer = new THREE.WebGLRenderer({
   antialias: false,                 // was true
   powerPreference: 'high-performance',
   precision: 'mediump'
-  });
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.xr.enabled = true;
@@ -183,32 +209,34 @@ const cameraGroup = new THREE.Group();
 cameraGroup.add(camera);
 scene.add(cameraGroup);
 
-// TEST 
-// --- Reference Plane for Orientation ---
-// const refPlaneGeo = new THREE.CircleGeometry(8, 64);
-// const refPlaneMat = new THREE.MeshBasicMaterial({
-//   color: 0x111111,
-//   opacity: 0.35,
-//   transparent: true,
-//   side: THREE.DoubleSide
-// });
-// const refPlane = new THREE.Mesh(refPlaneGeo, refPlaneMat);
-// refPlane.rotation.x = -Math.PI / 2;
-// refPlane.position.set(0, -1.6, 0); // just below user eye level
-// refPlane.name = "ReferencePlane";
-// cameraGroup.add(refPlane);
+
+// ========================
+// User Guide Panel Setup 
+// in Camera Group
+// ========================
+const userGuidePanel = createUserGuidePanel();
+cameraGroup.add(userGuidePanel);
+
+userGuidePanel.traverse(obj => {
+  if (obj.isMesh && obj.material) {
+    obj.material.depthTest = false;
+    obj.renderOrder = 999;
+  }
+});
+
+function toggleGuidePanel() {
+  console.log("Toggle Guide Panel")
+  userGuidePanel.visible = !userGuidePanel.visible
+}
 
 
-// TEST
 const controller1 = renderer.xr.getController(0);
 const controller2 = renderer.xr.getController(1);
 
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
 
-
-
-
+setupNinjaHands(scene, renderer);
 // ========================
 // Graph Rotation State
 // ========================
@@ -246,77 +274,21 @@ enableGraphRotation(controller2)
 
 
 
-
-
-
-
 // ========================
 // Graph Data and Maps
 // ========================
 const adjacency = new Map();
 const directLinksMap = new Map();
-
-
-// Init adjacency maps
-for (const node of graphData.nodes) {
-  const id = String(node.id);
-  adjacency.set(id, new Set());
-  directLinksMap.set(id, []);
-}
-
-for (const link of graphData.links) {
-  const srcId = String(link.source?.id ?? link.source);
-  const tgtId = String(link.target?.id ?? link.target);
-  adjacency.get(srcId).add(tgtId);
-  adjacency.get(tgtId).add(srcId);
-  const storedLink = { source: srcId, target: tgtId };
-  directLinksMap.get(srcId).push(storedLink);
-  if (srcId !== tgtId) directLinksMap.get(tgtId).push(storedLink);
-}
-
-// ========================
-// Graph Initialization
-// ========================
-const colorScale = scaleOrdinal(schemeCategory10)
-  .domain([...new Set(graphData.nodes.map(n => n.group))]);
-
-const Graph = ForceGraph3D()(document.body)
-  .graphData(graphData)
-  .linkVisibility(false)   // disable built-in lines
-  .nodeAutoColorBy('group')
-  .nodeColor(d => colorScale(d.group))
-  .nodeLabel(node => node.label || node.id)
-  .onNodeClick((node, event) => {
-    highlightSubgraph(node.id, 'DIRECT');
-    broadcastNodeSelection(node.id, 'DIRECT');
-  });
-
-  // --- make edges "longer" by increasing spring length ---
-const linkForce = Graph.d3Force('link');
-if (linkForce?.distance) {
-
-  linkForce.distance(220);
-
-
-  if (Graph.numDimensions) Graph.numDimensions(3);
-  else if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
-}
-
-const charge = Graph.d3Force('charge');
-if (charge?.strength) charge.strength(-150); // more negative = more repulsion
-
-initVoice();
-
-
+const nodesById = {};
 // Edge index map: edgeKey -> { start: idx0, end: idx1 }
 const edgeVertexMap = new Map();
-// Instead of creating thousands of individual line meshes (one per edge),
-// we build a single line made of many vertices. Each pair of vertices
-// represents one edge, and we store an "alpha" value per vertex. That way
-// we can fade out some edges by lowering their alpha while keeping others
-// fully visible, all in one draw call.
+let lineSegments = null
+export let periodStack = null;
+const colorScale = scaleOrdinal(schemeCategory10)
 
 function buildBatchedEdges(graphData, nodesById) {
+  console.log("buildBatchedEdges called")
+  // edgeVertexMap.clear()
   const positions = [];
   const colors = [];
   const color = new THREE.Color();
@@ -329,14 +301,23 @@ function buildBatchedEdges(graphData, nodesById) {
     const tgt = nodesById[link.target.id ?? link.target];
     if (!src || !tgt) return;
 
+    // each edge has 2 vertices, so you MUST push 2 alpha values
     alphas.push(0.2);
     alphas.push(0.2);
-    // positions
-    positions.push(src.x, src.y, src.z);
-    positions.push(tgt.x, tgt.y, tgt.z);
+    const x1 = Number.isFinite(src.x) ? src.x : 0;
+    const y1 = Number.isFinite(src.y) ? src.y : 0;
+    const z1 = Number.isFinite(src.z) ? src.z : 0;
+
+    const x2 = Number.isFinite(tgt.x) ? tgt.x : 0;
+    const y2 = Number.isFinite(tgt.y) ? tgt.y : 0;
+    const z2 = Number.isFinite(tgt.z) ? tgt.z : 0;
+
+    // // positions
+    positions.push(x1, y1, z1);
+    positions.push(x2, y2, z2);
 
     // default colors
-    color.setRGB(1, 1, 1);
+    color.setRGB(0.65, 0.75, 0.9);
     colors.push(color.r, color.g, color.b);
     colors.push(color.r, color.g, color.b);
 
@@ -394,46 +375,430 @@ function buildBatchedEdges(graphData, nodesById) {
   return new THREE.LineSegments(geometry, material);
 }
 
-const nodesById = {};
-Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
 
-// Build line batch
-const lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
-// scene.add(lineSegments);
+// ========================
+// Graph Initialization
+// ========================
 
-Graph.onEngineTick(() => {
-  const pos = lineSegments.geometry.attributes.position.array;
-  let i = 0;
-  Graph.graphData().links.forEach(link => {
-    const src = nodesById[link.source.id ?? link.source];
-    const tgt = nodesById[link.target.id ?? link.target];
+function applyDataset(dataset, periods) {
+  // 1️ Color scale
+  colorScale.domain([...new Set(dataset.nodes.map(n => n.group))]);
 
-    pos[i++] = src.x; pos[i++] = src.y; pos[i++] = src.z;
-    pos[i++] = tgt.x; pos[i++] = tgt.y; pos[i++] = tgt.z;
+  // 2️ Adjacency
+  adjacency.clear();
+  directLinksMap.clear();
+
+  dataset.nodes.forEach(n => {
+    const id = String(n.id);
+    adjacency.set(id, new Set());
+    directLinksMap.set(id, []);
   });
-  lineSegments.geometry.attributes.position.needsUpdate = true;
-});
 
+  dataset.links.forEach(l => {
+    const s = String(l.source.id ?? l.source);
+    const t = String(l.target.id ?? l.target);
+
+    adjacency.get(s)?.add(t);
+    adjacency.get(t)?.add(s);
+
+    directLinksMap.get(s)?.push({ source: s, target: t });
+    if (s !== t) directLinksMap.get(t)?.push({ source: s, target: t });
+  });
+
+  // 3️ ForceGraph data
+  Graph.graphData(dataset);
+  Graph.linkVisibility(false)   // disable built-in lines
+  Graph.nodeAutoColorBy('group');
+
+  // 4️ nodesById
+  Object.keys(nodesById).forEach(k => delete nodesById[k]);
+  dataset.nodes.forEach(n => nodesById[n.id] = n);
+
+  // 5️ Edges
+  if (lineSegments) {
+    graphRoot.remove(lineSegments);
+    lineSegments.geometry.dispose();
+    lineSegments.material.dispose();
+  }
+
+  edgeVertexMap.clear();
+  lineSegments = buildBatchedEdges(Graph.graphData(), nodesById);
+  graphRoot.add(lineSegments);
+
+  graphController.setEdgeLayer?.(lineSegments, edgeVertexMap);
+
+  // 6️ Controller
+  graphController.setDataset(dataset);
+  graphController.resetAll();
+
+
+  // 7️ Period stack
+  if (periodStack) {
+    scene.remove(periodStack.group);
+    periodStack = null;
+  }
+
+  // // 8 Update Filter Panel using the created uiPanel at initialization
+  // updateGroupList(uiPanel, buildGroupColorList())
+  // FORCE INITIAL INSIGHTS CALCULATION
+  // This ensures the panel is populated the moment you enter VR
+  setTimeout(() => {
+    if (graphController && insightPanel) {
+      const { nodes, links } = graphController.getFilteredData();
+      const stats = calculateInsights(nodes, links, { type: 'NONE', id: null });
+      insightPanel.update(stats, colorScale);
+    }
+  }, 500); // Small delay to ensure ForceGraph has finished initial layout
+
+  console.log('Dataset applied');
+}
+
+
+// colorScale.domain([...new Set(graphData.nodes.map(n => n.group))]);
+
+const Graph = ForceGraph3D()(document.body)
+Graph.nodeColor(d => colorScale(d.group))
+Graph.nodeLabel(node => node.label || node.id)
+Graph.onNodeClick((node, event) => {
+  graphController.highlightNode(node.id);
+  // broadcastNodeSelection(node.id, 'DIRECT');
+})
+
+async function loadDataset(datasetKey) {
+  const entry = DATASETS[datasetKey];
+  if (!entry) {
+    throw new Error(`Unknown dataset: ${datasetKey}`);
+  }
+
+  // 1️ Load modules
+  const dataModule = await entry.data();
+  const periodModule = await entry.periods();
+
+  // 2️ Extract actual values
+  dataset = dataModule.default ?? dataModule;
+  // Cache original timestamps BEFORE ForceGraph mutates links
+  dataset.__allTimes = dataset.links.flatMap(l =>
+    Array.isArray(l.times) ? l.times : []
+  );
+
+  periods = dataset.meta?.periods ?? [];
+
+
+  // 3️ Validate
+  if (!dataset?.nodes || !dataset?.links) {
+    throw new Error("Invalid dataset shape");
+  }
+
+  // console.log(
+  //   `Loaded dataset "${entry.label}"`,
+  //   dataset.nodes.length,
+  //   dataset.links.length
+  // );
+  // console.log(
+  //   `-----Loaded periods----- "${periods}"`
+  // )
+
+  return { datasetValues: dataset, periodLabelsValues: periods, key: datasetKey };
+
+  // // 4️ Apply to graph
+  // applyDataset(dataset, periods);
+}
+
+
+export async function switchDataset(datasetKey) {
+  // 1️ Load data and Store current state in dataset and periods
+  const { datasetValues, periodLabelsValues, key } = await loadDataset(datasetKey);
+
+
+  // 2️ Store current state
+  dataset = datasetValues;
+  periods = periodLabelsValues;
+  const currentDatasetKey = key;
+  console.log("LOADED DATA AND PERIODS AS WELL AS KEY", dataset, periods, currentDatasetKey)
+  // 3️ Apply to graph
+  applyDataset(dataset, periods);
+
+  // Update the rest of the visuals as well
+  // Update Filter Panel using the created uiPanel at initialization
+  updateGroupList(uiPanel, buildGroupColorList(Graph.graphData()))
+
+  console.log(`Dataset switched to: ${currentDatasetKey}`);
+}
+
+
+// --- make edges "longer" by increasing spring length ---
+const linkForce = Graph.d3Force('link');
+if (linkForce?.distance) {
+
+  linkForce.distance(220);
+
+
+  if (Graph.numDimensions) Graph.numDimensions(3);
+  else if (Graph.d3ReheatSimulation) Graph.d3ReheatSimulation();
+}
+
+const charge = Graph.d3Force('charge');
+if (charge?.strength) charge.strength(-150); // more negative = more repulsion
+
+initVoice();
+
+
+
+Graph.graphData().nodes.forEach(n => nodesById[n.id] = n);
 
 const GraphRef = { current: Graph };
 const graphRoot = Graph.scene();
-// console.log("graphRoot: ",typeof(graphRoot));
-// console.log("graph: ",typeof(Graph));
 
-scene.add(graphRoot);
-graphRoot.position.y += 20;   // or any value you like
+
+// Create controller after graph inititialization
+// Include the histogram as visual module updated by the controller
+const graphController = new GraphVisualController({
+  graph: Graph,
+  scene: Graph.scene(),
+  lineSegments: null,
+  edgeVertexMap,
+  adapter: graphAdapter
+});
+
+
+await loadDataset(selectedDatasetKey)
+applyDataset(dataset, periods)
+
+// ========================
+// EXPERIMENTAL: Temporal Hierarchy Autoplay
+// ========================
+
+
+
+const b = 4;
+// const deltaMin = 50; // arbitrary test value
+// Use the ORIGINAL dataset, not ForceGraph-mutated data
+const allTimes = dataset.__allTimes ?? [];
+
+// ==========
+const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
+console.log("VALUE T: ", T)
+
+
+
+let levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
+let root = buildTemporalTree(levels, 4);
+let navigator = createTemporalNavigator(root);
+
+const temporalPanel = createTemporalDrillPanel({
+  cameraGroup: cameraGroup,
+  camera: camera,
+  navigator: navigator,
+  graphController: graphController,
+  onStateChange: dispatchTemporalUpdate,    // NEW
+  getDeltaMin: () => userDeltaMin,          // NEW
+  onDeltaChange: updateDeltaMin             // NEW
+});
+
+// --- UNIFIED TEMPORAL DISPATCHER ---
+export function dispatchTemporalUpdate() {
+  const activeBucket = navigator.getCurrentNode();
+  if (!activeBucket) return;
+
+  graphController.highlightBucket(activeBucket);
+
+  if (temporalPanel.group.visible) {
+    temporalPanel.show();
+  }
+}
+
+// experiment
+// window.getVRInsights = () => {
+//     const controller = getGraphController();
+
+//     // 1. Get the data that the user is actually seeing right now
+//     const { nodes, links } = controller.getFilteredData();
+
+//     // 2. Determine the current selection state
+//     const selection = {
+//         type: 'NONE',
+//         id: null
+//     };
+
+//     if (controller.state.selection.active) {
+//         selection.type = 'NODE';
+//         selection.id = controller.state.selection.selectedNodeId;
+//     } else if (controller.state.group.active) {
+//         selection.type = 'GROUP';
+//         // Note: You might need to store the raw group name in state 
+//         // if you want to show group-specific insights later.
+//     }
+
+//     // 3. Calculate
+//     const stats = calculateInsights(nodes, links, selection);
+
+//     // 4. Output to console for your testing
+//     console.log("%c--- INSIGHT REPORT ---", "color: #00ff00; font-weight: bold;");
+//     console.log(`Visible Nodes: ${nodes.length} | Visible Edges: ${links.length}`);
+//     console.log("Top 3 Active Students:", stats.topHubs);
+//     console.log("Top 3 Active Groups:", stats.topGroups);
+
+//     if (selection.type === 'NODE') {
+//         console.log(`%cSelection (Node ${selection.id}): Rank ${stats.nodeRank}`, "color: #00aaff");
+//         console.log("Best Friends:", stats.bestFriends);
+//     }
+
+//     return stats;
+// };
+
+// --- NEW: REBUILD TREE FUNCTION ---
+export function updateDeltaMin(amount) {
+  // 1. Calculate new delta, ensure it doesn't drop below 10
+  userDeltaMin = Math.max(10, userDeltaMin + amount);
+  console.log(`[Time] Rebuilding tree with new delta_min: ${userDeltaMin}`);
+
+  // 2. Rebuild the mathematical tree
+  levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
+  root = buildTemporalTree(levels, 4);
+
+  // 3. Re-initialize the navigator
+  navigator = createTemporalNavigator(root);
+
+  // 4. Give the updated navigator to the drill panel
+  temporalPanel.setNavigator(navigator);
+
+  // 5. Reset the view to the new Root bucket
+  dispatchTemporalUpdate();
+}
+
+function handleTemporalShift(direction) {
+  // -1 to the left
+  //  1 to the right
+  const newNode = navigator.shiftSibling(direction);
+  if (newNode) {
+    dispatchTemporalUpdate();
+  }
+}
+
+const globalStart = 0; // Or math.min(...dataset.__allTimes) if it doesn't start at 0
+const globalDuration = T - globalStart;
+// // Create 60 bars across the timeline
+const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
+
+
+// create the histogram UI Module class
+const histogram = new HistogramGauge({
+  bins: histogramData,
+  globalStart,
+  globalDuration,
+  onBucketSelected: (bucket) => {
+    graphController.highlightBucket(bucket);
+  }
+});
+
+// Add it to the VR camera space
+cameraGroup.add(histogram.getObject3D());
+
+
+// Subscribe to controller temporal updates
+graphController.subscribeToTimeChanges(
+  histogram.onTimeChange.bind(histogram)
+);
+
+// Initialize the highlight of the histogram
+graphController.highlightBucket(null);
+
+// // Create 60 bars across the timeline
+// const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
+
+// export const timeGauge = createHistogramGauge(
+//   histogramData,
+//   new THREE.Vector3(0, 1.4, -1.2),
+//   1.5, // Width of the whole gauge
+//   0.2  // Max height of the tallest bar
+// );
+
+
+// // Subscribe the histogram to the graphController
+// graphController.subscribeToTimeChanges((bucket) => {
+//   const globalStart = 0;
+//   const globalDuration = T - globalStart;
+//   updateBarGaugeForBucket(timeGauge, bucket, globalStart, globalDuration);
+// })
+
+
+// // Add the histogram to the VR space 
+// cameraGroup.add(timeGauge);
+
+
+
+// await switchDataset('school')
 
 
 // shrink the graph by 50%
 graphRoot.scale.set(0.99, 0.99, 0.99);
-// const pathFinder = new PathFinder(Graph, adjacency, directLinksMap, colorScale);
 graphRoot.add(lineSegments);
 
+scene.add(graphRoot);
+graphRoot.position.y += 40;   // or any value you like
 
-// --- Period stack (lazy) ---
-export let periodStack = null;
 
-const baseGraphData = structuredClone(graphData);
+
+Graph.onEngineTick(() => {
+
+  if (!lineSegments) return;
+
+  const pos = lineSegments.geometry.attributes.position.array;
+  let i = 0;
+
+  Graph.graphData().links.forEach(link => {
+    const src = nodesById[link.source.id ?? link.source];
+    const tgt = nodesById[link.target.id ?? link.target];
+    if (!src || !tgt) return;
+
+    if (!Number.isFinite(src.x) || !Number.isFinite(tgt.x)) return;
+
+    pos[i++] = src.x;
+    pos[i++] = src.y;
+    pos[i++] = src.z;
+    pos[i++] = tgt.x;
+    pos[i++] = tgt.y;
+    pos[i++] = tgt.z;
+  });
+
+  lineSegments.geometry.attributes.position.needsUpdate = true;
+});
+
+// This lets other modules import the controller without circular dependency
+export function getGraphController() {
+  return graphController;
+}
+
+
+registerNetworkHandlers({
+  onNodeSelect: (nodeId) => {
+    graphController.highlightNode(nodeId);
+
+    // keep legacy UI side-effects
+    // uiPanel.userData.updateSelectedNodeLabel?.(String(nodeId));
+  },
+
+  onGroupSelect: (groupName) => {
+    graphController.highlightGroup(groupName);
+  },
+
+  onPeriodChange: (period) => {
+    graphController.highlightPeriod(period);
+    updatePeroidLabel(period);
+  },
+
+  onGraphReset: () => {
+    resetGraph()
+  },
+
+  onPeriodStackToggle: (visible, context) => {
+    applyRemotePeriodStackToggle(visible, context);
+  },
+  onDatasetChange: async (datasetKey) => {
+    console.log('[main] loading dataset from network:', datasetKey);
+    await switchDataset(datasetKey)
+  },
+});
 
 
 
@@ -443,47 +808,19 @@ function rebuildPeriodStack() {
     periodStack = null;
   }
 
-  const freshData = JSON.parse(JSON.stringify(graphData)); // deep clone
+  const freshData = JSON.parse(JSON.stringify(dataset)); // deep clone
   periodStack = createPeriodStack({
     Graph,
     graphData: freshData,
-    periods: schoolPeriods,
+    periods: periods,
     colorScale,
     spacing: 50,
     nodeSize: 1.2,
-    selectionState,
-    groupFilterState
+    controller: graphController
   });
 
   scene.add(periodStack.group);
 }
-
-
-
-
-Graph.onEngineStop(() => {
-  // optional: build once the force layout stabilizes
-  // buildPeriodStackOnce();
-});
-
-
-// function updateGraphScaling(xrFrame) {
-//   // Shrink (left stick button)
-//   handleLeftStickButton(xrFrame, () => {
-//     targetScale = Math.max(minScale, targetScale - 0.01);
-//   });
-
-//   // Grow (right stick button)
-//   handleRightStickButton(xrFrame, () => {
-//     targetScale = Math.min(maxScale, targetScale + 0.01);
-//   });
-
-//   // Smoothly interpolate current scale → target scale
-//   const current = graphRoot.scale.x;
-//   const newScale = THREE.MathUtils.lerp(current, targetScale, scaleSpeed);
-
-//   graphRoot.scale.set(newScale, newScale, newScale);
-// }
 
 // ========================
 // UI Setup (VR Button + Panel)
@@ -519,16 +856,53 @@ vrButton.textContent = 'Enter VR';
 document.body.appendChild(vrButton);
 
 
-const groups = [...new Set(graphData.nodes.map(n => n.group))].map(group => ({
+const groups = [...new Set(Graph.graphData().nodes.map(n => n.group))].map(group => ({
   name: String(group),
   color: colorScale(group)
 }));
-export const uiPanel = createFilterPanel({ groupColors: groups, camera });
+
+export function buildGroupColorList(dataset) {
+  console.log("HELLOSOSOFSDFDSIFISDF", dataset)
+  const map = new Map();
+  dataset.nodes.forEach(n => {
+    if (!map.has(n.group)) {
+      map.set(n.group, colorScale(n.group));
+    }
+  });
+  return [...map.entries()].map(([name, color]) => ({ name, color }));
+}
+
+export const uiPanel = await createFilterPanel({ groupColors: groups, camera, datasets: Object.values(DATASETS) });
 cameraGroup.add(uiPanel); // ui panel buttom center
 uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
-export const timeGauge = createBarGauge(new THREE.Vector3(0, 1.4, -1.2));
-cameraGroup.add(timeGauge);
+//panel for insight 
+
+const insightPanel = new InsightPanel();
+cameraGroup.add(insightPanel.getObject3D());
+
+// Hook it into the controller's update loop
+const originalUpdate = graphController.update.bind(graphController);
+graphController.update = () => {
+  // 1. Run original visual updates
+  originalUpdate();
+
+  // 2. Calculate new insights
+  const { nodes, links } = graphController.getFilteredData();
+  const selection = {
+    type: graphController.state.selection.active ? 'NODE' : 'NONE',
+    id: graphController.state.selection.selectedNodeId
+  };
+  const currentBucket = graphController.state.activeBucket;
+  const globalBucketLinks = dataset.links.filter(l =>
+    graphController._edgeInBucket(l, currentBucket)
+  );
+  const stats = calculateInsights(nodes, links, selection, globalBucketLinks);
+
+  // 3. Update the Panel
+  insightPanel.update(stats, colorScale);
+};
+
 // ========================
 // Graph Interaction + Reset
 // ========================
@@ -538,72 +912,24 @@ function requestGraphUpdate(mode, nodeId) {
   graphUpdateNeeded = true;
 }
 
+graphController.setSelectionListener((nodeId) => {
+  uiPanel.userData.updateSelectedNodeLabel?.(nodeId);
+});
+
 
 setUIPanel(uiPanel);
 
 export function highlightSubgraph(nodeId) {
-  const clickedId = String(nodeId);
-  uiPanel.userData.updateSelectedNodeLabel?.(clickedId);
-  selectionState.isActive = true;
-  selectionState.selectedNodeId = clickedId;
-  const validNeighbors = new Set();
-  const edges = Graph.graphData().links;
-  for (const edge of edges) {
-    if (activePeriod && !edge.periods?.includes(activePeriod)) continue;
-
-    const source = String(edge.source?.id ?? edge.source);
-    const target = String(edge.target?.id ?? edge.target);
-
-    if (source === clickedId) validNeighbors.add(target);
-    else if (target === clickedId) validNeighbors.add(source);
-  }
-  selectionState.neighborIds = validNeighbors;
-
-  updateAllVisuals();
+  graphController.highlightNode(nodeId)
 }
+
+
 function getEdgeKey(a, b) {
   return [a, b].sort().join('--');
 }
 
 export function highlightGroup(groupName) {
-  // Normalize and reset states
-  const normalizedGroup = String(groupName).trim().toLowerCase();
-
-  groupFilterState.isActive = true;
-  groupFilterState.activeGroup = normalizedGroup;
-  groupFilterState.nodeIds.clear();
-  groupFilterState.edgeIds.clear();
-
-  // Reset selection to avoid conflicts
-  selectionState.isActive = false;
-  selectionState.selectedNodeId = null;
-  selectionState.neighborIds.clear();
-
-  // Filter nodes
-  for (const node of Graph.graphData().nodes) {
-    const nodeGroup = String(node.group).trim().toLowerCase();
-    const nodeId = String(node.id);
-    if (nodeGroup === normalizedGroup) {
-      groupFilterState.nodeIds.add(nodeId);
-    }
-  }
-
-  // Filter edges where both ends are in the group AND match current period (if any)
-  for (const edge of Graph.graphData().links) {
-    const src = String(edge.source?.id ?? edge.source);
-    const tgt = String(edge.target?.id ?? edge.target);
-
-    const edgeInPeriod = !activePeriod || edge.periods?.includes(activePeriod);
-    if (
-      groupFilterState.nodeIds.has(src) &&
-      groupFilterState.nodeIds.has(tgt) &&
-      edgeInPeriod
-    ) {
-      groupFilterState.edgeIds.add(getEdgeKey(src, tgt));
-    }
-  }
-
-  updateAllVisuals();
+  graphController.highlightGroup(groupName)
 }
 
 
@@ -619,151 +945,37 @@ document.body.appendChild(resetBtn);
 
 resetBtn.addEventListener('click', () => {
   resetGraph();
-  broadcastGraphReset();
+  // broadcastGraphReset();
 });
 
 export function resetGraph() {
-  activePeriod = null;
-  selectionState.isActive = false;
-  selectionState.selectedNodeId = null;
-  selectionState.neighborIds = new Set();
 
-  clearGroupFilter();
+  graphController.clearGroupFilter()
   updatePeroidLabel('Default');
   uiPanel.userData.updateSelectedNodeLabel?.(null);
 
-  // reset nodes as before (Graph.scene().traverse)
-
-  // reset edges (all white again)
-
-  const alphas = lineSegments.geometry.attributes.alpha.array;
-  for (let i = 0; i < alphas.length; i++) alphas[i] = 0.2;
-  lineSegments.geometry.attributes.alpha.needsUpdate = true;
-
-
-  Graph.graphData(Graph.graphData());
-  Graph.d3ReheatSimulation();
-  updateBarGauge(timeGauge, 0, "Default");
-}
-
-
-
-
-function updateAllVisuals() {
-  const periodNodes = activePeriod ? (periodActiveNodes.get(activePeriod) || new Set()) : null;
-
-  // ---------- Nodes ----------
-  Graph.scene().traverse(obj => {
-    if (obj.__data?.id !== undefined) {
-      const nodeId = String(obj.__data.id);
-      const inPeriod = !periodNodes || periodNodes.has(nodeId);
-      const inGroup = !groupFilterState.isActive || groupFilterState.nodeIds.has(nodeId);
-
-      let shouldShow = inPeriod && inGroup;
-
-      if (selectionState.isActive) {
-        const isSelected = selectionState.selectedNodeId === nodeId;
-        const isNeighbor = selectionState.neighborIds.has(nodeId);
-        shouldShow = shouldShow && (isSelected || isNeighbor);
-      }
-
-      applyOpacityLayer(obj, "combined", shouldShow);
-    }
-  });
-
-  // ---------- Edges (batched) ----------
-
-  const alphas = lineSegments.geometry.attributes.alpha.array;
-
-  Graph.graphData().links.forEach(link => {
-    const src = String(link.source.id ?? link.source);
-    const tgt = String(link.target.id ?? link.target);
-    const edgeKey = getEdgeKey(src, tgt);
-    const entry = edgeVertexMap.get(edgeKey);
-    if (!entry) return;
-
-    const edgeInPeriod = !activePeriod || link.periods?.includes(activePeriod);
-    const edgeInGroup = !groupFilterState.isActive || groupFilterState.edgeIds.has(edgeKey);
-
-    let isVisible = edgeInPeriod && edgeInGroup;
-    if (selectionState.isActive) {
-      isVisible = isVisible &&
-        (src === selectionState.selectedNodeId || tgt === selectionState.selectedNodeId);
-    }
-
-    const a = isVisible ? 1.0 : 0.0; // fully visible or fully invisible
-    alphas[entry.start] = a;
-    alphas[entry.end] = a;
-  });
-
-  lineSegments.geometry.attributes.alpha.needsUpdate = true;
-
-
-  Graph.d3ReheatSimulation();
-  markHoverCacheDirty?.();
-}
-
-
-
-export function clearGroupFilter() {
-  groupFilterState.isActive = false;
-  groupFilterState.activeGroup = null;
-  groupFilterState.nodeIds.clear();
-  groupFilterState.edgeIds.clear();
-  updateAllVisuals();
-}
-
-
-// ========================
-// Auto Highlight Cycle
-// ========================
-
-function applyOpacityLayer(obj, context, visible) {
-  const base = obj.userData.originalMaterial ||= obj.material;
-
-  // Clone per context (e.g., periodMaterial, selectionMaterial)
-  const key = context + "Material";
-  if (!obj.userData[key]) {
-    obj.userData[key] = base.clone();
+  graphController.resetAll()
+  histogram.reset()
+  // updateBarGauge(timeGauge, 0, "Default");
+  if (navigator && root) {
+    navigator.selectNode(root); // Point the brain back to the top of the tree
+    dispatchTemporalUpdate();   // Force the Panel, Graph, and UI to sync to the root
   }
-
-  const mat = obj.userData[key];
-  mat.transparent = true;
-  mat.opacity = visible ? 1.0 : 0.1;
-  mat.needsUpdate = true;
-
-  obj.material = mat;
-}
-export const periodActiveNodes = new Map();
-
-export function precomputePeriodData() {
-  periodActiveNodes.clear();
-
-  Graph.graphData().links.forEach(link => {
-    const periods = link.periods || [];
-
-    periods.forEach(period => {
-      if (!periodActiveNodes.has(period)) {
-        periodActiveNodes.set(period, new Set());
-      }
-      periodActiveNodes.get(period).add(link.source);
-      periodActiveNodes.get(period).add(link.target);
-    });
-  });
 }
 
 
-export function highlightPeriod(period) {
-  activePeriod = period;
-  selectionState.isActive = false; // clear selection on period change
-  updatePeroidLabel(period);
-  updateAllVisuals();
 
-  currentPeriodIndex = schoolPeriods.indexOf(period);
+export function highlightPeriod(periodValue) {
+  graphController.highlightPeriod(periodValue)
 
-  const value = currentPeriodIndex / (schoolPeriods.length - 1);
+  console.log("GET RID OF ME LATER WHEN YOU GET RID OF THE DEPENDENCIES :)");
+  updatePeroidLabel(periodValue);
 
-  updateBarGauge(timeGauge, value, period);
+  currentPeriodIndex = periods.indexOf(periodValue);
+
+  const value = currentPeriodIndex / (periods.length - 1);
+
+  updateBarGauge(timeGauge, value, periodValue);
 }
 
 
@@ -776,8 +988,12 @@ renderer.xr.addEventListener('sessionstart', () => {
   Graph.enablePointerInteraction(false);
   inVR = true;
 
+  // Show guide panel when starting the tool
+  userGuidePanel.visible = true
+
   cameraGroup.position.set(0, 3.6, 230);  // Initial spawn position
   cameraGroup.position.y += 22.2;
+
 
   const session = renderer.xr.getSession();
   // startAutoHighlightCycle(); // Test 
@@ -803,9 +1019,9 @@ renderer.xr.addEventListener('sessionend', () => {
 
 setInterval(() => {
   if (inVR) {
-    
+
     broadcastAvatar(camera, controller1, controller2);
-    
+
     // console.log('Hellow');
   }
 }, 100);
@@ -824,13 +1040,16 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 
   // Apply context BEFORE showing
   if (context.groupName) {
-    highlightGroup(context.groupName);
+    graphController.highlightGroup(context.groupName)
+    // highlightGroup(context.groupName);
   }
   if (context.period) {
-    highlightPeriod(context.period);
+    graphController.highlightPeriod(context.period)
+    // highlightPeriod(context.period);
   }
   if (context.selectedNodeId) {
-    highlightSubgraph(context.selectedNodeId);
+    graphController.highlightNode(context.selectedNodeId)
+    // highlightSubgraph(context.selectedNodeId);
   }
 
   if (visible) {
@@ -842,67 +1061,69 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 
 
 
-
-
 // ========================
 // Animation Loop
 // ========================
-
-
-
-
 const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
-setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup);
-precomputePeriodData();
+setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup, histogram);
+// precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;
 // startPeriodPreviewCycle();
 
 let fpsAccum = 0;
 let frameCount = 0;
+
+// --- Reusable vectors for the "Behind" check ---
+const _panelDir = new THREE.Vector3();
+const _camForward = new THREE.Vector3();
+const _snapPos = new THREE.Vector3();
+
+
 renderer.setAnimationLoop((timestamp, xrFrame) => {
+
+  // SKYBOX RENDERING 
+  grid.position.x = Math.floor(camera.position.x / 10) * 10;
+  grid.position.z = Math.floor(camera.position.z / 10) * 10;
+
   scene.updateMatrixWorld(true);
   if (periodStack?.group?.visible) {
     periodStack.syncFromGraph?.(Graph);
   }
+  //setupNinjaHands(scene, renderer)
 
 
-  // TEST
-  // const plane = cameraGroup.getObjectByName("ReferencePlane");
-  // if (plane) {
-  //   plane.rotation.set(-Math.PI / 2, 0, 0); // keep it flat
-  // }
-  
-
-  // TEST
-
-  // if (timestamp > 10000) graphRoot.scale.set(0.1, 0.1, 0.1);
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
   if (periodStack) periodStack.update(deltaTime);
 
   avatarInterpolation.update(userAvatars, deltaTime);
-    
+
 
 
   const fps = 1 / Math.max(deltaTime, 1e-6);
-  fpsAccum += fps; 
-  frameCount++; 
+  fpsAccum += fps;
+  frameCount++;
   if (frameCount % 60 === 0) { // log once every ~60 frames 
-    console.log("FPS:", Math.round(fpsAccum / frameCount)); 
+    // console.log("FPS:", Math.round(fpsAccum / frameCount));
     frameCount = 0;
-    fpsAccum = 0; 
+    fpsAccum = 0;
   }
   // Make avatar name labels always face the camera
   Object.values(userAvatars).forEach(({ head, nameLabel }) => {
     if (nameLabel) {
-  
+
       nameLabel.lookAt(camera.position);
     }
   });
+  //livesheer 
 
-  if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL)  {
-  broadcastAvatar(camera, controller1, controller2);
-  lastBroadcast = timestamp;
+
+
+
+
+  if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) {
+    broadcastAvatar(camera, controller1, controller2);
+    lastBroadcast = timestamp;
   }
   if (graphUpdateNeeded) {
     switch (graphUpdateMode) {
@@ -916,8 +1137,9 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         break;
       case 'SUBGRAPH':
       case 'DIRECT':
-        highlightSubgraph(graphUpdateNodeId);
-        broadcastNodeSelection(graphUpdateNodeId);
+        // highlightSubgraph(graphUpdateNodeId);
+        graphController.highlightNode(graphUpdateNodeId)
+        // broadcastNodeSelection(graphUpdateNodeId);
         break;
     }
     graphUpdateNeeded = false;
@@ -926,24 +1148,29 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
 
 
-  
+
   panelState = updatePanelPosition({
-  uiPanel,
-  panelState,
-  camera,
-  cameraGroup,
-  controller: controller1,
-  scene,
-  inVR
+    uiPanel,
+    panelState,
+    camera,
+    cameraGroup,
+    controller: controller1,
+    scene,
+    inVR
   });
   uiPanel?.userData?.update?.();
 
+  // <--- NEW: FIX FOR "GOING BEHIND" (Snap Logic)
+  // ============================================================
+  temporalPanel.update();
+  // ============================================================
+
 
   if (uiPanel?.userData?.bgPlane) {
-  const bg = uiPanel.userData.bgPlane;
-  
-  // Only update color if panel is interactive
-    if (bg.userData.isUIPanel) { 
+    const bg = uiPanel.userData.bgPlane;
+
+    // Only update color if panel is interactive
+    if (bg.userData.isUIPanel) {
       const targetColor = bg.userData.isHovered ? 0x4444aa : 0x000000;
       bg.material.color.lerp(new THREE.Color(targetColor), 0.1);
     }
@@ -963,18 +1190,29 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
-    clampCameraToRoom();
+    // clampCameraToRoom();
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
     // --- Graph scaling with stick buttons ---
     handleLeftStickButton(xrFrame, () => {
+      handleTemporalShift(-1);
+      if (userGuidePanel.visible) {
+        prevGuidePage(userGuidePanel);
+      };
+
       console.log("Left stick clicked")
     });
-
+    animatePuppetHands(xrFrame, renderer);
     handleRightStickButton(xrFrame, () => {
       console.log("Right stick clicked")
+      handleTemporalShift(1);
+      if (userGuidePanel.visible) {
+        nextGuidePage(userGuidePanel);
+      };
+      // temporalPanel.toggle();
     });
+
 
     // Smoothly interpolate scale
     const currentScale = graphRoot.scale.x;
@@ -995,45 +1233,58 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleAButtonInput(xrFrame, () => {
-    togglePanel();
-    [controller1, controller2].forEach(c => {
-      const gp = c.userData.inputSource?.gamepad;
-      const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
-      if (h?.pulse) {
-        h.pulse(0.8, 100);
-      } else if (navigator.vibrate) {
-        navigator.vibrate(100);
+      togglePanel();
+      [controller1, controller2].forEach(c => {
+        const gp = c.userData.inputSource?.gamepad;
+        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
+        if (h?.pulse) {
+          h.pulse(0.8, 100);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(100);
         }
       });
     });
 
     handleBButtonInput(xrFrame, () => {
-      const context = {
-        groupName: groupFilterState.activeGroup,
-        period: activePeriod,
-        selectedNodeId: selectionState.selectedNodeId
-      };
+      // Show the user guide panel
+      toggleGuidePanel();
 
-      if (!periodStack || periodStack.group.visible === false) {
-        rebuildPeriodStack();
-        periodStack.show();
-        broadcastPeriodStackToggle(true, context);
-      } else {
-        periodStack.hide();
-        broadcastPeriodStackToggle(false, context);
-      }
+      // const state = graphController.getState();
+
+      // const context = {
+      //   groupName: state.activeGroup,
+      //   period: state.activePeriod,
+      //   selectedNodeId: state.selectedNodeId
+      // };
+
+      // if (!periodStack || periodStack.group.visible === false) {
+      //   rebuildPeriodStack();
+      //   periodStack.show();
+      //   broadcastPeriodStackToggle(true, context);
+      // } else {
+      //   periodStack.hide();
+      //   broadcastPeriodStackToggle(false, context);
+      // }
     });
 
+    handleYButtonInput(xrFrame, () => {
+      temporalPanel.toggle();
+      [controller1, controller2].forEach(c => {
+        const gp = c.userData.inputSource?.gamepad;
+        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
+        if (h?.pulse) {
+          h.pulse(0.8, 100);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(100);
+        }
+      });
+    })
 
 
-
-
-
-
-  if (!periodStack?.group?.visible) {
-    detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
-    detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
-  }
+    if (!periodStack?.group?.visible) {
+      detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
+      detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
+    }
 
     pollGraphSwitchButtons();
   } else {
@@ -1054,6 +1305,5 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
 
   renderer.render(scene, camera);
+  // renderer.clearDepth();
 });
-
-// Today

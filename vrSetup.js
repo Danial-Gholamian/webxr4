@@ -1,9 +1,9 @@
 //vrSetup.js
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
-import { schoolPeriods } from './periodDefs';
-import { highlightPeriod } from './main.js';
+import { highlightPeriod, getActivePeriods } from './main.js';
 import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // --- Constants ---
 const movementSpeed = 0.9;
@@ -56,8 +56,8 @@ function setupController(controller, index, renderer, cameraGroup) {
 
 // --- 1.2 Changing time slices ---
 function cyclePeriod(delta) {
-  currentPeriodIndex = (currentPeriodIndex + delta + schoolPeriods.length) % schoolPeriods.length;
-  const period = schoolPeriods[currentPeriodIndex];
+  currentPeriodIndex = (currentPeriodIndex + delta + getActivePeriods().length) % getActivePeriods().length;
+  const period = getActivePeriods()[currentPeriodIndex];
   highlightPeriod(period);
   console.log(`Period changed to: ${period}`);
 }
@@ -70,9 +70,9 @@ function teleportFromController(controller, cameraGroup, teleportDistance = 5) {
   controller.getWorldDirection(direction);
   direction.y = 0;
   direction.normalize();
-  
+
   // Add this line to reverse direction
-  direction.multiplyScalar(-1); 
+  direction.multiplyScalar(-1);
   controller.getWorldPosition(position);
   const target = position.clone().add(direction.multiplyScalar(teleportDistance));
 
@@ -89,7 +89,7 @@ function handleJoystickInput(xrFrame, camera, cameraGroup) {
     const gamepad = source.gamepad;
     if (!gamepad || !source.handedness) continue;
 
-    const [ , , x, y ] = gamepad.axes;
+    const [, , x, y] = gamepad.axes;
 
     if (source.handedness === "left" && Math.abs(x) > deadZone) {
       cameraGroup.rotation.y -= x * rotationSpeed;
@@ -119,70 +119,89 @@ function moveThumbstick(inputX, inputY, camera, cameraGroup, speed = movementSpe
   cameraGroup.position.add(moveVector);
 }
 
-// --- 4. Trigger Selection ---, today
+// --- 4. Trigger Selection (Updated for Generic UI) ---
 let vrNodeSelectionInitialized = false;
 let lastSelectedCapsule = null;
 
-function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup) {
+function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup, histogram) {
+  // Hierarchy of selection
+  // Check UI buttons
+  // Check histogram bars
+  // Check graph nodes
   function onVRSelect(event) {
     const controller = event.target;
     const controllerSide = controller === controller1 ? 'left' : 'right';
-    console.log(` VR selectstart from ${controllerSide} Controller`);
+    // console.log(`[VR] Select from ${controllerSide}`);
 
     const raycaster = new THREE.Raycaster();
     const matrix = new THREE.Matrix4();
 
+    // 1. Setup Ray
     matrix.identity().extractRotation(controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
-    raycaster.far = laserDistance;
+    raycaster.far = laserDistance; // 2000
 
-    const uiPanel = scene.getObjectByName('FilterUIPanel') || cameraGroup.getObjectByName('FilterUIPanel');
+    // ============================================================
+    // 2. UI INTERACTION (Panel Buttons)
+    // ============================================================
+    // We check everything in cameraGroup (includes FilterPanel, TemporalPanel AND histogram as well)
+    const intersects = raycaster.intersectObject(cameraGroup, true);
 
-    if (uiPanel && uiPanel.userData.panelState === 'shown') {
-      const interactiveObjects = [];
-      uiPanel.traverse(obj => {
-        if (obj.isMesh && obj.userData?.interactive) {
-          interactiveObjects.push(obj);
+    // Filter hits to find the first actual "Button" (Object with onClick)
+    // We use a loop to "bubble up" from the hit point (e.g. text) to the button container
+    let uiHit = null;
+
+    for (const hit of intersects) {
+      // Check if visible
+      if (!hit.object.visible) continue;
+
+      let target = hit.object;
+
+      // Traverse up to find the clickable element
+      while (target) {
+        if (target.userData && target.userData.onClick) {
+          uiHit = target;
+          break;
         }
-      });
-
-      const hits = raycaster.intersectObjects(interactiveObjects, false);
-// now debugg
-      if (hits.length > 0) {
-        const hit = hits[0].object;
-        const { onClick, label, target } = hit.userData;
-
-        console.log('VR ray hit object:', hit.name);
-        console.log('hit.userData:', hit.userData);
-        console.log('hit target material:', target?.material?.color.getHexString());
-
-        // Reset previous selection
-        if (lastSelectedCapsule && lastSelectedCapsule !== target) {
-          console.log(' Deselecting previous capsule');
-          lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
-          lastSelectedCapsule.userData.isSelected = false;
-        }
-
-        // Set new selection
-        if (target?.material) {
-          const selectedColor = target.userData.selectedColor || new THREE.Color(0x3366ff);
-          console.log(' Selecting capsule:', label, 'Color:', selectedColor.getHexString());
-          target.material.color.copy(selectedColor);
-          target.userData.isSelected = true;
-          lastSelectedCapsule = target;
-        } else {
-          console.warn(' No target material found');
-        }
-
-        if (typeof onClick === 'function') onClick(label);
-        console.log(` Capsule clicked: ${label}`);
-        return;
+        // Stop if we hit the cameraGroup root
+        if (target === cameraGroup) break;
+        target = target.parent;
       }
 
+      if (uiHit) break; // Found a button, stop looking
     }
 
-    // --- Fallback to graph node selection ---
+    if (uiHit) {
+      console.log(`[VR] Clicked Button: ${uiHit.userData.label || 'Unnamed'}`);
+
+      // A. Fire the Click Handler
+      uiHit.userData.onClick();
+
+      // B. Haptic Feedback (Pulse)
+      const gamepad = controller.userData.inputSource?.gamepad;
+      if (gamepad && gamepad.hapticActuators && gamepad.hapticActuators[0]) {
+        gamepad.hapticActuators[0].pulse(0.8, 20); // Strength 0.8, 20ms
+      }
+
+      // C. Legacy Highlighting (Only for FilterUIPanel capsules that need manual color change)
+      // If the button handles its own re-render (like TemporalPanel), this part is ignored.
+      if (uiHit.material && uiHit.userData.selectedColor) {
+        if (lastSelectedCapsule && lastSelectedCapsule !== uiHit) {
+          // Reset previous
+          if (lastSelectedCapsule.userData.defaultColor) {
+            lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
+          }
+        }
+        uiHit.material.color.copy(uiHit.userData.selectedColor);
+        lastSelectedCapsule = uiHit;
+      }
+
+      return; // STOP HERE. Don't click through the UI to the graph behind it.
+    }
+    // ============================================================
+    // 3. GRAPH SELECTION (Fallback)
+    // ============================================================
     if (!GraphRef.current?.scene) return;
 
     const graphNodes = [];
@@ -193,10 +212,13 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     const hits = raycaster.intersectObjects(graphNodes, false);
     if (hits.length > 0) {
       const node = hits[0].object.__data;
-      console.log(" VR Selected node:", node);
+      console.log("[VR] Selected Graph Node:", node.id);
+
+      // Haptics
+      const gamepad = controller.userData.inputSource?.gamepad;
+      if (gamepad?.hapticActuators?.[0]) gamepad.hapticActuators[0].pulse(0.5, 10);
+
       requestGraphUpdate('SUBGRAPH', node.id);
-    } else {
-      console.log(`HERE  [${controllerSide}] Button 0 pressed but hit nothing`);
     }
   }
 
@@ -204,7 +226,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     controller1.addEventListener('selectstart', onVRSelect);
     controller2.addEventListener('selectstart', onVRSelect);
     vrNodeSelectionInitialized = true;
-    console.log("setupVRNodeSelection: Listeners initialized.");
+    console.log("setupVRNodeSelection: Generic Interaction Initialized.");
   }
 }
 
@@ -254,16 +276,16 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
     }
   }
 
-  
+
   function pollGamepadButtons() {
 
     if (controller1.userData.inputSource) {
       checkButtonPress(controller1, 'left');
-    } 
+    }
 
     if (controller2.userData.inputSource) {
       checkButtonPress(controller2, 'right');
-    } 
+    }
   }
 
   return pollGamepadButtons;
@@ -352,6 +374,29 @@ export function handleBButtonInput(xrFrame, onBPress) {
 }
 handleBButtonInput._wasPressed = false;
 
+
+export function handleYButtonInput(xrFrame, onYPress) {
+  if (!xrFrame || typeof onYPress !== 'function') return;
+
+  let isPressed = false;
+  for (const source of xrFrame.session.inputSources) {
+    if (source.handedness === 'left' && source.gamepad) {
+      const btns = source.gamepad.buttons;
+      if (btns.length > yButtonIndex && btns[yButtonIndex].pressed) {
+        isPressed = true;
+        break;
+      }
+    }
+  }
+
+
+  if (isPressed && !handleYButtonInput._wasPressed) {
+    onYPress();
+  }
+
+  handleYButtonInput._wasPressed = isPressed;
+}
+
 // Generic stick-button handler
 function handleStickButton(xrFrame, handedness, buttonIndex, callback) {
   if (!xrFrame) return;
@@ -382,11 +427,10 @@ export function handleLeftStickButton(xrFrame, onPress) {
   handleStickButton(xrFrame, "left", leftStickButtonIndex, (isPressed) => {
     if (isPressed && !leftStickWasPressed) {
       console.log("Left stick clicked");
-      cyclePeriod(-1);
-      squeezeLefttPrevPeriod();
+      // REMOVED: cyclePeriod(-1);
+      // REMOVED: squeezeLefttPrevPeriod();
       if (onPress) onPress();
     }
-
     leftStickWasPressed = isPressed;
   });
 }
@@ -395,11 +439,10 @@ export function handleRightStickButton(xrFrame, onPress) {
   handleStickButton(xrFrame, "right", rightStickButtonIndex, (isPressed) => {
     if (isPressed && !rightStickWasPressed) {
       console.log("Right stick clicked");
-      cyclePeriod(1);
-      squeezeRightNextPeriod();
+      // REMOVED: cyclePeriod(1);
+      // REMOVED: squeezeRightNextPeriod();
       if (onPress) onPress();
     }
-
     rightStickWasPressed = isPressed;
   });
 }
@@ -416,3 +459,222 @@ export {
   setupGraphSwitchButtons,
   updateLaserPointer
 };
+
+
+// DISCOVER NAMES
+
+
+export function setupNinjaHands(scene, renderer) {
+  const loader = new GLTFLoader();
+
+  for (let i = 0; i < 2; i++) {
+    const controller = renderer.xr.getController(i);
+    const controllerGrip = renderer.xr.getControllerGrip(i);
+
+    controller.addEventListener('connected', (event) => {
+      const handedness = event.data.handedness;
+
+      loader.load('models/ninja_hands_-_rigged_for_animation__vr.glb', (gltf) => {
+        const handMesh = gltf.scene;
+        
+        const baseScale = 1; 
+        handMesh.scale.set(baseScale, baseScale, baseScale);
+        
+        // Resetting alignment to a neutral starting point
+        handMesh.rotation.set(0, Math.PI, 0); 
+        handMesh.position.set(0, 0, 0);
+        const handAnchor = new THREE.Group();
+                
+      if (handedness === 'left') {
+        // LEFT HAND
+        handAnchor.rotation.set(-0.5, 0, 1.8);
+        handAnchor.position.set(-0.02, 0.08, -0.03);
+        window.leftHand = handAnchor;
+
+      } else {
+        // RIGHT HAND
+        handAnchor.rotation.set(-0.38, 0, -1.8);
+        handAnchor.position.set(0.03, 0.12, -0.05);
+        window.rightHand = handAnchor;
+      }
+              controllerGrip.add(handAnchor);
+        handAnchor.add(handMesh);
+
+        // Expose to console for live alignment
+        if (handedness === 'left') {
+            window.leftHand = handAnchor;
+        } else {
+            window.rightHand = handAnchor;
+        }
+
+        const bones = { index: [], middle: [], ring: [], pinky: [], thumb: [] };
+
+        handMesh.traverse((child) => {
+          if (child.isBone && !child.name.includes('ignore')) {
+            // Save the artist's original resting pose!
+            child.userData.initialRotation = child.rotation.clone();
+
+            const prefix = handedness === 'left' ? 'handsb_l_' : 'handsb_r_';
+            
+            if (child.name.includes(prefix + 'index')) bones.index.push(child);
+            if (child.name.includes(prefix + 'middle')) bones.middle.push(child);
+            if (child.name.includes(prefix + 'ring')) bones.ring.push(child);
+            if (child.name.includes(prefix + 'pinky')) bones.pinky.push(child);
+            if (child.name.includes(prefix + 'thumb')) bones.thumb.push(child);
+          }
+        });
+
+        controllerGrip.userData.bones = bones;
+
+        // Hide the TRUE root bones so no floating pieces are left behind
+        const rightRoot = handMesh.getObjectByName('handsr_hand_world_01'); 
+        const leftRoot = handMesh.getObjectByName('handsl_hand_world_019'); 
+        
+        if (handedness === 'left' && rightRoot) rightRoot.scale.set(0, 0, 0);
+        if (handedness === 'right' && leftRoot) leftRoot.scale.set(0, 0, 0);
+      });
+    });
+  }
+}
+
+export function animatePuppetHands(xrFrame, renderer) {
+  if (!xrFrame) return;
+  const session = xrFrame.session;
+  let i = 0;
+
+  for (const source of session.inputSources) {
+    if (!source.gamepad) continue;
+
+    const grip = renderer.xr.getControllerGrip(i);
+    const bones = grip.userData.bones;
+    
+    if (!bones) { i++; continue; }
+
+    const gamepad = source.gamepad;
+
+    const triggerValue = gamepad.buttons[0]?.value || 0; 
+    const gripValue = gamepad.buttons[1]?.value || 0;    
+    // const thumbValue = (gamepad.buttons[3]?.touched || gamepad.buttons[4]?.touched) ? 1 : 0;
+
+    const isThumbstickActive = gamepad.buttons[3]?.touched || gamepad.buttons[3]?.pressed;
+    const isBottomButtonActive = gamepad.buttons[4]?.touched || gamepad.buttons[4]?.pressed; // A or X
+    const isTopButtonActive = gamepad.buttons[5]?.touched || gamepad.buttons[5]?.pressed;    // B or Y
+
+    const thumbValue = (isThumbstickActive || isBottomButtonActive || isTopButtonActive) ? 1 : 0;
+    const curlFingers = (fingerArray, value, maxAngle) => {
+      fingerArray.forEach(bone => {
+        // ---> NEW: Safely animate without breaking the hand <---
+        // 1. Reset to the beautiful resting pose
+        bone.rotation.copy(bone.userData.initialRotation);
+        
+        // 2. Add the trigger curl on top of the resting pose
+        // NOTE: If the fingers bend sideways, change this to rotateX or rotateY
+        bone.rotateZ(value * maxAngle); 
+      });
+    };
+
+    curlFingers(bones.index, triggerValue, Math.PI / 4);
+    curlFingers(bones.middle, gripValue, Math.PI / 4);
+    curlFingers(bones.ring, gripValue, Math.PI / 4);
+    curlFingers(bones.pinky, gripValue, Math.PI / 4);
+    curlFingers(bones.thumb, thumbValue, Math.PI / 6);
+
+    i++;
+  }
+}
+
+// --- Bones for Hand Left ---
+// vrSetup.js:484 Found bone: _rootJoint
+// vrSetup.js:484 Found bone: handsr_hand_world_01
+// vrSetup.js:484 Found bone: handsb_r_hand_02
+// vrSetup.js:484 Found bone: handsb_r_thumb1_03
+// vrSetup.js:484 Found bone: handsb_r_thumb2_04
+// vrSetup.js:484 Found bone: handsb_r_thumb3_05
+// vrSetup.js:484 Found bone: handsb_r_index1_06
+// vrSetup.js:484 Found bone: handsb_r_index2_07
+// vrSetup.js:484 Found bone: handsb_r_index3_08
+// vrSetup.js:484 Found bone: handsb_r_middle1_09
+// vrSetup.js:484 Found bone: handsb_r_middle2_00
+// vrSetup.js:484 Found bone: handsb_r_middle3_010
+// vrSetup.js:484 Found bone: handsb_r_ring1_011
+// vrSetup.js:484 Found bone: handsb_r_ring2_012
+// vrSetup.js:484 Found bone: handsb_r_ring3_013
+// vrSetup.js:484 Found bone: handsb_r_pinky0_014
+// vrSetup.js:484 Found bone: handsb_r_pinky1_015
+// vrSetup.js:484 Found bone: handsb_r_pinky2_016
+// vrSetup.js:484 Found bone: handsb_r_pinky3_017
+// vrSetup.js:484 Found bone: handsb_r_grip_018
+// vrSetup.js:484 Found bone: handsl_hand_world_019
+// vrSetup.js:484 Found bone: handsb_l_hand_020
+// vrSetup.js:484 Found bone: handsb_l_thumb1_021
+// vrSetup.js:484 Found bone: handsb_l_thumb2_022
+// vrSetup.js:484 Found bone: handsb_l_thumb3_023
+// vrSetup.js:484 Found bone: handsb_l_thumb_ignore_024
+// vrSetup.js:484 Found bone: handsb_l_index1_025
+// vrSetup.js:484 Found bone: handsb_l_index2_026
+// vrSetup.js:484 Found bone: handsb_l_index3_027
+// vrSetup.js:484 Found bone: handsb_l_index_ignore_028
+// vrSetup.js:484 Found bone: handsb_l_middle1_029
+// vrSetup.js:484 Found bone: handsb_l_middle2_030
+// vrSetup.js:484 Found bone: handsb_l_middle3_031
+// vrSetup.js:484 Found bone: handsb_l_middle_ignore_032
+// vrSetup.js:484 Found bone: handsb_l_ring1_033
+// vrSetup.js:484 Found bone: handsb_l_ring2_034
+// vrSetup.js:484 Found bone: handsb_l_ring3_035
+// vrSetup.js:484 Found bone: handsb_l_ring_ignore_036
+// vrSetup.js:484 Found bone: handsb_l_pinky0_037
+// vrSetup.js:484 Found bone: handsb_l_pinky1_038
+// vrSetup.js:484 Found bone: handsb_l_pinky2_039
+// vrSetup.js:484 Found bone: handsb_l_pinky3_040
+// vrSetup.js:484 Found bone: handsb_l_pinky_ignore_041
+// vrSetup.js:484 Found bone: handsb_l_grip_042
+// vrSetup.js:481 --- Bones for Hand Right ---
+// vrSetup.js:484 Found bone: _rootJoint
+// vrSetup.js:484 Found bone: handsr_hand_world_01
+// vrSetup.js:484 Found bone: handsb_r_hand_02
+// vrSetup.js:484 Found bone: handsb_r_thumb1_03
+// vrSetup.js:484 Found bone: handsb_r_thumb2_04
+// vrSetup.js:484 Found bone: handsb_r_thumb3_05
+// vrSetup.js:484 Found bone: handsb_r_index1_06
+// vrSetup.js:484 Found bone: handsb_r_index2_07
+// vrSetup.js:484 Found bone: handsb_r_index3_08
+// vrSetup.js:484 Found bone: handsb_r_middle1_09
+// vrSetup.js:484 Found bone: handsb_r_middle2_00
+// vrSetup.js:484 Found bone: handsb_r_middle3_010
+// vrSetup.js:484 Found bone: handsb_r_ring1_011
+// vrSetup.js:484 Found bone: handsb_r_ring2_012
+// vrSetup.js:484 Found bone: handsb_r_ring3_013
+// vrSetup.js:484 Found bone: handsb_r_pinky0_014
+// vrSetup.js:484 Found bone: handsb_r_pinky1_015
+// vrSetup.js:484 Found bone: handsb_r_pinky2_016
+// vrSetup.js:484 Found bone: handsb_r_pinky3_017
+// vrSetup.js:484 Found bone: handsb_r_grip_018
+// vrSetup.js:484 Found bone: handsl_hand_world_019
+// vrSetup.js:484 Found bone: handsb_l_hand_020
+// vrSetup.js:484 Found bone: handsb_l_thumb1_021
+// vrSetup.js:484 Found bone: handsb_l_thumb2_022
+// vrSetup.js:484 Found bone: handsb_l_thumb3_023
+// vrSetup.js:484 Found bone: handsb_l_thumb_ignore_024
+// vrSetup.js:484 Found bone: handsb_l_index1_025
+// vrSetup.js:484 Found bone: handsb_l_index2_026
+// vrSetup.js:484 Found bone: handsb_l_index3_027
+// vrSetup.js:484 Found bone: handsb_l_index_ignore_028
+// vrSetup.js:484 Found bone: handsb_l_middle1_029
+// vrSetup.js:484 Found bone: handsb_l_middle2_030
+// vrSetup.js:484 Found bone: handsb_l_middle3_031
+// vrSetup.js:484 Found bone: handsb_l_middle_ignore_032
+// vrSetup.js:484 Found bone: handsb_l_ring1_033
+// vrSetup.js:484 Found bone: handsb_l_ring2_034
+// vrSetup.js:484 Found bone: handsb_l_ring3_035
+// vrSetup.js:484 Found bone: handsb_l_ring_ignore_036
+// vrSetup.js:484 Found bone: handsb_l_pinky0_037
+// vrSetup.js:484 Found bone: handsb_l_pinky1_038
+// vrSetup.js:484 Found bone: handsb_l_pinky2_039
+// vrSetup.js:484 Found bone: handsb_l_pinky3_040
+// vrSetup.js:484 Found bone: handsb_l_pinky_ignore_041
+// vrSetup.js:484 Found bone: handsb_l_grip_042
+// vrSetup.js:481 --- Bones for Hand Left ---
+// vrSetup.js:484 Found bone: _rootJoint
+// vrSetup.js:484 Found bone: handsr_hand_world_01
+// vrSetup.js:484 Found bone: handsb_r_hand_02
+// vrSetup.js:484 
