@@ -862,7 +862,6 @@ const groups = [...new Set(Graph.graphData().nodes.map(n => n.group))].map(group
 }));
 
 export function buildGroupColorList(dataset) {
-  console.log("HELLOSOSOFSDFDSIFISDF", dataset)
   const map = new Map();
   dataset.nodes.forEach(n => {
     if (!map.has(n.group)) {
@@ -881,27 +880,33 @@ uiPanel.position.copy(PANEL_HIDDEN_POS);
 const insightPanel = new InsightPanel();
 cameraGroup.add(insightPanel.getObject3D());
 
-// Hook it into the controller's update loop
-const originalUpdate = graphController.update.bind(graphController);
-graphController.update = () => {
-  // 1. Run original visual updates
-  originalUpdate();
-
-  // 2. Calculate new insights
-  const { nodes, links } = graphController.getFilteredData();
-  const selection = {
-    type: graphController.state.selection.active ? 'NODE' : 'NONE',
-    id: graphController.state.selection.selectedNodeId
-  };
-  const currentBucket = graphController.state.activeBucket;
-  const globalBucketLinks = dataset.links.filter(l =>
-    graphController._edgeInBucket(l, currentBucket)
-  );
-  const stats = calculateInsights(nodes, links, selection, globalBucketLinks);
-
-  // 3. Update the Panel
+// Add the insight panel to the controller subscribers
+// This allows them to listen to any selection done in the graph and update
+graphController.subscribeToSelection((stats) => {
   insightPanel.update(stats, colorScale);
-};
+});
+
+// // Hook it into the controller's update loop
+// const originalUpdate = graphController.update.bind(graphController);
+// graphController.update = () => {
+//   // 1. Run original visual updates
+//   originalUpdate();
+
+//   // 2. Calculate new insights
+//   const { nodes, links } = graphController.getFilteredData();
+//   const selection = {
+//     type: graphController.state.selection.active ? 'NODE' : 'NONE',
+//     id: graphController.state.selection.selectedNodeId
+//   };
+//   const currentBucket = graphController.state.activeBucket;
+//   const globalBucketLinks = dataset.links.filter(l =>
+//     graphController._edgeInBucket(l, currentBucket)
+//   );
+//   const stats = calculateInsights(nodes, links, selection, globalBucketLinks);
+
+//   // 3. Update the Panel
+//   insightPanel.update(stats, colorScale);
+// };
 
 // ========================
 // Graph Interaction + Reset

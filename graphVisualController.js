@@ -1,6 +1,7 @@
 // GraphVisualController.js
 // Given a graph and interaction state, it decides how it should look
 import { markHoverCacheDirty } from "./hover";
+import { calculateInsights } from "./insightSystem";
 
 /**
  * GraphVisualController
@@ -30,6 +31,7 @@ export class GraphVisualController {
         this.edgeVertexMap = edgeVertexMap;
         this.adapter = adapter;
         this.temporal_subscribers = new Set();
+        this.selection_subscribers = new Set();
 
         // --- Internal interaction state ---
         this.state = {
@@ -171,33 +173,33 @@ export class GraphVisualController {
     }
 
     highlightBucket(bucket) {
-      if (bucket && !this.bucketActiveNodes.has(bucket.id)) {
-          // console.log(`[GraphController] Cache miss for bucket ${bucket.id}. Computing active nodes...`);
-          
-          const active = new Set();
-          
-          // Iterate all links to find which ones belong to this time slice
-          this.graph.graphData().links.forEach(link => {
-              if (this._edgeInBucket(link, bucket)) {
-                  // If link is active, its nodes must be active too
-                  const src = this.adapter.getEdgeSource(link);
-                  const tgt = this.adapter.getEdgeTarget(link);
-                  active.add(src);
-                  active.add(tgt);
-              }
-          });
+        if (bucket && !this.bucketActiveNodes.has(bucket.id)) {
+            // console.log(`[GraphController] Cache miss for bucket ${bucket.id}. Computing active nodes...`);
 
-          // Save to cache so we don't do this work next frame
-          this.bucketActiveNodes.set(bucket.id, active);
-      }
+            const active = new Set();
 
-      // Proceed as normal
-      this.state.activeBucket = bucket;
-      this.clearNodeSelection();
-      this.update();
+            // Iterate all links to find which ones belong to this time slice
+            this.graph.graphData().links.forEach(link => {
+                if (this._edgeInBucket(link, bucket)) {
+                    // If link is active, its nodes must be active too
+                    const src = this.adapter.getEdgeSource(link);
+                    const tgt = this.adapter.getEdgeTarget(link);
+                    active.add(src);
+                    active.add(tgt);
+                }
+            });
 
-    //   Notify UI modules that are listening to temporal changes
-    this._notifyTimeChanges(bucket)
+            // Save to cache so we don't do this work next frame
+            this.bucketActiveNodes.set(bucket.id, active);
+        }
+
+        // Proceed as normal
+        this.state.activeBucket = bucket;
+        this.clearNodeSelection();
+        this.update();
+
+        //   Notify UI modules that are listening to temporal changes
+        this._notifyTimeChanges(bucket)
     }
 
 
@@ -217,10 +219,10 @@ export class GraphVisualController {
         });
 
         // Update selected node variable
-        this._onSelectionChange?.(null); 
+        this._onSelectionChange?.(null);
         console.log('LineSegments in scene:', lines.length, lines);
         this.update();
-        
+
     }
 
     // =========================================================
@@ -240,7 +242,20 @@ export class GraphVisualController {
         this._updateEdgeVisuals(ctx);
 
         this.graph.d3ReheatSimulation?.();
+
+        // CALCULATE THE VALUES FOR INSIGHT PANEL and notify the UI object
+        const { nodes, links } = this.getFilteredData();
+
+        const selection = {
+            type: this.state.selection.active ? 'NODE' : 'NONE',
+            id: this.state.selection.selectedNodeId
+        };
+
+        const stats = calculateInsights(nodes, links, selection);
+
+        this._notifyInsights(stats);
     }
+
 
     // =========================================================
     // Optional introspection
@@ -258,270 +273,284 @@ export class GraphVisualController {
     // Internal helpers — Visibility context & policy
     // =========================================================
 
-    _buildVisibilityContext() {
-      return {
-          activeBucket: this.state.activeBucket,
-          bucketNodes: this.state.activeBucket
-              ? this.bucketActiveNodes?.get(this.state.activeBucket.id)
-              : null,
-          selection: this.state.selection,
-          group: this.state.group
-      };
+_buildVisibilityContext() {
+    return {
+        activeBucket: this.state.activeBucket,
+        bucketNodes: this.state.activeBucket
+            ? this.bucketActiveNodes?.get(this.state.activeBucket.id)
+            : null,
+        selection: this.state.selection,
+        group: this.state.group
+    };
 
+}
+
+
+_isNodeVisible(nodeId, ctx) {
+    // Period constraint (hard)
+    if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
+        return false;
     }
 
 
-    _isNodeVisible(nodeId, ctx) {
-        // Period constraint (hard)
-        if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
-            return false;
-        }
+    // Group constraint
+    if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) {
+        return false;
+    }
 
+    // election constraint (period-aware!)
+    if (ctx.selection.active) {
+        const selId = ctx.selection.selectedNodeId;
 
-        // Group constraint
-        if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) {
-            return false;
-        }
-
-        // election constraint (period-aware!)
-        if (ctx.selection.active) {
-            const selId = ctx.selection.selectedNodeId;
-
-            if (!ctx.activeBucket) {
-                return (
-                    nodeId === selId ||
-                    ctx.selection.neighbors.has(nodeId)
-                );
-            }
-
-            // Period-scoped neighbors
-            const bucketNeighbors = this._getBucketNeighbors(selId, ctx.activeBucket);
-
-
+        if (!ctx.activeBucket) {
             return (
                 nodeId === selId ||
-                bucketNeighbors.has(nodeId)
+                ctx.selection.neighbors.has(nodeId)
             );
         }
 
-        return true;
+        // Period-scoped neighbors
+        const bucketNeighbors = this._getBucketNeighbors(selId, ctx.activeBucket);
+
+
+        return (
+            nodeId === selId ||
+            bucketNeighbors.has(nodeId)
+        );
     }
 
-    _isEdgeVisible(link, ctx) {
+    return true;
+}
+
+_isEdgeVisible(link, ctx) {
+    const src = this.adapter.getEdgeSource(link);
+    const tgt = this.adapter.getEdgeTarget(link);
+    const key = this._getEdgeKey(src, tgt);
+
+    if (ctx.activeBucket && !this._edgeInBucket(link, ctx.activeBucket)) return false;
+
+
+    if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
+
+    if (ctx.selection.active) {
+        return (
+            src === ctx.selection.selectedNodeId ||
+            tgt === ctx.selection.selectedNodeId
+        );
+    }
+
+    return true;
+}
+
+// ------------------------------
+// Internal helper for node visuals
+// ------------------------------
+_applyOpacityLayer(obj, context, visible) {
+    const base = obj.userData.originalMaterial ||= obj.material;
+
+    // Clone per context (e.g., periodMaterial, selectionMaterial)
+    const key = context + "Material";
+    if (!obj.userData[key]) {
+        obj.userData[key] = base.clone();
+    }
+
+    const mat = obj.userData[key];
+    mat.transparent = true;
+    mat.opacity = visible ? 1.0 : 0.1;
+    mat.needsUpdate = true;
+
+    obj.material = mat;
+}
+
+// =========================================================
+// Internal helpers — Rendering
+// =========================================================
+
+_updateNodeVisuals(ctx) {
+    this.graph.scene().traverse(obj => {
+        if (!obj.__data) return;
+
+        // // Only node meshes have __data.id
+        // if (!obj.__data?.id) return;
+
+        const nodeId = this.adapter.getNodeId(obj.__data);
+        const visible = this._isNodeVisible(nodeId, ctx);
+
+        this._applyOpacityLayer(obj, "combined", visible);
+    });
+}
+
+_updateEdgeVisuals(ctx) {
+    const alphas = this.lineSegments.geometry.attributes.alpha.array;
+    console.log(
+        "edges:",
+        this.lineSegments.geometry.attributes.alpha.array.length
+    );
+
+    this.graph.graphData().links.forEach(link => {
         const src = this.adapter.getEdgeSource(link);
         const tgt = this.adapter.getEdgeTarget(link);
         const key = this._getEdgeKey(src, tgt);
+        const entry = this.edgeVertexMap.get(key);
+        if (!entry) return;
 
-      if (ctx.activeBucket && !this._edgeInBucket(link, ctx.activeBucket)) return false;
+        const visible = this._isEdgeVisible(link, ctx);
+        const a = visible ? this.BASE_EDGE_ALPHA : 0.0;
 
+        alphas[entry.start] = a;
+        alphas[entry.end] = a;
+    });
 
-        if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
+    this.lineSegments.geometry.attributes.alpha.needsUpdate = true;
+}
 
-        if (ctx.selection.active) {
-            return (
-                src === ctx.selection.selectedNodeId ||
-                tgt === ctx.selection.selectedNodeId
-            );
-        }
+// =========================================================
+// Internal helpers -- Precomputation
+// =========================================================
 
-        return true;
-    }
+_precomputeBucketData(buckets) {
+    // buckets: [{ id, start, end, level?, index? }, ...]
+    this.bucketActiveNodes.clear();
+    this._bucketIndex = {
+        buckets,
+        byId: new Map(buckets.map(b => [b.id, b]))
+    };
 
-    // ------------------------------
-    // Internal helper for node visuals
-    // ------------------------------
-    _applyOpacityLayer(obj, context, visible) {
-        const base = obj.userData.originalMaterial ||= obj.material;
-
-        // Clone per context (e.g., periodMaterial, selectionMaterial)
-        const key = context + "Material";
-        if (!obj.userData[key]) {
-            obj.userData[key] = base.clone();
-        }
-
-        const mat = obj.userData[key];
-        mat.transparent = true;
-        mat.opacity = visible ? 1.0 : 0.1;
-        mat.needsUpdate = true;
-
-        obj.material = mat;
-    }
-
-    // =========================================================
-    // Internal helpers — Rendering
-    // =========================================================
-
-    _updateNodeVisuals(ctx) {
-        this.graph.scene().traverse(obj => {
-            if (!obj.__data) return;
-
-            // // Only node meshes have __data.id
-            // if (!obj.__data?.id) return;
-
-            const nodeId = this.adapter.getNodeId(obj.__data);
-            const visible = this._isNodeVisible(nodeId, ctx);
-
-            this._applyOpacityLayer(obj, "combined", visible);
-        });
-    }
-
-    _updateEdgeVisuals(ctx) {
-        const alphas = this.lineSegments.geometry.attributes.alpha.array;
-        console.log(
-            "edges:",
-            this.lineSegments.geometry.attributes.alpha.array.length
-        );
-
-        this.graph.graphData().links.forEach(link => {
-            const src = this.adapter.getEdgeSource(link);
-            const tgt = this.adapter.getEdgeTarget(link);
-            const key = this._getEdgeKey(src, tgt);
-            const entry = this.edgeVertexMap.get(key);
-            if (!entry) return;
-
-            const visible = this._isEdgeVisible(link, ctx);
-            const a = visible ? this.BASE_EDGE_ALPHA : 0.0;
-
-            alphas[entry.start] = a;
-            alphas[entry.end] = a;
-        });
-
-        this.lineSegments.geometry.attributes.alpha.needsUpdate = true;
-    }
-
-    // =========================================================
-    // Internal helpers -- Precomputation
-    // =========================================================
-
-    _precomputeBucketData(buckets) {
-        // buckets: [{ id, start, end, level?, index? }, ...]
-        this.bucketActiveNodes.clear();
-        this._bucketIndex = {
-            buckets,
-            byId: new Map(buckets.map(b => [b.id, b]))
-        };
-
-        // For each bucket, mark which nodes are active in it
-        for (const bucket of buckets) {
-            const active = new Set();
-            this.graph.graphData().links.forEach(link => {
-                if (!this._edgeInBucket(link, bucket)) return;
-
-                const src = this.adapter.getEdgeSource(link);
-                const tgt = this.adapter.getEdgeTarget(link);
-                active.add(src);
-                active.add(tgt);
-            });
-            this.bucketActiveNodes.set(bucket.id, active);
-        }
-    }
-
-
-    _resetState() {
-        this.state.activeBucket = null;
-        this.state.selection.active = false;
-        this.state.selection.selectedNodeId = null;
-        this.state.selection.neighbors.clear();
-        this.state.group.active = false;
-        this.state.group.nodeIds.clear();
-        this.state.group.edgeIds.clear();
-    }
-
-    _getEdgeKey(a, b) {
-        return [a, b].sort().join("--");
-    }
-
-    _isTimeInBucket(t, bucket) {
-      return t >= bucket.start && t < bucket.end;
-      }
-
-    _edgeInBucket(link, bucket) {
-        if (!bucket) return true;
-        const times = this.adapter.getEdgePeriods(link) || []; // currently returns edge.times (compat)
-        for (const t of times) {
-            if (this._isTimeInBucket(t, bucket)) return true;
-        }
-        return false;
-      }
-
-
-    /**
-     * Query node visibility for an arbitrary period context
-     * (used by secondary views like PeriodStack)
-     */
-    isNodeVisibleInContext(nodeId, bucket) {
-        const ctx = {
-            activeBucket: bucket,
-            bucketNodes: bucket ? this.bucketActiveNodes.get(bucket.id) : null,
-            selection: this.state.selection,
-            group: this.state.group
-        };
-        return this._isNodeVisible(String(nodeId), ctx);
-      }
-
-    /**
-     * Query edge visibility for an arbitrary period context
-     */
-    isEdgeVisibleInContext(link, bucket) {
-        const ctx = {
-            activeBucket: bucket,
-            bucketNodes: bucket ? this.bucketActiveNodes.get(bucket.id) : null,
-            selection: this.state.selection,
-            group: this.state.group
-        };
-        return this._isEdgeVisible(link, ctx);
-    }
-
-    _getBucketNeighbors(nodeId, bucket) {
-        const neighbors = new Set();
-        if (!bucket) return neighbors;
-
+    // For each bucket, mark which nodes are active in it
+    for (const bucket of buckets) {
+        const active = new Set();
         this.graph.graphData().links.forEach(link => {
             if (!this._edgeInBucket(link, bucket)) return;
 
             const src = this.adapter.getEdgeSource(link);
             const tgt = this.adapter.getEdgeTarget(link);
-
-            if (src === nodeId) neighbors.add(tgt);
-            if (tgt === nodeId) neighbors.add(src);
+            active.add(src);
+            active.add(tgt);
         });
-
-        return neighbors;
+        this.bucketActiveNodes.set(bucket.id, active);
     }
+}
 
-    setBuckets(buckets) {
+
+_resetState() {
+    this.state.activeBucket = null;
+    this.state.selection.active = false;
+    this.state.selection.selectedNodeId = null;
+    this.state.selection.neighbors.clear();
+    this.state.group.active = false;
+    this.state.group.nodeIds.clear();
+    this.state.group.edgeIds.clear();
+}
+
+_getEdgeKey(a, b) {
+    return [a, b].sort().join("--");
+}
+
+_isTimeInBucket(t, bucket) {
+    return t >= bucket.start && t < bucket.end;
+}
+
+_edgeInBucket(link, bucket) {
+    if (!bucket) return true;
+    const times = this.adapter.getEdgePeriods(link) || []; // currently returns edge.times (compat)
+    for (const t of times) {
+        if (this._isTimeInBucket(t, bucket)) return true;
+    }
+    return false;
+}
+
+
+/**
+ * Query node visibility for an arbitrary period context
+ * (used by secondary views like PeriodStack)
+ */
+isNodeVisibleInContext(nodeId, bucket) {
+    const ctx = {
+        activeBucket: bucket,
+        bucketNodes: bucket ? this.bucketActiveNodes.get(bucket.id) : null,
+        selection: this.state.selection,
+        group: this.state.group
+    };
+    return this._isNodeVisible(String(nodeId), ctx);
+}
+
+/**
+ * Query edge visibility for an arbitrary period context
+ */
+isEdgeVisibleInContext(link, bucket) {
+    const ctx = {
+        activeBucket: bucket,
+        bucketNodes: bucket ? this.bucketActiveNodes.get(bucket.id) : null,
+        selection: this.state.selection,
+        group: this.state.group
+    };
+    return this._isEdgeVisible(link, ctx);
+}
+
+_getBucketNeighbors(nodeId, bucket) {
+    const neighbors = new Set();
+    if (!bucket) return neighbors;
+
+    this.graph.graphData().links.forEach(link => {
+        if (!this._edgeInBucket(link, bucket)) return;
+
+        const src = this.adapter.getEdgeSource(link);
+        const tgt = this.adapter.getEdgeTarget(link);
+
+        if (src === nodeId) neighbors.add(tgt);
+        if (tgt === nodeId) neighbors.add(src);
+    });
+
+    return neighbors;
+}
+
+setBuckets(buckets) {
     this._precomputeBucketData(buckets);
     this.update();
-    }
+}
 
-    // This sections handles updating other UI modules that depend on the user
-    // changing/traversing through different time stamps
-    subscribeToTimeChanges(uiObject) {
-        this.temporal_subscribers.add(uiObject);
-    }
+// This sections handles updating other UI modules that depend on the user
+// changing/traversing through different time stamps
+subscribeToTimeChanges(uiObject) {
+    this.temporal_subscribers.add(uiObject);
+}
 
-    _unsubscribeToTimeChanges(uiObject) {
-        this.temporal_subscribers.delete(uiObject);
-    }
+_unsubscribeToTimeChanges(uiObject) {
+    this.temporal_subscribers.delete(uiObject);
+}
 
-    _notifyTimeChanges(bucket) {
-        this.temporal_subscribers.forEach(uiObject => uiObject(bucket))
-    }
+_notifyTimeChanges(bucket) {
+    this.temporal_subscribers.forEach(uiObject => uiObject(bucket))
+}
 
-    /**
-     * Returns the subset of data currently passing all filters (Time, Group, etc.)
-     */
-    getFilteredData() {
-        const nodes = this.graph.graphData().nodes;
-        const links = this.graph.graphData().links;
-        
-        // Use the internal visibility logic to pick the "winners"
-        const ctx = this._buildVisibilityContext();
-        
-        const visibleLinks = links.filter(l => this._isEdgeVisible(l, ctx));
-        const visibleNodes = nodes.filter(n => this._isNodeVisible(n.id, ctx));
+// This sections add UI modules that update based on selected graph objects
+// e.g node or group selection. Insight Panel
+subscribeToSelection(fn) {
+    this.selection_subscribers.add(fn);
+}
 
-        return { nodes: visibleNodes, links: visibleLinks };
-    }
+unsubscribeFromSelection(fn) {
+    this.selection_subscribers.delete(fn);
+}
+
+_notifyInsights(stats) {
+    this.selection_subscribers.forEach(fn => fn(stats));
+}
+
+/**
+ * Returns the subset of data currently passing all filters (Time, Group, etc.)
+ */
+getFilteredData() {
+    const nodes = this.graph.graphData().nodes;
+    const links = this.graph.graphData().links;
+
+    // Use the internal visibility logic to pick the "winners"
+    const ctx = this._buildVisibilityContext();
+
+    const visibleLinks = links.filter(l => this._isEdgeVisible(l, ctx));
+    const visibleNodes = nodes.filter(n => this._isNodeVisible(n.id, ctx));
+
+    return { nodes: visibleNodes, links: visibleLinks };
+}
 
 }
