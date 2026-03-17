@@ -461,7 +461,7 @@ Graph.nodeColor(d => colorScale(d.group))
 Graph.nodeLabel(node => node.label || node.id)
 Graph.onNodeClick((node, event) => {
   graphController.highlightNode(node.id);
-  broadcastNodeSelection(node.id, 'DIRECT');
+  // broadcastNodeSelection(node.id, 'DIRECT');
 })
 
 async function loadDataset(datasetKey) {
@@ -945,7 +945,7 @@ document.body.appendChild(resetBtn);
 
 resetBtn.addEventListener('click', () => {
   resetGraph();
-  broadcastGraphReset();
+  // broadcastGraphReset();
 });
 
 export function resetGraph() {
@@ -1139,7 +1139,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       case 'DIRECT':
         // highlightSubgraph(graphUpdateNodeId);
         graphController.highlightNode(graphUpdateNodeId)
-        broadcastNodeSelection(graphUpdateNodeId);
+        // broadcastNodeSelection(graphUpdateNodeId);
         break;
     }
     graphUpdateNeeded = false;
