@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
+import { createCapsuleLabel } from './filterUIPanel';
 
 /**
  * HistogramGauge

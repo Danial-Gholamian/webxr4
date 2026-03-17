@@ -38,6 +38,8 @@ export function initStartMenu() {
       const deltaMin = (!isNaN(parsedDelta) && parsedDelta > 0) ? parsedDelta : 50;
       const username = usernameInput.value.trim() || "Anonymous";
 
+      console.log("USERNAME....", username)
+
       startPanel.style.display = "none";
 
       resolve({
@@ -48,7 +50,7 @@ export function initStartMenu() {
     }
 
     startBtn.addEventListener("click", startApp)
-    document.addEventListener("keydown", (event) => {
+    usernameInput.addEventListener("keyup", (event) => {
       if (event.key === "Enter") {
         startApp();
       }

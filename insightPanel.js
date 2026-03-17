@@ -48,12 +48,6 @@ export class InsightPanel {
         this.group.add(this.leftTextGroup);
         this.group.add(this.rightTextGroup);
 
-
-
-        // this.leftColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
-
-        // this.rightColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
-
         // Position above the Histogram
         this.group.position.set(2.8, 1.9, -3.3);
         this.group.rotation.y = -Math.PI / 2.95;

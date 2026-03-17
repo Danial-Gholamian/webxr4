@@ -60,16 +60,26 @@ export function setScene(s) {
 }
 
 
-let username = "Anonymous";
+let username = null;
+
+
+let isConnected = false;
+
+socket.on('connect', () => {
+  isConnected = true;
+
+  if (username) {
+    socket.emit('user-join', { id: socket.id, name: username });
+  }
+});
 
 export function setUsername(name) {
   username = name;
-}
 
-socket.on('connect', () => {
-  console.log('Connected as', socket.id);
-  socket.emit('user-join', { id: socket.id, name: username });
-});
+  if (isConnected) {
+    socket.emit('user-join', { id: socket.id, name: username });
+  }
+}
 
 socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot }) => {
   const username = knownUsers[id] || id;

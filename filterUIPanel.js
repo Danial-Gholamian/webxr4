@@ -181,6 +181,7 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
     while (userListGroup.children.length > 0) userListGroup.remove(userListGroup.children[0]);
 
     Object.entries(knownUsers).forEach(([id, name], index) => {
+      console.log("USERNAME------------------------", name)
       const label = id === selfId ? `${name} (you)` : name;
 
       const capsule = createCapsuleLabel(label, {
