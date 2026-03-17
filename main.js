@@ -1252,7 +1252,12 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
     handleBButtonInput(xrFrame, () => {
       // Show the user guide panel
-      toggleGuidePanel();
+      userGuidePanel.visible = !userGuidePanel.visible;
+    
+      // This part ensures the video plays/pauses
+      if (userGuidePanel.onToggle) {
+          userGuidePanel.onToggle(userGuidePanel.visible);
+      }
 
       // const state = graphController.getState();
 
