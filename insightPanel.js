@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import { Text } from 'troika-three-text';
+import { createCapsuleLabel, createColorDot } from './filterUIPanel';
+
+const FONT_SIZE = 66
+const SUB_HEADING_FONT_SIZE = 70
+
+const HEADER_SPACING = 0.09
+const ROW_SPACING = 0.075
+const SECTION_GAP = 0.08
 
 export class InsightPanel {
     constructor() {
@@ -10,12 +17,13 @@ export class InsightPanel {
 
         // 1. Opaque Background for high contrast
         const bg = new THREE.Mesh(
-            new THREE.PlaneGeometry(1.6, 1.0), 
+            new THREE.PlaneGeometry(1.6, 1.0),
             new THREE.MeshBasicMaterial({
                 color: 0x0a0f1a, // Darker navy for better contrast
                 transparent: true,
                 opacity: 0.98,   // Almost fully opaque to block background "noise"
-                depthWrite: false
+                depthWrite: false,
+                depthTest: false
             })
         );
         this.group.add(bg);
@@ -26,84 +34,142 @@ export class InsightPanel {
         this.group.add(line);
 
         // 3. Title (Bright & Bold)
-        this.title = this._createText("LIVE INSIGHTS", 0.08, 0.4, 0x00ff00);
+        this.title = this._createText("LIVE INSIGHTS", 80, 0.4, 0x00ff00);
         this.title.fontWeight = 'bold';
 
         // 4. Columns
-        this.leftColumn = this._createText("", 0.05, 0.25, 0xffffff);
-        this.leftColumn.anchorX = 'left';
-        this.leftColumn.position.x = -0.75;
-        this.leftColumn.maxWidth = 0.7;
+        this.leftTextGroup = new THREE.Group();
+        this.leftTextGroup.position.x = -0.75;
 
-        this.rightColumn = this._createText("", 0.05, 0.25, 0xffffff);
-        this.rightColumn.anchorX = 'left';
-        this.rightColumn.position.x = 0.1;
-        this.rightColumn.maxWidth = 0.7;
+        this.rightTextGroup = new THREE.Group();
+        this.rightTextGroup.position.x = 0.1;
+
+        this.group.add(this.leftTextGroup);
+        this.group.add(this.rightTextGroup);
+
+
+
+        this.leftColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
+
+        this.rightColumn = this._createText("", FONT_SIZE, 0.25, 0xffffff);
 
         // Position above the Histogram
-        this.group.position.set(2.8, 1.9, -3.3); 
+        this.group.position.set(2.8, 1.9, -3.3);
         this.group.rotation.y = -Math.PI / 2.95;
         this.group.scale.set(1.3, 1.3, 1.3);
     }
 
-    _createText(text, size, y, color) {
-        const t = new Text();
-        t.text = text;
-        t.fontSize = size;
-        t.color = color;
-        t.position.y = y;
-        t.anchorX = 'center';
-        t.anchorY = 'top';
-        t.renderOrder = 1001; // Draw above background
-        t.sync();
-        this.group.add(t);
-        return t;
+    _createText(text, size = FONT_SIZE, y, color) {
+        const label = createCapsuleLabel(text, {
+            fontSize: size,
+            color: color,
+            hoverColor: 0x000000,
+            textColor: color,
+            opacity: 0
+        });
+
+        label.position.set(0, y, 0.01);
+
+        this.group.add(label);
+
+        label.traverse(obj => {
+            if (obj.material) {
+                obj.material.depthTest = false;
+                obj.material.depthWrite = false;
+            }
+        });
+
+        label.renderOrder = 10;
+
+        return label;
+
     }
 
     update(stats, colorScale) {
+
         if (!stats) return;
+        this.leftTextGroup.clear();
+        this.rightTextGroup.clear();
+        this.groupDots.clear();
 
         // 1. Clear existing dots
         this.groupDots.clear();
 
         // 2. Generate Node Text (Left)
-        let nodeText = `TOP STUDENTS\n`;
-        stats.topHubs.forEach((h, i) => nodeText += `${i+1}. ID ${h.id} (${h.count})\n`);
-        
-        nodeText += `\nQUIET STUDENTS\n`;
-        stats.bottomNodes.forEach((n, i) => nodeText += `${i+1}. ID ${n.id} (${n.count})\n`);
+        let y = 0.25;
 
-        if (stats.nodeRank) {
-            nodeText += `\nRANK: ${stats.nodeRank}`;
-        }
+        const header = this._createText("TOP NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
+        header.position.x = -0.4;
 
-        // 3. Generate Group Text (Right) with Dots
-        let groupText = `TOP GROUPS\n`;
-        stats.topGroups.forEach((g, i) => {
-            groupText += `   ${g.name} (${g.count})\n`; // Indent for the dot
+        y -= HEADER_SPACING;
 
-            // Create Color Dot
-            const dotColor = colorScale ? colorScale(g.name) : 0xffffff;
-            const dot = new THREE.Mesh(
-                new THREE.SphereGeometry(0.02, 16, 16),
-                new THREE.MeshBasicMaterial({ color: dotColor })
-            );
-            // Position dot next to the text line
-            dot.position.set(0.13, 0.20 - (i * 0.06), 0.01); 
-            this.groupDots.add(dot);
+        stats.topHubs.forEach((h, i) => {
+            const row = this._createText(`${i + 1}. ID ${h.id} (${h.count})`, FONT_SIZE, y, 0xffffff);
+            row.position.x = -0.4;
+            y -= ROW_SPACING;
+
         });
-        
-        groupText += `\nAVG DENSITY: ${stats.avgDensity}`;
-        
-        if (stats.bestFriends && stats.bestFriends.length > 0) {
-            groupText += `\nFRIENDS: ${stats.bestFriends.join(', ')}`;
-        }
 
-        this.leftColumn.text = nodeText;
-        this.rightColumn.text = groupText;
-        
-        this.leftColumn.sync();
-        this.rightColumn.sync();
+        y -= SECTION_GAP;
+
+        const quietHeader = this._createText("QUIET NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
+        quietHeader.position.x = -0.4;
+
+        y -= HEADER_SPACING;
+
+        stats.bottomNodes.forEach((n, i) => {
+            const row = this._createText(`${i + 1}. ID ${n.id} (${n.count})`, FONT_SIZE, y, 0xffffff);
+            row.position.x = -0.4;
+            y -= ROW_SPACING;
+        });
+
+
+        // 2. Generate Node Text (Right)
+        let yRight = 0.25;
+
+        const groupHeader = this._createText("TOP GROUPS", SUB_HEADING_FONT_SIZE, yRight, 0xffffff);
+        groupHeader.position.x = 0.25;
+
+        yRight -= HEADER_SPACING;
+
+        stats.topGroups.forEach((g, i) => {
+
+            const row = this._createText(`${g.name} (${g.count})`, FONT_SIZE, yRight, 0xffffff);
+
+            row.position.x = 0.30;
+
+            const dotColor = colorScale ? colorScale(g.name) : 0xffffff;
+            const dot = createColorDot(dotColor, 20);
+
+            dot.position.set(0.13, yRight, 0.02);
+
+            dot.material.depthTest = false;
+            dot.material.depthWrite = false;
+            dot.renderOrder = 11;
+
+            this.groupDots.add(dot);
+            yRight -= ROW_SPACING;
+
+        });
+
+        yRight -= SECTION_GAP;
+
+        const density = this._createText(`AVG DENSITY: ${stats.avgDensity}`, FONT_SIZE, yRight, 0xffffff);
+        density.position.x = 0.25;
+
+        yRight -= HEADER_SPACING;
+
+        if (stats.bestFriends?.length) {
+
+            const friends = this._createText(
+                `FRIENDS: ${stats.bestFriends.join(", ")}`,
+                FONT_SIZE,
+                yRight,
+                0xffffff
+            );
+
+            friends.position.x = 0.25;
+        }
     }
 
     getObject3D() {
