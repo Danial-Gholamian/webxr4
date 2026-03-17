@@ -4,7 +4,11 @@ import path from 'path'
 export default {
   base: '/webxr4/',
   build: {
-    outDir: 'docs'
+    outDir: 'docs',
+    target: 'esnext',
+    supported: {
+      'top-level-await': true
+    }
   },
   server: {
     open: true,
