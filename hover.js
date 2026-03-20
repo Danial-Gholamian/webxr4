@@ -9,7 +9,7 @@ let nodeMeshesCache = [];
 let cacheNeedsUpdate = true;
 
 const FONT_SIZE = 0.05;        // 5cm in VR units
-const LASER_DEFAULT_LENGTH = 10; // Default length when hitting nothing (adjust as needed)
+const LASER_DEFAULT_LENGTH = 50; // Default length when hitting nothing (adjust as needed)
 
 // ============================================================
 // HELPER: Reset Node and UI visual states
@@ -131,7 +131,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   tempMatrix.identity().extractRotation(controller.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-  raycaster.far = 2000;
+  raycaster.far = 200;
 
   // --- 3. COLLECT OBJECTS ---
   if (cacheNeedsUpdate) {
