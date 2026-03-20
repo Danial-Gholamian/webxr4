@@ -140,7 +140,7 @@ export class HistogramGauge {
     // Start with zero width
     this.highlightWindow.scale.x = 1;
     this.highlightWindow.position.x = 0;
-
+    this.highlightWindow.renderOrder = 10;
     // Vertically center it
     this.highlightWindow.position.y = this.maxHeight / 2;
 
@@ -159,7 +159,13 @@ export class HistogramGauge {
     });
 
     this.label.position.set(0, -0.12, 0.01);
-
+    this.label.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.renderOrder = 999;
+        child.material.depthTest = false;
+        child.material.depthWrite = false;
+      }
+    });
     this.group.add(this.label);
   }
 
@@ -207,6 +213,13 @@ export class HistogramGauge {
     );
 
     this.label.position.set(0, -0.12, 0.01);
+    this.label.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.renderOrder = 999;
+        child.material.depthTest = false;
+        child.material.depthWrite = false;
+      }
+    });
 
     this.group.add(this.label);
   }
@@ -231,6 +244,13 @@ export class HistogramGauge {
     });
 
     this.label.position.set(0, -0.12, 0.01);
+    this.label.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.renderOrder = 999;
+        child.material.depthTest = false;
+        child.material.depthWrite = false;
+      }
+    });
 
     this.group.add(this.label);
   }
