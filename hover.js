@@ -1,6 +1,6 @@
 // hover.js
 import * as THREE from 'three';
-import { Text } from 'troika-three-text';
+import { createCapsuleLabel } from './filterUIPanel';
 
 const raycaster = new THREE.Raycaster();
 
@@ -60,30 +60,49 @@ export function initLabels(nodeId, groupNum, camera, cameraGroup) {
   const panel = new THREE.Group();
   panel.name = 'NodeIDBillboard';
 
-  const idLabel = new Text();
-  idLabel.text = `Node ${nodeId}\nGroup: ${groupNum}`;
-  idLabel.fontSize = FONT_SIZE;
-  idLabel.color = 0xffffff;
-  idLabel.anchorX = 'center';
-  idLabel.anchorY = 'middle';
-  idLabel.position.set(0, 0, 0.01);
+  // --- NODE LABEL ---
+  const nodeLabel = createCapsuleLabel(`Node: ${nodeId}`, {
+    fontSize: 48,
+    color: 0x222244,
+    textColor: "#ffffff",
+    opacity: 0.9
+  });
 
-  idLabel.sync(() => {
-    if (idLabel.mesh) {
-      idLabel.mesh.renderOrder = 999;
-      idLabel.mesh.material.depthTest = false;
-      idLabel.mesh.material.depthWrite = false;
+  nodeLabel.position.set(0, 0.05, 0);
+
+  // --- GROUP LABEL ---
+  const groupLabel = createCapsuleLabel(`Group: ${groupNum}`, {
+    fontSize: 48,
+    color: 0x222244,
+    textColor: "#ffffff",
+    opacity: 0.9
+  });
+
+  groupLabel.position.set(0, -0.08, 0);
+
+  // --- Ensure always visible ---
+  panel.traverse(obj => {
+    if (obj.material) {
+      obj.material.depthTest = false;
+      obj.material.depthWrite = false;
     }
   });
 
-  panel.add(idLabel);
+  panel.renderOrder = 999;
+
+  panel.add(nodeLabel);
+  panel.add(groupLabel);
+
   cameraGroup.add(panel);
 
+  // --- Billboard behavior ---
   panel.userData.update = () => {
     const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
+
     const worldPosition = new THREE.Vector3()
       .copy(camera.position)
       .add(panelOffset.applyQuaternion(camera.quaternion));
+
     panel.position.copy(worldPosition);
     panel.quaternion.copy(camera.quaternion);
   };

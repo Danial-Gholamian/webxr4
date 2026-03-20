@@ -151,14 +151,14 @@ export class HistogramGauge {
    * Build the text label displayed below the histogram.
    */
   _buildLabel() {
-    this.label = new Text();
-    this.label.text = 'All Time';
-    this.label.fontSize = 0.04;
-    this.label.color = 0x00ff00;
-    this.label.anchorX = 'center';
-    this.label.anchorY = 'top';
-    this.label.position.set(0, -0.05, 0);
-    this.label.sync();
+    this.label = createCapsuleLabel('All Time', {
+      fontSize: 48,
+      color: 0x00ff00,
+      textColor: "#00ff00",
+      opacity: 0.0 // transparent background, text only
+    });
+
+    this.label.position.set(0, -0.12, 0.01);
 
     this.group.add(this.label);
   }
@@ -194,24 +194,46 @@ export class HistogramGauge {
       (actualWidth / 2);
 
     // Update label
-    this.label.text =
-      `${Math.floor(bucket.start)} - ${Math.floor(bucket.end)}`;
-    this.label.sync();
+    this.group.remove(this.label);
+
+    this.label = createCapsuleLabel(
+      `${Math.floor(bucket.start)} - ${Math.floor(bucket.end)}`,
+      {
+        fontSize: 48,
+        color: 0x00ff00,
+        textColor: "#00ff00",
+        opacity: 0.0
+      }
+    );
+
+    this.label.position.set(0, -0.12, 0.01);
+
+    this.group.add(this.label);
   }
 
-/**
- * Reset histogram to full-range default state.
- * Highlight spans entire histogram.
- */
-reset() {
-  // Cover full histogram width
-  this.highlightWindow.scale.x = 1;
-  this.highlightWindow.position.x = 0;
+  /**
+   * Reset histogram to full-range default state.
+   * Highlight spans entire histogram.
+   */
+  reset() {
+    // Cover full histogram width
+    this.highlightWindow.scale.x = 1;
+    this.highlightWindow.position.x = 0;
 
-  // Reset label
-  this.label.text = 'All Time';
-  this.label.sync();
-}
+    // Reset label
+    this.group.remove(this.label);
+
+    this.label = createCapsuleLabel('All Time', {
+      fontSize: 48,
+      color: 0x00ff00,
+      textColor: "#00ff00",
+      opacity: 0.0
+    });
+
+    this.label.position.set(0, -0.12, 0.01);
+
+    this.group.add(this.label);
+  }
 
 }
 
