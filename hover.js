@@ -9,7 +9,7 @@ let nodeMeshesCache = [];
 let cacheNeedsUpdate = true;
 
 const FONT_SIZE = 0.05;        // 5cm in VR units
-const LASER_DEFAULT_LENGTH = 10; // Default length when hitting nothing (adjust as needed)
+const LASER_DEFAULT_LENGTH = 50; // Default length when hitting nothing (adjust as needed)
 
 // ============================================================
 // HELPER: Reset Node and UI visual states
@@ -60,30 +60,58 @@ export function initLabels(nodeId, groupNum, camera, cameraGroup) {
   const panel = new THREE.Group();
   panel.name = 'NodeIDBillboard';
 
+  // --- 1. ChatGPT's Advice: The Background Anchor ---
+  // A dark, semi-transparent backing plate makes text readable and stabilizes VR depth
+  const bgWidth = 0.5;
+  const bgHeight = 0.2;
+  const bgMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(bgWidth, bgHeight),
+    new THREE.MeshBasicMaterial({ 
+      color: 0x111122, 
+      transparent: true, 
+      opacity: 0.85, 
+      depthTest: false,   // Ignore physical depth
+      depthWrite: false   // Don't punch holes
+    })
+  );
+  bgMesh.renderOrder = 9998; // Draw AFTER the main UI panels (which are 0 and 1000)
+  bgMesh.position.set(0, 0, 0); // Base position
+  panel.add(bgMesh);
+
+  // --- 2. My Advice: The Troika Text Override ---
   const idLabel = new Text();
   idLabel.text = `Node ${nodeId}\nGroup: ${groupNum}`;
   idLabel.fontSize = FONT_SIZE;
   idLabel.color = 0xffffff;
   idLabel.anchorX = 'center';
   idLabel.anchorY = 'middle';
-  idLabel.position.set(0, 0, 0.01);
+  
+  // Push text slightly forward from the background plane
+  idLabel.position.set(0, 0, 0.01); 
+  
+  // Text must draw AFTER the background plate (9999 > 9998)
+  idLabel.renderOrder = 9999; 
 
+  // Wait for Troika to generate the material, then override it for VR
   idLabel.sync(() => {
-    if (idLabel.mesh) {
-      idLabel.mesh.renderOrder = 999;
-      idLabel.mesh.material.depthTest = false;
-      idLabel.mesh.material.depthWrite = false;
+    if (idLabel.material) {
+      idLabel.material.depthTest = false;
+      idLabel.material.depthWrite = false;
+      idLabel.material.needsUpdate = true;
     }
   });
 
   panel.add(idLabel);
   cameraGroup.add(panel);
 
+  // --- 3. Follow the Camera ---
   panel.userData.update = () => {
-    const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
+    // Moved slightly down and out so it doesn't block the exact center of vision
+    const panelOffset = new THREE.Vector3(0, -0.15, -0.6); 
     const worldPosition = new THREE.Vector3()
       .copy(camera.position)
       .add(panelOffset.applyQuaternion(camera.quaternion));
+    
     panel.position.copy(worldPosition);
     panel.quaternion.copy(camera.quaternion);
   };
@@ -112,7 +140,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   tempMatrix.identity().extractRotation(controller.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-  raycaster.far = 2000;
+  raycaster.far = 200;
 
   // --- 3. COLLECT OBJECTS ---
   if (cacheNeedsUpdate) {
