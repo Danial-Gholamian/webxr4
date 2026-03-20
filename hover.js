@@ -53,52 +53,75 @@ function resetAllHoverStates(controller, cameraGroup) {
   controller.userData.lastHoveredNodeId = null;
 }
 
-export function initLabels(nodeId, groupNum, camera, cameraGroup) {
+export function initLabels(nodeId, groupNum, nodeColorHex, camera, cameraGroup) {
   const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
   if (oldPanel) cameraGroup.remove(oldPanel);
 
   const panel = new THREE.Group();
   panel.name = 'NodeIDBillboard';
 
-  // --- NODE LABEL ---
-  const nodeLabel = createCapsuleLabel(`Node: ${nodeId}`, {
-    fontSize: 48,
-    color: 0x222244,
-    textColor: "#ffffff",
-    opacity: 0.9
+  // --- Create the Canvas ---
+  const canvasWidth = 512;
+  const canvasHeight = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext("2d");
+
+  // --- Draw the Background Plate ---
+  const radius = 30;
+  ctx.fillStyle = 'rgba(20, 25, 35, 0.9)'; 
+  ctx.beginPath();
+  ctx.moveTo(radius, 0);
+  ctx.lineTo(canvasWidth - radius, 0);
+  ctx.quadraticCurveTo(canvasWidth, 0, canvasWidth, radius);
+  ctx.lineTo(canvasWidth, canvasHeight - radius);
+  ctx.quadraticCurveTo(canvasWidth, canvasHeight, canvasWidth - radius, canvasHeight);
+  ctx.lineTo(radius, canvasHeight);
+  ctx.quadraticCurveTo(0, canvasHeight, 0, canvasHeight - radius);
+  ctx.lineTo(0, radius);
+  ctx.quadraticCurveTo(0, 0, radius, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // --- Draw the Text ---
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = 'bold 65px Arial';
+  ctx.fillText(`Node ${nodeId}`, canvasWidth / 2, canvasHeight / 2 - 25);
+  
+  ctx.font = '50px Arial';
+  // Use the dynamically passed color, or fallback to green if it fails
+  ctx.fillStyle = nodeColorHex || '#00ffaa'; 
+  ctx.fillText(`Group: ${groupNum}`, canvasWidth / 2, canvasHeight / 2 + 45);
+
+  // --- Create the Material (Matching your filter UI exactly!) ---
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false // <-- Stops the fog/lighting from washing it out!
   });
 
-  nodeLabel.position.set(0, 0.05, 0);
+  const aspect = canvasWidth / canvasHeight;
+  const geometry = new THREE.PlaneGeometry(0.15 * aspect, 0.15); 
+  const idLabelMesh = new THREE.Mesh(geometry, material);
+  
+  idLabelMesh.renderOrder = 9999; 
 
-  // --- GROUP LABEL ---
-  const groupLabel = createCapsuleLabel(`Group: ${groupNum}`, {
-    fontSize: 48,
-    color: 0x222244,
-    textColor: "#ffffff",
-    opacity: 0.9
-  });
-
-  groupLabel.position.set(0, -0.08, 0);
-
-  // --- Ensure always visible ---
-  panel.traverse(obj => {
-    if (obj.material) {
-      obj.material.depthTest = false;
-      obj.material.depthWrite = false;
-    }
-  });
-
-  panel.renderOrder = 999;
-
-  panel.add(nodeLabel);
-  panel.add(groupLabel);
-
+  panel.add(idLabelMesh);
   cameraGroup.add(panel);
 
-  // --- Billboard behavior ---
+  // --- Position it comfortably above the Filter Panel ---
   panel.userData.update = () => {
-    const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
-
+    // Moved to Y: -0.1 and Z: -0.6 (Closer and higher than the Filter UI)
+    const panelOffset = new THREE.Vector3(0, -0.1, -0.6);
     const worldPosition = new THREE.Vector3()
       .copy(camera.position)
       .add(panelOffset.applyQuaternion(camera.quaternion));
@@ -255,7 +278,12 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
           triggerHaptic();
           controller.userData.lastPulseTime = now;
         }
-        initLabels(nodeId, groupNum, camera, cameraGroup);
+        
+        // Extract the exact hex color of the 3D node you are pointing at
+        const colorHex = '#' + hit.material.color.getHexString();
+        
+        // Pass the colorHex into our updated function!
+        initLabels(nodeId, groupNum, colorHex, camera, cameraGroup);
       }
 
       controller.userData.lastHoveredObject = hit;

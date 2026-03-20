@@ -1184,14 +1184,10 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
   const hoverPanel = cameraGroup.getObjectByName('NodeIDBillboard');
-  if (hoverPanel) {
-    const panelOffset = new THREE.Vector3(0, -0.3, -0.8);
-    const worldPosition = new THREE.Vector3()
-      .copy(camera.position)
-      .add(panelOffset.applyQuaternion(camera.quaternion));
-    hoverPanel.position.copy(worldPosition);
-    if (inVR) hoverPanel.userData.update?.();
-  }
+    if (hoverPanel && inVR) {
+      // Just trigger the update. Let hover.js handle the math and coordinates!
+      hoverPanel.userData.update?.();
+    }
 
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
