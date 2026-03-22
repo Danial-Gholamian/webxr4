@@ -58,95 +58,20 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   uiPanel.userData.bgPlane = bgPlane;
   uiPanel.add(bgPlane);
 
-  // OLD SECTION FOR CHANGING DATASETS
-
-  // const datasetTitle = new Text();
-  // datasetTitle.text = 'Dataset';
-  // datasetTitle.fontSize = TITLE_SIZE * 0.85;
-  // datasetTitle.color = 0xffffff;
-  // datasetTitle.anchorX = 'center';
-  // datasetTitle.position.set(0, cursorY, 0.01);
-  // datasetTitle.sync();
-  // datasetTitle.renderOrder = 10; // <--- Higher than the background (0)
-    
-  // datasetTitle.material.depthWrite = false;
-
-  // uiPanel.add(datasetTitle);
-
-  // // move cursor down
-  // // cursorY -= SECTION_GAP;
-  // cursorY -= SECTION_GAP * 1.2;
-
-
-  // let datasetStartY = 0.12;
-
-  // options.datasets.forEach((ds, index) => {
-  //   const capsule = createCapsuleLabel(ds.id, {
-  //     fontSize: ITEM_SIZE,
-  //     color: 0x2a2a3d,
-  //     hoverColor: 0x444488,
-  //     padding: 0.03,
-  //     onClick: () => {
-  //       console.log(`Dataset selected: ${ds.id}`);
-  //       // local switch data set
-  //       switchDataset(ds.key);
-
-  //       // broadcast it across :) 
-  //       broadcastDatasetChange(ds.key)
-  //     }
-  //   });
-
-  //   capsule.position.set(0, cursorY, 0.01);
-  //   uiPanel.add(capsule);
-
-  //   cursorY -= ROW_SPACING * 0.8;
-  // });
-
-  // cursorY -= SECTION_GAP * 0.5;
-
-
-  // periodTitle = new Text();
-  // periodTitle.text = 'Time of the day: Default 📚';
-  // periodTitle.fontSize = TITLE_SIZE;
-  // periodTitle.color = 0xffffff;
-  // periodTitle.anchorX = 'center';
-  // // periodTitle.position.set(0, 0.35, 0.01);
-  // periodTitle.position.set(0, cursorY, 0.01);
-  // periodTitle.renderOrder = 10; // <--- Higher than the background (0)
-    
-  // periodTitle.material.depthWrite = false;
-  // cursorY -= SECTION_GAP * 0.7;
-  // periodTitle.sync();
-
-
-
-  // selectedNodeLabel = new Text();
-  // selectedNodeLabel.text = 'Selected node: None';
-  // // selectedNodeLabel.fontSize = FONT_SIZE * 0.9;
-  // selectedNodeLabel.fontSize = ITEM_SIZE;
-  // selectedNodeLabel.color = 0xffffff;
-  // selectedNodeLabel.anchorX = 'center';
-  // // selectedNodeLabel.position.set(0, 0.28, 0.01); // just below periodTitle
-  // selectedNodeLabel.position.set(0, cursorY, 0.01);
-  // selectedNodeLabel.renderOrder = 10; // <--- Higher than the background (0)
-    
-  // selectedNodeLabel.material.depthWrite = false;
-  // cursorY -= SECTION_GAP;
-  // selectedNodeLabel.sync();
 
   selectedNodeLabel = createCapsuleLabel('Selected node: None', {
     color: 0xffaa00,
     hoverColor: 0xffaa00
   })
-    selectedNodeLabel.position.set(0, cursorY, 0.01);
+  selectedNodeLabel.position.set(0, cursorY, 0.01);
   // uiPanel.add(periodTitle);
   uiPanel.add(selectedNodeLabel);
 
 
   uiPanel.userData.updateSelectedNodeLabel = (nodeId) => {
-  selectedNodeLabel.userData.setText(
-    `Selected node: ${nodeId ?? 'None'}`
-  );
+    selectedNodeLabel.userData.setText(
+      `Selected node: ${nodeId ?? 'None'}`
+    );
   };
 
   cursorY -= ROW_SPACING * 1.2;
@@ -243,7 +168,7 @@ export function updateGroupList(uiPanel, groupColors) {
     // );
 
     const dot = createColorDot(group.color);
-    
+
     dot.material.depthTest = false;
     dot.material.depthWrite = false;
     dot.renderOrder = 1000;
@@ -499,12 +424,12 @@ export function createCapsuleLabel(text, {
   drawCapsule(color);
 
 
-const material = new THREE.MeshBasicMaterial({
-  map: texture,
-  transparent: true,
-  depthTest: false,
-  toneMapped: false
-});
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    toneMapped: false
+  });
 
   const aspect = canvas.width / canvas.height;
 
@@ -613,4 +538,22 @@ function layoutVertical(container, startY, spacing) {
 
 }
 
+
+export function createSelectionRing() {
+  const geometry = new THREE.RingGeometry(0.12, 0.18, 32);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffff00,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false
+  });
+
+  const ring = new THREE.Mesh(geometry, material);
+
+  // Make it face camera
+  ring.userData.isSelectionRing = true;
+
+  return ring;
+}
 
