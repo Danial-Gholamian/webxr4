@@ -953,19 +953,22 @@ resetBtn.addEventListener('click', () => {
   // broadcastGraphReset();
 });
 
+
 export function resetGraph() {
+  // Instead of resetting the whole thing, just reset the selection :)
+  graphController.clearAllSelection()
 
-  graphController.clearGroupFilter()
-  updatePeroidLabel('Default');
-  uiPanel.userData.updateSelectedNodeLabel?.(null);
+  // graphController.clearGroupFilter()
+  // updatePeroidLabel('Default');
+  // uiPanel.userData.updateSelectedNodeLabel?.(null);
 
-  graphController.resetAll()
-  histogram.reset()
-  // updateBarGauge(timeGauge, 0, "Default");
-  if (navigator && root) {
-    navigator.selectNode(root); // Point the brain back to the top of the tree
-    dispatchTemporalUpdate();   // Force the Panel, Graph, and UI to sync to the root
-  }
+  // graphController.resetAll()
+  // histogram.reset()
+  // // updateBarGauge(timeGauge, 0, "Default");
+  // if (navigator && root) {
+  //   navigator.selectNode(root); // Point the brain back to the top of the tree
+  //   dispatchTemporalUpdate();   // Force the Panel, Graph, and UI to sync to the root
+  // }
 }
 
 

@@ -255,6 +255,7 @@ export class GraphVisualController {
 
 
     resetAll() {
+        console.log("RESET ALL IN PROGRESS...")
         console.log("edgeVertexMap size:", this.edgeVertexMap.size);
         this._resetState();
 
@@ -640,4 +641,9 @@ export class GraphVisualController {
         return { nodes: visibleNodes, links: visibleLinks };
     }
 
+
+    clearAllSelection() {
+        this._clearNodeSelectionState()
+        this.clearGroupFilter()
+    }
 }
