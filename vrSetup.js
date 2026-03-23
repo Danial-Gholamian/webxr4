@@ -36,7 +36,7 @@ function setupController(controller, index, renderer, cameraGroup) {
   laser.scale.z = laserDistance;
   console.log(`Laser lenght ${laserDistance}`)
   laser.userData.isLaser = true;
-
+// comment
   controller.add(laser);
   controller.userData.laser = laser;
   cameraGroup.add(controller);
