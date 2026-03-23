@@ -47,6 +47,7 @@ import { gridGeo, gridMaterial } from './skybox.js';
 import { calculateInsights } from './insightSystem.js';
 import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
+import { SlidingTimelineManager } from './SlidingTimelineManager.js';
 
 // INTIALIZE THE START MENU AND GLOBAL VARIABLES
 const { datasetKey, deltaMin, username } = await initStartMenu();
@@ -55,11 +56,14 @@ let selectedDatasetKey = datasetKey;
 setUsername(username)
 export const myUsername = username
 
+let stickHoldTimer = 0;
+const HOLD_THRESHOLD = 0.3; // Seconds before a click turns into a slide
+const SLIDE_SPEED = 15; // Steps per second while holding
 
+// ONLY DECLARE IT HERE. DO NOT INITIALIZE IT YET.
+export let timelineManager = null; 
 
 let levelIndex = 0;
-let bucketIndex = null;
-let autoplayInterval = null;
 
 
 // Graph data variables
@@ -569,82 +573,29 @@ applyDataset(dataset, periods)
 // ========================
 
 
+// ========================
+// SLIDING TIMELINE SETUP
+// ========================
 
-const b = 4;
-// const deltaMin = 50; // arbitrary test value
 // Use the ORIGINAL dataset, not ForceGraph-mutated data
 const allTimes = dataset.__allTimes ?? [];
-
-// ==========
 const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
-console.log("VALUE T: ", T)
+console.log("VALUE T: ", T);
 
+const globalStart = 0; 
+const globalDuration = T - globalStart;
+const initialWindowSize = 500;
 
+// NOW WE INITIALIZE IT!
+timelineManager = new SlidingTimelineManager(globalStart, globalDuration, initialWindowSize);
 
-let levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
-let root = buildTemporalTree(levels, 4);
-let navigator = createTemporalNavigator(root);
-
+// We will update the inside of this panel in the next step!
 const temporalPanel = createTemporalDrillPanel({
   cameraGroup: cameraGroup,
   camera: camera,
-  navigator: navigator,
-  graphController: graphController,
-  onStateChange: dispatchTemporalUpdate,    // NEW
-  getDeltaMin: () => userDeltaMin,          // NEW
-  onDeltaChange: updateDeltaMin             // NEW
+  timelineManager: timelineManager,
+  graphController: graphController
 });
-
-// --- UNIFIED TEMPORAL DISPATCHER ---
-export function dispatchTemporalUpdate() {
-  const activeBucket = navigator.getCurrentNode();
-  if (!activeBucket) return;
-
-  graphController.highlightBucket(activeBucket);
-
-  if (temporalPanel.group.visible) {
-    temporalPanel.show();
-  }
-}
-
-// experiment
-// window.getVRInsights = () => {
-//     const controller = getGraphController();
-
-//     // 1. Get the data that the user is actually seeing right now
-//     const { nodes, links } = controller.getFilteredData();
-
-//     // 2. Determine the current selection state
-//     const selection = {
-//         type: 'NONE',
-//         id: null
-//     };
-
-//     if (controller.state.selection.active) {
-//         selection.type = 'NODE';
-//         selection.id = controller.state.selection.selectedNodeId;
-//     } else if (controller.state.group.active) {
-//         selection.type = 'GROUP';
-//         // Note: You might need to store the raw group name in state 
-//         // if you want to show group-specific insights later.
-//     }
-
-//     // 3. Calculate
-//     const stats = calculateInsights(nodes, links, selection);
-
-//     // 4. Output to console for your testing
-//     console.log("%c--- INSIGHT REPORT ---", "color: #00ff00; font-weight: bold;");
-//     console.log(`Visible Nodes: ${nodes.length} | Visible Edges: ${links.length}`);
-//     console.log("Top 3 Active Students:", stats.topHubs);
-//     console.log("Top 3 Active Groups:", stats.topGroups);
-
-//     if (selection.type === 'NODE') {
-//         console.log(`%cSelection (Node ${selection.id}): Rank ${stats.nodeRank}`, "color: #00aaff");
-//         console.log("Best Friends:", stats.bestFriends);
-//     }
-
-//     return stats;
-// };
 
 // --- NEW: REBUILD TREE FUNCTION ---
 export function updateDeltaMin(amount) {
@@ -666,18 +617,8 @@ export function updateDeltaMin(amount) {
   dispatchTemporalUpdate();
 }
 
-function handleTemporalShift(direction) {
-  // -1 to the left
-  //  1 to the right
-  const newNode = navigator.shiftSibling(direction);
-  if (newNode) {
-    dispatchTemporalUpdate();
-  }
-}
 
-const globalStart = 0; // Or math.min(...dataset.__allTimes) if it doesn't start at 0
-const globalDuration = T - globalStart;
-// // Create 60 bars across the timeline
+
 const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 
 
@@ -1192,31 +1133,82 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       hoverPanel.userData.update?.();
     }
 
-  if (inVR && xrFrame) {
+if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
-    // clampCameraToRoom();
+    
+    // Calculate deltaTime for smooth sliding and timers
     const deltaTime = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
-    // --- Graph scaling with stick buttons ---
-    handleLeftStickButton(xrFrame, () => {
-      handleTemporalShift(-1);
-      if (userGuidePanel.visible) {
-        prevGuidePage(userGuidePanel);
-      };
-
-      console.log("Left stick clicked")
-    });
     animatePuppetHands(xrFrame, renderer);
-    handleRightStickButton(xrFrame, () => {
-      console.log("Right stick clicked")
-      handleTemporalShift(1);
-      if (userGuidePanel.visible) {
-        nextGuidePage(userGuidePanel);
-      };
-      // temporalPanel.toggle();
-    });
 
+    // ============================================================
+    // NEW: "Click-to-Step, Hold-to-Slide" Logic
+    // ============================================================
+    let isLeftStickPressed = false;
+    let isRightStickPressed = false;
+
+    // 1. Manually check raw stick button state (index 3)
+    for (const source of xrFrame.session.inputSources) {
+      if (source.gamepad && source.gamepad.buttons.length > 3) {
+        if (source.handedness === 'left') {
+          isLeftStickPressed = source.gamepad.buttons[3].pressed;
+        } else if (source.handedness === 'right') {
+          isRightStickPressed = source.gamepad.buttons[3].pressed;
+        }
+      }
+    }
+
+    let shifted = false;
+    let direction = 0;
+    let slideAmount = 0;
+
+    // 2. Process the input
+    if (isLeftStickPressed || isRightStickPressed) {
+      stickHoldTimer += deltaTime;
+      direction = isRightStickPressed ? 1 : -1;
+
+      if (stickHoldTimer === deltaTime) { 
+        // --- FIRST FRAME (SINGLE CLICK) ---
+        console.log(`${direction === 1 ? "Right" : "Left"} stick clicked`);
+        slideAmount = 1; // Step exactly by 1
+        shifted = true;
+
+        // Handle User Guide Pagination only on the initial click
+        if (userGuidePanel.visible) {
+          if (direction === 1) nextGuidePage(userGuidePanel);
+          else prevGuidePage(userGuidePanel);
+        }
+
+      } else if (stickHoldTimer > HOLD_THRESHOLD) { 
+        // --- HOLDING DOWN (SLIDING) ---
+        // Multiply speed by deltaTime so it slides smoothly regardless of FPS
+        slideAmount = SLIDE_SPEED * deltaTime; 
+        shifted = true;
+      }
+    } else {
+      // --- RELEASED ---
+      if (stickHoldTimer > 0) {
+        // User just let go of the stick. 
+        // Fire a single physics reheat to let the graph "settle" nicely into place
+        Graph.d3ReheatSimulation?.();
+      }
+      stickHoldTimer = 0; // Reset timer
+    }
+
+    // 3. Apply the shift if needed
+    if (shifted) {
+      timelineManager.shift(direction, slideAmount);
+      const newBucket = timelineManager.getCurrentBucket();
+
+      // CRITICAL: Clear the cache so sliding doesn't crash the VR headset memory!
+      graphController.bucketActiveNodes.clear();
+
+      // Update Visuals (Controller & Scented Widget)
+      graphController.highlightBucket(newBucket);
+      if (histogram) histogram.onTimeChange(newBucket);
+    }
+    // ============================================================
 
     // Smoothly interpolate scale
     const currentScale = graphRoot.scale.x;
@@ -1257,23 +1249,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       if (userGuidePanel.onToggle) {
           userGuidePanel.onToggle(userGuidePanel.visible);
       }
-
-      // const state = graphController.getState();
-
-      // const context = {
-      //   groupName: state.activeGroup,
-      //   period: state.activePeriod,
-      //   selectedNodeId: state.selectedNodeId
-      // };
-
-      // if (!periodStack || periodStack.group.visible === false) {
-      //   rebuildPeriodStack();
-      //   periodStack.show();
-      //   broadcastPeriodStackToggle(true, context);
-      // } else {
-      //   periodStack.hide();
-      //   broadcastPeriodStackToggle(false, context);
-      // }
     });
 
     handleYButtonInput(xrFrame, () => {
@@ -1288,7 +1263,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         }
       });
     })
-
 
     if (!periodStack?.group?.visible) {
       detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
