@@ -43,7 +43,7 @@ import {
   createTemporalNavigator
 } from './temporalHierarchy.js';
 import { createTemporalDrillPanel } from './temporalDrillPanel.js';
-import { gridGeo, gridMaterial } from './skybox.js';
+import { createSky, gridGeo, gridMaterial, keepUserNearGraph } from './skybox.js';
 import { calculateInsights } from './insightSystem.js';
 import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
@@ -109,8 +109,14 @@ const scene = new THREE.Scene();
 // });
 
 // scene.background = new THREE.Color(0x111827);
+
 scene.background = new THREE.Color(0x1a2638);
-scene.fog = new THREE.FogExp2(0x1a2638, 0.004);
+// scene.fog = new THREE.FogExp2(0x1a2638, 0.004);
+// scene.fog = new THREE.FogExp2(0x020617, 0.0025);
+scene.fog = new THREE.FogExp2(0x0f2238, 0.0015);
+
+const sky = createSky();
+scene.add(sky);
 
 const grid = new THREE.Mesh(gridGeo, gridMaterial)
 scene.add(grid)
@@ -1089,6 +1095,8 @@ const _snapPos = new THREE.Vector3();
 
 renderer.setAnimationLoop((timestamp, xrFrame) => {
 
+  sky.position.copy(camera.position);
+
   // SKYBOX RENDERING 
   grid.position.x = Math.floor(camera.position.x / 10) * 10;
   grid.position.z = Math.floor(camera.position.z / 10) * 10;
@@ -1099,6 +1107,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
   //setupNinjaHands(scene, renderer)
 
+  keepUserNearGraph()
 
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
