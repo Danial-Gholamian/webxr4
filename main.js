@@ -58,8 +58,7 @@ export const myUsername = username
 
 let stickHoldTimer = 0;
 const HOLD_THRESHOLD = 0.3; // Seconds before a click turns into a slide
-const SLIDE_SPEED = 15; // Steps per second while holding
-
+const SLIDE_SPEED = 100;
 // ONLY DECLARE IT HERE. DO NOT INITIALIZE IT YET.
 export let timelineManager = null; 
 
