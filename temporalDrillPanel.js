@@ -12,7 +12,6 @@ export function createTemporalDrillPanel({
   timelineManager, // We pass our new manager here
   graphController
 }) {
-  let activeResize = 0; // -1 (shrink), +1 (grow), 0 (idle)
   const panel = new THREE.Group();
   panel.name = 'TemporalDrillPanel';
 
@@ -33,6 +32,7 @@ export function createTemporalDrillPanel({
 
   cameraGroup.add(panel);
   panel.visible = false;
+  cameraGroup.userData.temporalPanel = panel;
 
   let interactables = [];
 
@@ -84,14 +84,25 @@ export function createTemporalDrillPanel({
       hoverColor: 0xaa4444,
 
       onClick: () => {
-        activeResize = -1;
+        timelineManager.setWindowSize(
+          timelineManager.windowSize - 20
+        );
+
+        const newBucket = timelineManager.getCurrentBucket();
+
+        graphController.bucketActiveNodes.clear();
+        graphController.highlightBucket(newBucket);
+
+        if (window.histogramRef) {
+          window.histogramRef.onTimeChange(newBucket);
+        }
+
+        render();
       }
     });
 
     minusBtn.userData.isInteractable = true;
-    minusBtn.userData.onRelease = () => {
-      activeResize = 0;
-    };
+
 
     minusBtn.position.set(-0.35, yCursor, 0);
     minusBtn.userData.isInteractable = true;
@@ -105,14 +116,25 @@ export function createTemporalDrillPanel({
       hoverColor: 0x44aa44,
 
       onClick: () => {
-        activeResize = +1;
+        timelineManager.setWindowSize(
+          timelineManager.windowSize + 20
+        );
+
+        const newBucket = timelineManager.getCurrentBucket();
+
+        graphController.bucketActiveNodes.clear();
+        graphController.highlightBucket(newBucket);
+
+        if (window.histogramRef) {
+          window.histogramRef.onTimeChange(newBucket);
+        }
+
+        render();
       }
     });
 
     plusBtn.userData.isInteractable = true;
-    plusBtn.userData.onRelease = () => {
-      activeResize = 0;
-    };
+
     plusBtn.position.set(0.35, yCursor, 0);
     plusBtn.userData.isInteractable = true;
     panel.add(plusBtn);
@@ -143,25 +165,6 @@ export function createTemporalDrillPanel({
     panel.position.copy(headPos).add(offset);
     panel.quaternion.copy(headRot);
 
-    // Continuous resize
-    if (activeResize !== 0) {
-      const RESIZE_SPEED = 100; // tweak this
-
-      timelineManager.setWindowSize(
-        timelineManager.windowSize + activeResize * RESIZE_SPEED * 0.016
-      );
-
-      const newBucket = timelineManager.getCurrentBucket();
-
-      graphController.bucketActiveNodes.clear();
-      graphController.highlightBucket(newBucket);
-
-      if (window.histogramRef) {
-        window.histogramRef.onTimeChange(newBucket);
-      }
-
-      render(); // keep label updated
-    }
   }
 
   function show() {

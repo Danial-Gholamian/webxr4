@@ -1177,7 +1177,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     let isRightStickPressed = false;
     let isLeftTriggerPressed = false;
     let isRightTriggerPressed = false;
-    
+
 
 
     // 1. Manually check raw stick button state (index 3)
@@ -1277,6 +1277,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     let resized = false;
 
 
+    if (!cameraGroup.userData.temporalPanel?.visible) {
       if (isLeftTriggerPressed) {
         timelineManager.setWindowSize(
           timelineManager.windowSize - RESIZE_SPEED * deltaTime
@@ -1290,6 +1291,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         );
         updateTimeWindow();
       }
+    }
 
     if (resized) {
       updateTimeWindow();

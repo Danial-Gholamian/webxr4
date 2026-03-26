@@ -12,7 +12,6 @@ export class SlidingTimelineManager {
     this.stepResolution = 1; // Always 1 for now
   }
 
-  // Move forward or backward
   shift(direction, amount = this.stepResolution) {
     this.currentStart += (direction * amount);
 
@@ -23,7 +22,7 @@ export class SlidingTimelineManager {
     );
   }
 
-  // Change window size via the Panel
+
   setWindowSize(newSize) {
     this.windowSize = Math.max(1, newSize); // Prevent window size of 0
 
@@ -36,7 +35,7 @@ export class SlidingTimelineManager {
     );
   }
 
-  // Generates the bucket format your GraphVisualController expects
+
   getCurrentBucket() {
     return {
       id: `window_${this.currentStart.toFixed(2)}_${this.windowSize}`,
