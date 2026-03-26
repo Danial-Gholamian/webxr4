@@ -30,7 +30,7 @@ import {
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
-import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle, setUsername } from './network.js';
+import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUIPanel, setUsername } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
@@ -57,11 +57,15 @@ setUsername(username)
 export const myUsername = username
 
 let stickHoldTimer = 0;
-const HOLD_THRESHOLD = 0.3; // Seconds before a click turns into a slide
-const SLIDE_SPEED = 15; // Steps per second while holding
+const HOLD_THRESHOLD = 0.2; // Seconds before a click turns into a slide
+const SLIDE_SPEED = 50; // Steps per second while holding
+
+let triggerHoldTime = 0;
+const TRIGGER_HOLD_THRESHOLD = 0.25; // seconds
+let wasTriggerPressed = false;
 
 // ONLY DECLARE IT HERE. DO NOT INITIALIZE IT YET.
-export let timelineManager = null; 
+export let timelineManager = null;
 
 let levelIndex = 0;
 
@@ -582,12 +586,12 @@ const allTimes = dataset.__allTimes ?? [];
 const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
 console.log("VALUE T: ", T);
 
-const globalStart = 0; 
+const globalStart = 0;
 const globalDuration = T - globalStart;
-const initialWindowSize = 500;
+
 
 // NOW WE INITIALIZE IT!
-timelineManager = new SlidingTimelineManager(globalStart, globalDuration, initialWindowSize);
+timelineManager = new SlidingTimelineManager(globalStart, globalDuration);
 
 // We will update the inside of this panel in the next step!
 const temporalPanel = createTemporalDrillPanel({
@@ -628,12 +632,20 @@ const histogram = new HistogramGauge({
   globalStart,
   globalDuration,
   onBucketSelected: (bucket) => {
-    graphController.highlightBucket(bucket);
+    timelineManager.currentStart = bucket.start;
+
+    const newBucket = timelineManager.getCurrentBucket();
+
+    graphController.bucketActiveNodes.clear();
+    graphController.highlightBucket(newBucket);
+    histogram.onTimeChange(newBucket);
   }
 });
 
 // Add it to the VR camera space
 cameraGroup.add(histogram.getObject3D());
+cameraGroup.userData.histogram = histogram;
+window.histogramRef = histogram
 
 
 // Subscribe to controller temporal updates
@@ -861,6 +873,22 @@ function requestGraphUpdate(mode, nodeId) {
 graphController.setSelectionListener((nodeId) => {
   uiPanel.userData.updateSelectedNodeLabel?.(nodeId);
 });
+
+// update scented widget
+function updateTimeWindow() {
+  const newBucket = timelineManager.getCurrentBucket();
+
+  // Clear cache (important for performance)
+  graphController.bucketActiveNodes.clear();
+
+  // Update graph
+  graphController.highlightBucket(newBucket);
+
+  // Update histogram (visual highlight box)
+  if (histogram) {
+    histogram.onTimeChange(newBucket);
+  }
+}
 
 
 setUIPanel(uiPanel);
@@ -1128,17 +1156,17 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
   const hoverPanel = cameraGroup.getObjectByName('NodeIDBillboard');
-    if (hoverPanel && inVR) {
-      // Just trigger the update. Let hover.js handle the math and coordinates!
-      hoverPanel.userData.update?.();
-    }
+  if (hoverPanel && inVR) {
+    // Just trigger the update. Let hover.js handle the math and coordinates!
+    hoverPanel.userData.update?.();
+  }
 
-if (inVR && xrFrame) {
+  if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
-    
-    // Calculate deltaTime for smooth sliding and timers
-    const deltaTime = (timestamp - lastTime) / 1000;
-    lastTime = timestamp;
+
+    // // Calculate deltaTime for smooth sliding and timers
+    // const deltaTime = (timestamp - lastTime) / 1000;
+    // lastTime = timestamp;
 
     animatePuppetHands(xrFrame, renderer);
 
@@ -1147,9 +1175,34 @@ if (inVR && xrFrame) {
     // ============================================================
     let isLeftStickPressed = false;
     let isRightStickPressed = false;
+    let isLeftTriggerPressed = false;
+    let isRightTriggerPressed = false;
+    
+
 
     // 1. Manually check raw stick button state (index 3)
     for (const source of xrFrame.session.inputSources) {
+      // Listen for holding the trigger button
+      for (const source of xrFrame.session.inputSources) {
+        if (source.gamepad) {
+          const gp = source.gamepad;
+
+          if (source.handedness === 'left') {
+            isLeftTriggerPressed = gp.buttons[0]?.pressed;
+            if (isLeftTriggerPressed) {
+              console.log("LEFT TRIGGER");
+            }
+          }
+
+          if (source.handedness === 'right') {
+            isRightTriggerPressed = gp.buttons[0]?.pressed;
+            if (isRightTriggerPressed) {
+              console.log("RIGHT TRIGGER");
+            }
+          }
+        }
+      }
+
       if (source.gamepad && source.gamepad.buttons.length > 3) {
         if (source.handedness === 'left') {
           isLeftStickPressed = source.gamepad.buttons[3].pressed;
@@ -1157,56 +1210,89 @@ if (inVR && xrFrame) {
           isRightStickPressed = source.gamepad.buttons[3].pressed;
         }
       }
+
+      const isTriggerPressed = isLeftTriggerPressed || isRightTriggerPressed;
+
+      if (isTriggerPressed) {
+        triggerHoldTime += deltaTime;
+      } else {
+        // Trigger released → check if it was a tap
+        if (wasTriggerPressed && triggerHoldTime < TRIGGER_HOLD_THRESHOLD) {
+          // 👉 THIS IS A CLICK (tap)
+          console.log("TRIGGER TAP → should select");
+
+          // Let your existing raycast click system run
+          // (do nothing special here)
+        }
+
+        triggerHoldTime = 0;
+      }
+
+      wasTriggerPressed = isTriggerPressed;
     }
 
+
+
+
+    // 2. Process the input
     let shifted = false;
     let direction = 0;
     let slideAmount = 0;
 
-    // 2. Process the input
-    if (isLeftStickPressed || isRightStickPressed) {
+    // Determine direction
+    if (isLeftStickPressed) direction = -1;
+    if (isRightStickPressed) direction = 1;
+
+    if (direction !== 0) {
       stickHoldTimer += deltaTime;
-      direction = isRightStickPressed ? 1 : -1;
 
-      if (stickHoldTimer === deltaTime) { 
-        // --- FIRST FRAME (SINGLE CLICK) ---
-        console.log(`${direction === 1 ? "Right" : "Left"} stick clicked`);
-        slideAmount = 1; // Step exactly by 1
-        shifted = true;
-
-        // Handle User Guide Pagination only on the initial click
-        if (userGuidePanel.visible) {
-          if (direction === 1) nextGuidePage(userGuidePanel);
-          else prevGuidePage(userGuidePanel);
-        }
-
-      } else if (stickHoldTimer > HOLD_THRESHOLD) { 
-        // --- HOLDING DOWN (SLIDING) ---
-        // Multiply speed by deltaTime so it slides smoothly regardless of FPS
-        slideAmount = SLIDE_SPEED * deltaTime; 
-        shifted = true;
+      if (stickHoldTimer < HOLD_THRESHOLD) {
+        // --- TAP (single step) ---
+        slideAmount = 5; // small step
+      } else {
+        // --- HOLD (continuous) ---
+        slideAmount = SLIDE_SPEED * deltaTime;
       }
+
+      shifted = true;
+
     } else {
-      // --- RELEASED ---
+      // Released
       if (stickHoldTimer > 0) {
-        // User just let go of the stick. 
-        // Fire a single physics reheat to let the graph "settle" nicely into place
         Graph.d3ReheatSimulation?.();
       }
-      stickHoldTimer = 0; // Reset timer
-    }
 
+      stickHoldTimer = 0;
+    }
     // 3. Apply the shift if needed
     if (shifted) {
       timelineManager.shift(direction, slideAmount);
-      const newBucket = timelineManager.getCurrentBucket();
+      updateTimeWindow()
+    }
 
-      // CRITICAL: Clear the cache so sliding doesn't crash the VR headset memory!
-      graphController.bucketActiveNodes.clear();
 
-      // Update Visuals (Controller & Scented Widget)
-      graphController.highlightBucket(newBucket);
-      if (histogram) histogram.onTimeChange(newBucket);
+    // Handle increase in window size
+    const RESIZE_SPEED = 200; // tweak this
+
+    let resized = false;
+
+
+      if (isLeftTriggerPressed) {
+        timelineManager.setWindowSize(
+          timelineManager.windowSize - RESIZE_SPEED * deltaTime
+        );
+        updateTimeWindow();
+      }
+
+      if (isRightTriggerPressed) {
+        timelineManager.setWindowSize(
+          timelineManager.windowSize + RESIZE_SPEED * deltaTime
+        );
+        updateTimeWindow();
+      }
+
+    if (resized) {
+      updateTimeWindow();
     }
     // ============================================================
 
@@ -1244,10 +1330,10 @@ if (inVR && xrFrame) {
     handleBButtonInput(xrFrame, () => {
       // Show the user guide panel
       userGuidePanel.visible = !userGuidePanel.visible;
-    
+
       // This part ensures the video plays/pauses
       if (userGuidePanel.onToggle) {
-          userGuidePanel.onToggle(userGuidePanel.visible);
+        userGuidePanel.onToggle(userGuidePanel.visible);
       }
     });
 

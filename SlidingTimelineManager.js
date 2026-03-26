@@ -1,23 +1,24 @@
 // SlidingTimelineManager.js
 
 export class SlidingTimelineManager {
-  constructor(globalStart, globalDuration, initialWindowSize) {
+  constructor(globalStart, globalDuration) {
     this.globalStart = globalStart;
     this.maxTime = globalStart + globalDuration;
-    
+
     // We start at the beginning
     this.currentStart = globalStart;
-    this.windowSize = initialWindowSize;
+    this.initialWindowSize = 500;
+    this.windowSize = this.initialWindowSize;
     this.stepResolution = 1; // Always 1 for now
   }
 
   // Move forward or backward
   shift(direction, amount = this.stepResolution) {
     this.currentStart += (direction * amount);
-    
+
     // Clamp to boundaries so we don't scroll past the end or before the beginning
     this.currentStart = Math.max(
-      this.globalStart, 
+      this.globalStart,
       Math.min(this.currentStart, this.maxTime - this.windowSize)
     );
   }
@@ -25,11 +26,13 @@ export class SlidingTimelineManager {
   // Change window size via the Panel
   setWindowSize(newSize) {
     this.windowSize = Math.max(1, newSize); // Prevent window size of 0
-    
+
     // Re-clamp in case expanding the window pushes it past maxTime
     this.currentStart = Math.max(
-      this.globalStart, 
-      Math.min(this.currentStart, this.maxTime - this.windowSize)
+      this.globalStart,
+      Math.round(
+        Math.min(this.currentStart, this.maxTime - this.windowSize)
+      )
     );
   }
 

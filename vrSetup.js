@@ -36,7 +36,7 @@ function setupController(controller, index, renderer, cameraGroup) {
   laser.scale.z = laserDistance;
   console.log(`Laser lenght ${laserDistance}`)
   laser.userData.isLaser = true;
-// comment
+  // comment
   controller.add(laser);
   controller.userData.laser = laser;
   cameraGroup.add(controller);
@@ -54,13 +54,13 @@ function setupController(controller, index, renderer, cameraGroup) {
   });
 }
 
-// --- 1.2 Changing time slices ---
-function cyclePeriod(delta) {
-  currentPeriodIndex = (currentPeriodIndex + delta + getActivePeriods().length) % getActivePeriods().length;
-  const period = getActivePeriods()[currentPeriodIndex];
-  highlightPeriod(period);
-  console.log(`Period changed to: ${period}`);
-}
+// // --- 1.2 Changing time slices ---
+// function cyclePeriod(delta) {
+//   currentPeriodIndex = (currentPeriodIndex + delta + getActivePeriods().length) % getActivePeriods().length;
+//   const period = getActivePeriods()[currentPeriodIndex];
+//   highlightPeriod(period);
+//   console.log(`Period changed to: ${period}`);
+// }
 
 // --- 2. Teleport Movement ---
 function teleportFromController(controller, cameraGroup, teleportDistance = 5) {
@@ -173,6 +173,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     }
 
     if (uiHit) {
+      controller.userData.activeButton = uiHit;
       console.log(`[VR] Clicked Button: ${uiHit.userData.label || 'Unnamed'}`);
 
       // A. Fire the Click Handler
@@ -225,6 +226,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
   if (!vrNodeSelectionInitialized) {
     controller1.addEventListener('selectstart', onVRSelect);
     controller2.addEventListener('selectstart', onVRSelect);
+
     vrNodeSelectionInitialized = true;
     console.log("setupVRNodeSelection: Generic Interaction Initialized.");
   }
@@ -476,35 +478,35 @@ export function setupNinjaHands(scene, renderer) {
 
       loader.load('models/ninja_hands_-_rigged_for_animation__vr.glb', (gltf) => {
         const handMesh = gltf.scene;
-        
-        const baseScale = 1; 
+
+        const baseScale = 1;
         handMesh.scale.set(baseScale, baseScale, baseScale);
-        
+
         // Resetting alignment to a neutral starting point
-        handMesh.rotation.set(0, Math.PI, 0); 
+        handMesh.rotation.set(0, Math.PI, 0);
         handMesh.position.set(0, 0, 0);
         const handAnchor = new THREE.Group();
-                
-      if (handedness === 'left') {
-        // LEFT HAND
-        handAnchor.rotation.set(-0.5, 0, 1.8);
-        handAnchor.position.set(-0.02, 0.08, -0.03);
-        window.leftHand = handAnchor;
 
-      } else {
-        // RIGHT HAND
-        handAnchor.rotation.set(-0.38, 0, -1.8);
-        handAnchor.position.set(0.03, 0.12, -0.05);
-        window.rightHand = handAnchor;
-      }
-              controllerGrip.add(handAnchor);
+        if (handedness === 'left') {
+          // LEFT HAND
+          handAnchor.rotation.set(-0.5, 0, 1.8);
+          handAnchor.position.set(-0.02, 0.08, -0.03);
+          window.leftHand = handAnchor;
+
+        } else {
+          // RIGHT HAND
+          handAnchor.rotation.set(-0.38, 0, -1.8);
+          handAnchor.position.set(0.03, 0.12, -0.05);
+          window.rightHand = handAnchor;
+        }
+        controllerGrip.add(handAnchor);
         handAnchor.add(handMesh);
 
         // Expose to console for live alignment
         if (handedness === 'left') {
-            window.leftHand = handAnchor;
+          window.leftHand = handAnchor;
         } else {
-            window.rightHand = handAnchor;
+          window.rightHand = handAnchor;
         }
 
         const bones = { index: [], middle: [], ring: [], pinky: [], thumb: [] };
@@ -515,7 +517,7 @@ export function setupNinjaHands(scene, renderer) {
             child.userData.initialRotation = child.rotation.clone();
 
             const prefix = handedness === 'left' ? 'handsb_l_' : 'handsb_r_';
-            
+
             if (child.name.includes(prefix + 'index')) bones.index.push(child);
             if (child.name.includes(prefix + 'middle')) bones.middle.push(child);
             if (child.name.includes(prefix + 'ring')) bones.ring.push(child);
@@ -527,9 +529,9 @@ export function setupNinjaHands(scene, renderer) {
         controllerGrip.userData.bones = bones;
 
         // Hide the TRUE root bones so no floating pieces are left behind
-        const rightRoot = handMesh.getObjectByName('handsr_hand_world_01'); 
-        const leftRoot = handMesh.getObjectByName('handsl_hand_world_019'); 
-        
+        const rightRoot = handMesh.getObjectByName('handsr_hand_world_01');
+        const leftRoot = handMesh.getObjectByName('handsl_hand_world_019');
+
         if (handedness === 'left' && rightRoot) rightRoot.scale.set(0, 0, 0);
         if (handedness === 'right' && leftRoot) leftRoot.scale.set(0, 0, 0);
       });
@@ -547,13 +549,13 @@ export function animatePuppetHands(xrFrame, renderer) {
 
     const grip = renderer.xr.getControllerGrip(i);
     const bones = grip.userData.bones;
-    
+
     if (!bones) { i++; continue; }
 
     const gamepad = source.gamepad;
 
-    const triggerValue = gamepad.buttons[0]?.value || 0; 
-    const gripValue = gamepad.buttons[1]?.value || 0;    
+    const triggerValue = gamepad.buttons[0]?.value || 0;
+    const gripValue = gamepad.buttons[1]?.value || 0;
     // const thumbValue = (gamepad.buttons[3]?.touched || gamepad.buttons[4]?.touched) ? 1 : 0;
 
     const isThumbstickActive = gamepad.buttons[3]?.touched || gamepad.buttons[3]?.pressed;
@@ -566,10 +568,10 @@ export function animatePuppetHands(xrFrame, renderer) {
         // ---> NEW: Safely animate without breaking the hand <---
         // 1. Reset to the beautiful resting pose
         bone.rotation.copy(bone.userData.initialRotation);
-        
+
         // 2. Add the trigger curl on top of the resting pose
         // NOTE: If the fingers bend sideways, change this to rotateX or rotateY
-        bone.rotateZ(value * maxAngle); 
+        bone.rotateZ(value * maxAngle);
       });
     };
 

@@ -42,6 +42,11 @@ export class HistogramGauge {
     this._buildHistogram(bins);
     this._buildHighlightWindow();
     this._buildLabel();
+    this.currentWindowSize = globalDuration; // default
+
+    // Plane for user interaction 
+
+    this._buildInteractionPlane();
 
     // === Preserve your spatial configuration ===
 
@@ -67,8 +72,8 @@ export class HistogramGauge {
    */
   _buildHistogram(bins) {
     const maxBinCount = Math.max(...bins) || 1;
-    const numBins = bins.length;
-    const binWidth = this.width / numBins;
+    this.numBins = bins.length;
+    const binWidth = this.width / this.numBins;
     const binDepth = 0.05;
 
     const barsGroup = new THREE.Group();
@@ -109,6 +114,15 @@ export class HistogramGauge {
 
       // Center vertically so base rests at y = 0
       barMesh.position.y = h / 2;
+
+      // This makes the bars clickable and interactive
+      // barMesh.userData = {
+      //   isInteractable: true,
+      //   isHistogramBar: true,
+      //   onClick: () => {
+      //     this._handleBarClick(i, numBins);
+      //   }
+      // };
 
       barsGroup.add(barMesh);
       this.binMeshes.push(barMesh);
@@ -178,6 +192,7 @@ export class HistogramGauge {
       this.reset();
       return;
     }
+    this.currentWindowSize = bucket.end - bucket.start;
 
     const startRatio =
       (bucket.start - this.globalStart) / this.globalDuration;
@@ -253,6 +268,80 @@ export class HistogramGauge {
     });
 
     this.group.add(this.label);
+  }
+
+  // Can be used later if we want to implement selection
+
+  _handleBarClick(binIndex, numBins) {
+    console.log("CLICKING BAR HISTOGRAM...")
+    if (!this.onBucketSelected) return;
+
+    const ratio = binIndex / numBins;
+
+    const time =
+      this.globalStart +
+      ratio * this.globalDuration;
+
+    // Center the window around clicked point
+    const halfWindow = this.currentWindowSize / 2;
+
+    const start = time - halfWindow;
+    const end = time + halfWindow;
+
+    this.onBucketSelected({
+      start,
+      end
+    });
+  }
+
+  _buildInteractionPlane() {
+    const geom = new THREE.PlaneGeometry(
+      this.width,
+      this.maxHeight * 1.5
+    );
+
+    const mat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.0, // invisible
+      depthWrite: false
+    });
+
+    this.interactionPlane = new THREE.Mesh(geom, mat);
+
+    // Put it slightly behind bars
+    this.interactionPlane.position.z = 0.05;
+    this.interactionPlane.renderOrder = 999;
+
+    this.interactionPlane.userData = {
+      isInteractable: true,
+      isHistogram: true,
+      onClick: (intersection) => {
+        this._handlePlaneClick(intersection);
+      }
+    };
+
+    this.group.add(this.interactionPlane);
+  }
+
+  _handlePlaneClick(intersection) {
+    if (!intersection || !intersection.point) return;
+
+    const localPoint = this.interactionPlane.worldToLocal(
+      intersection.point.clone()
+    );
+
+    const normalized =
+      (localPoint.x + this.width / 2) / this.width;
+
+    const clamped = Math.max(0, Math.min(normalized, 1));
+
+    // Convert to bin
+    const binIndex = Math.floor(clamped * this.numBins);
+
+    // Clamp index (edge safety)
+    const safeIndex = Math.max(0, Math.min(binIndex, this.numBins - 1));
+
+    this._handleBarClick(safeIndex, this.numBins);
   }
 
 }

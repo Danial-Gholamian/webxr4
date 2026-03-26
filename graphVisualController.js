@@ -194,6 +194,7 @@ export class GraphVisualController {
     
 
     highlightBucket(bucket) {
+        console.log(bucket)
         if (bucket && !this.bucketActiveNodes.has(bucket.id)) {
             // console.log(`[GraphController] Cache miss for bucket ${bucket.id}. Computing active nodes...`);
 

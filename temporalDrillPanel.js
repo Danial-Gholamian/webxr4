@@ -12,6 +12,7 @@ export function createTemporalDrillPanel({
   timelineManager, // We pass our new manager here
   graphController
 }) {
+  let activeResize = 0; // -1 (shrink), +1 (grow), 0 (idle)
   const panel = new THREE.Group();
   panel.name = 'TemporalDrillPanel';
 
@@ -54,20 +55,20 @@ export function createTemporalDrillPanel({
     // 1. HEADER
     const bucket = timelineManager.getCurrentBucket();
     const headerStr = `Time: ${Math.floor(bucket.start)} to ${Math.floor(bucket.end)}`;
-    
+
     const header = createCapsuleLabel(headerStr, {
       width: 1.2,
       color: 0xffaa00,
-      hoverColor: 0xffaa00  
+      hoverColor: 0xffaa00
     });
     header.position.set(0, yCursor, 0);
     panel.add(header);
     interactables.push(header);
-    
+
     yCursor -= 0.3;
 
     // 2. WINDOW SIZE CONTROLS
-    const sizeLabel = createCapsuleLabel(`Window Size: ${timelineManager.windowSize}`, {
+    const sizeLabel = createCapsuleLabel(`Window Size: ${Math.floor(timelineManager.windowSize)}`, {
       width: 0.8, color: 0x222222
     });
     sizeLabel.position.set(0, yCursor, 0);
@@ -77,26 +78,41 @@ export function createTemporalDrillPanel({
     yCursor -= 0.25;
 
     // [-] MINUS BUTTON
-    const minusBtn = createCapsuleLabel("- 1", {
-      width: 0.3, color: 0x882222, hoverColor: 0xaa4444,
-      onClick: () => { 
-        timelineManager.setWindowSize(timelineManager.windowSize - 1);
-        updateGraph(); 
+    const minusBtn = createCapsuleLabel("- 20", {
+      width: 0.3,
+      color: 0x882222,
+      hoverColor: 0xaa4444,
+
+      onClick: () => {
+        activeResize = -1;
       }
     });
+
+    minusBtn.userData.isInteractable = true;
+    minusBtn.userData.onRelease = () => {
+      activeResize = 0;
+    };
+
     minusBtn.position.set(-0.35, yCursor, 0);
     minusBtn.userData.isInteractable = true;
     panel.add(minusBtn);
     interactables.push(minusBtn);
 
     // [+] PLUS BUTTON
-    const plusBtn = createCapsuleLabel("+ 1", {
-      width: 0.3, color: 0x228822, hoverColor: 0x44aa44,
-      onClick: () => { 
-        timelineManager.setWindowSize(timelineManager.windowSize + 1);
-        updateGraph();
+    const plusBtn = createCapsuleLabel("+ 20", {
+      width: 0.3,
+      color: 0x228822,
+      hoverColor: 0x44aa44,
+
+      onClick: () => {
+        activeResize = +1;
       }
     });
+
+    plusBtn.userData.isInteractable = true;
+    plusBtn.userData.onRelease = () => {
+      activeResize = 0;
+    };
     plusBtn.position.set(0.35, yCursor, 0);
     plusBtn.userData.isInteractable = true;
     panel.add(plusBtn);
@@ -105,9 +121,15 @@ export function createTemporalDrillPanel({
     // Helper to update everything when a button is clicked
     function updateGraph() {
       const newBucket = timelineManager.getCurrentBucket();
-      graphController.bucketActiveNodes.clear(); // Clear cache!
+
+      graphController.bucketActiveNodes.clear();
       graphController.highlightBucket(newBucket);
-      render(); // Re-render this UI to show the new window size number
+
+      if (window.histogramRef) {
+        window.histogramRef.onTimeChange(newBucket);
+      }
+
+      render(); // refresh panel text
     }
   }
 
@@ -116,15 +138,35 @@ export function createTemporalDrillPanel({
     if (!panel.visible) return;
     const headPos = camera.position;
     const headRot = camera.quaternion;
-    const offset = new THREE.Vector3(0, -0.2, -1.8); 
+    const offset = new THREE.Vector3(0, -0.2, -1.8);
     offset.applyQuaternion(headRot);
     panel.position.copy(headPos).add(offset);
     panel.quaternion.copy(headRot);
+
+    // Continuous resize
+    if (activeResize !== 0) {
+      const RESIZE_SPEED = 100; // tweak this
+
+      timelineManager.setWindowSize(
+        timelineManager.windowSize + activeResize * RESIZE_SPEED * 0.016
+      );
+
+      const newBucket = timelineManager.getCurrentBucket();
+
+      graphController.bucketActiveNodes.clear();
+      graphController.highlightBucket(newBucket);
+
+      if (window.histogramRef) {
+        window.histogramRef.onTimeChange(newBucket);
+      }
+
+      render(); // keep label updated
+    }
   }
 
   function show() {
     panel.visible = true;
-    render(); 
+    render();
     update();
   }
 
