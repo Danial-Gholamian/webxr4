@@ -99,7 +99,7 @@ let graphUpdateMode = null;
 let graphUpdateNodeId = null;
 
 
-const roomCenter = new THREE.Vector3();
+const roomCenter = new THREE.Vector3(0, 0, 0);
 
 
 // ========================
@@ -129,7 +129,7 @@ grid.renderOrder = -1;
 // ======== LOAD VR ROOM / LAB ROOM ========
 const loader = new GLTFLoader();
 let labRoom;
-let roomHalfSize = new THREE.Vector2(); // XZ half size we allow the user to move in
+let roomHalfSize = new THREE.Vector2(500, 500); // XZ half size we allow the user to move in
 
 // loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
 //   labRoom = gltf.scene;
@@ -994,14 +994,11 @@ renderer.xr.addEventListener('sessionend', () => {
 
 
 
-setInterval(() => {
-  if (inVR) {
-
-    broadcastAvatar(camera, controller1, controller2);
-
-    // console.log('Hellow');
-  }
-}, 100);
+// setInterval(() => {
+//   if (inVR && timelineManager) {
+//     broadcastAvatar(camera, controller1, controller2, timelineManager);
+//   }
+// }, 100);
 
 function togglePanel() {
   console.log("console.log from togglePanel");
@@ -1098,8 +1095,8 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-  if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) {
-    broadcastAvatar(camera, controller1, controller2);
+  if (inVR && (timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) && timelineManager) {
+    broadcastAvatar(camera, controller1, controller2, timelineManager); 
     lastBroadcast = timestamp;
   }
   if (graphUpdateNeeded) {
@@ -1167,7 +1164,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     // // Calculate deltaTime for smooth sliding and timers
     // const deltaTime = (timestamp - lastTime) / 1000;
     // lastTime = timestamp;
-
+    clampCameraToRoom();
     animatePuppetHands(xrFrame, renderer);
 
     // ============================================================

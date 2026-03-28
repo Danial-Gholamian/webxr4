@@ -31,8 +31,8 @@ export const socket = io('https://webxr4-server.fly.dev', {
 export const userAvatars = {};
 export const avatarInterpolation = {
   factors: {
-    position: 0.25,
-    rotation: 0.2
+    position: 0.15,
+    rotation: 0.12
   },
 
   update(avatars, deltaTime) {
@@ -99,7 +99,9 @@ const createRemoteLaser = () => {
   return line;
 };
 
-socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot, leftLaserL, rightLaserL }) => {
+socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, rightRot, leftLaserL, rightLaserL
+  ,windowStart, windowEnd
+ }) => {
   if (id === socket.id || !scene) return;
 
   // 2. If avatar doesn't exist at all, create it
@@ -144,6 +146,9 @@ socket.on('user-update', async ({ id, head, left, right, headRot, leftRot, right
     avatar.rightLaser.scale.z = rightLaserL || 0;
     avatar.rightLaser.visible = (rightLaserL > 0.1);
   }
+  if (window.histogramRef && windowStart !== undefined) {
+      window.histogramRef.updateRemoteWindow(id, windowStart, windowEnd);
+  }
 });
 
 socket.on('user-disconnect', id => {
@@ -151,6 +156,9 @@ socket.on('user-disconnect', id => {
   if (avatar) {
     scene.remove(avatar.head, avatar.left, avatar.right);
     delete userAvatars[id];
+  }
+  if (window.histogramRef) {
+    window.histogramRef.removeRemoteWindow(id);
   }
 });
 
@@ -162,9 +170,12 @@ let lastPositions = {
   right: new THREE.Vector3()
 };
 
-export function broadcastAvatar(camera, controller1, controller2) {
+export function broadcastAvatar(camera, controller1, controller2, timelineManager) {
   const now = Date.now();
   if (now - lastAvatarUpdate < AVATAR_UPDATE_INTERVAL) return;
+
+  // 1. Get the bucket once at the start
+  const currentBucket = timelineManager ? timelineManager.getCurrentBucket() : { start: 0, end: 0 };
 
   const compressRot = q => [
     Math.round(q.x * ROTATION_COMPRESSION_FACTOR),
@@ -181,9 +192,10 @@ export function broadcastAvatar(camera, controller1, controller2) {
   controller1.getWorldPosition(leftPos);
   controller2.getWorldPosition(rightPos);
 
-  // Get laser lengths
   const leftLaser = controller1.userData.laser?.scale.z || 0;
   const rightLaser = controller2.userData.laser?.scale.z || 0;
+
+  // REMOVED the second 'const currentBucket' line that was here
 
   socket.emit('user-update', {
     id: socket.id,
@@ -193,8 +205,10 @@ export function broadcastAvatar(camera, controller1, controller2) {
     headRot: compressRot(camera.quaternion),
     leftRot: compressRot(controller1.quaternion),
     rightRot: compressRot(controller2.quaternion),
-    leftLaserL: leftLaser,  // <--- NEW
-    rightLaserL: rightLaser // <--- NEW
+    leftLaserL: leftLaser,
+    rightLaserL: rightLaser,
+    windowStart: Math.floor(currentBucket.start), // Now using the one from the top
+    windowEnd: Math.floor(currentBucket.end)
   });
 
   lastAvatarUpdate = now;
