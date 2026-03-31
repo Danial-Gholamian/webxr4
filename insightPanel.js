@@ -134,7 +134,7 @@ export class InsightPanel {
 
             // TEXT
             const row = this._createText(`${g.name} (${g.count})`, FONT_SIZE, yRight, 0xffffff);
-            row.position.x = 0.15; // relative to rowGroup
+            row.position.x = 0.20; // relative to rowGroup
             rowGroup.add(row);
 
             // DOT
@@ -163,6 +163,7 @@ export class InsightPanel {
 
         yRight -= HEADER_SPACING;
 
+
         if (stats.bestFriends?.length) {
 
             const friends = this._createText(
@@ -188,6 +189,15 @@ export class InsightPanel {
         //  IF NODE IS SELECTED CLEAR THE RIGHT COLUMN, TOP NODES AND QUIET NODES INFO NOT NEEDED
         if (nodeSelected) {
             this.leftTextGroup.clear()
+
+            // Add the selected node info
+            yRight -= ROW_SPACING;
+            const selectedNodeInfo = stats.topHubs[0]
+            const selected = this._createText(`SELECTED NODE: ID ${selectedNodeInfo.id}`, SUB_HEADING_FONT_SIZE, y, 0xffffff);
+            selected.position.x = 0.25
+            this.rightTextGroup.add(selected)
+
+
             this.rightTextGroup.position.x = -0.25
         }
     }

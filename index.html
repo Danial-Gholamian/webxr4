@@ -17,19 +17,14 @@
   <!-- Start menu elements -->
   <div id="startPanel">
     <h2>Temporal Explorer</h2>
-    <p>
-      Welcome to the Temporal Explorer!
-      Please enter the minimum time step (delta_min) for your lowest drill-down level
-      (For example: 10, 50, or 100). If you leave this blank, it will default to 50:
-    </p>
     <!-- <h3>Your Name</h3> -->
     <input style="display: none;" type="text" id="usernameInput" placeholder="Enter your name">
 
     <h3>Select Dataset</h3>
     <div id="datasetSelector"></div>
 
-    <h3>Minimum Time Step (delta_min)</h3>
-    <input type="number" id="deltaInput" value="50" />
+    <!-- <h3>Minimum Time Step (delta_min)</h3> -->
+    <input style="display: none;" type="number" id="deltaInput" value="50" />
 
     <br><br>
     <button id="startBtn">Start Exploration</button>
