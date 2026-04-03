@@ -200,17 +200,24 @@ export class InsightPanel {
 
         //  IF NODE IS SELECTED CLEAR THE RIGHT COLUMN, TOP NODES AND QUIET NODES INFO NOT NEEDED
         if (nodeSelected) {
-            this.leftTextGroup.clear()
+            this.leftTextGroup.clear();
 
-            // Add the selected node info
-            yRight -= ROW_SPACING;
-            const selectedNodeInfo = stats.topHubs[0]
-            const selected = this._createText(`SELECTED NODE: ID ${selectedNodeInfo.id}`, SUB_HEADING_FONT_SIZE, y, 0xffffff);
-            selected.position.x = 0.25
-            this.rightTextGroup.add(selected)
+            // Guard: If no nodes are visible in this time window, stats.topHubs will be empty
+            const selectedNodeInfo = stats.topHubs && stats.topHubs.length > 0 ? stats.topHubs[0] : null;
 
+            if (selectedNodeInfo) {
+                yRight -= ROW_SPACING;
+                const selected = this._createText(`SELECTED NODE: ID ${selectedNodeInfo.id}`, SUB_HEADING_FONT_SIZE, y, 0xffffff);
+                selected.position.x = 0.25;
+                this.rightTextGroup.add(selected);
+            } else {
+                // Optional: Show a message that the selected node is currently inactive
+                const inactiveMsg = this._createText(`NODE INACTIVE IN THIS WINDOW`, FONT_SIZE, y, 0xff6666);
+                inactiveMsg.position.x = 0.25;
+                this.rightTextGroup.add(inactiveMsg);
+            }
 
-            this.rightTextGroup.position.x = -0.25
+            this.rightTextGroup.position.x = -0.25;
         }
     }
 

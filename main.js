@@ -67,7 +67,9 @@ let wasTriggerPressed = false;
 // ONLY DECLARE IT HERE. DO NOT INITIALIZE IT YET.
 export let timelineManager = null;
 
-let levelIndex = 0;
+let globalStart = 0;
+let globalDuration = 1;
+let insightPanel = null;
 
 
 // Graph data variables
@@ -217,6 +219,8 @@ const cameraGroup = new THREE.Group();
 cameraGroup.add(camera);
 scene.add(cameraGroup);
 
+insightPanel = new InsightPanel();
+cameraGroup.add(insightPanel.getObject3D());
 
 // ========================
 // User Guide Panel Setup 
@@ -280,7 +284,7 @@ function enableGraphRotation(controller) {
 enableGraphRotation(controller1)
 enableGraphRotation(controller2)
 
-
+// THIS CHNAGED
 
 // ========================
 // Graph Data and Maps
@@ -295,12 +299,15 @@ export let periodStack = null;
 const colorScale = scaleOrdinal(schemeCategory10)
 
 function buildBatchedEdges(graphData, nodesById) {
-  console.log("buildBatchedEdges called")
+  console.log("buildBatchedEdges called with GPU filtering (Fixed)");
+  
   const positions = [];
   const colors = [];
+  const alphas = [];
+  const startTimes = []; 
+  const endTimes = [];   
 
   let vIndex = 0;
-  const alphas = [];
 
   graphData.links.forEach(link => {
     // 1. Get the actual node objects
@@ -309,27 +316,35 @@ function buildBatchedEdges(graphData, nodesById) {
     
     if (!src || !tgt) return;
 
-    // 2. Logic for Edge Coloring (Intra vs Inter)
-  
+    // 2. Extract Temporal Data for this edge
+    // FIX: If there are no times, we set values to -1.0. 
+    // Since the timeline slider is always >= 0, these will be hidden by the shader.
+    const times = link.times || [];
+    const edgeStart = times.length > 0 ? Math.min(...times) : -1.0;
+    const edgeEnd = times.length > 0 ? Math.max(...times) : -1.0;
+
+    // 3. Logic for Edge Coloring (Intra vs Inter)
     const srcGroup = src.group;
     const tgtGroup = tgt.group;
 
     if (srcGroup === tgtGroup) {
         // INTRA: Same community -> Use Group Color
         const c = new THREE.Color(colorScale(srcGroup));
-        colors.push(c.r, c.g, c.b); // Vertex 1
-        colors.push(c.r, c.g, c.b); // Vertex 2
+        colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
     } else {
         // INTER: Different communities -> Pure White
-        colors.push(1, 1, 1); // Vertex 1
-        colors.push(1, 1, 1); // Vertex 2
+        colors.push(1, 1, 1, 1, 1, 1);
     }
 
-    // 3. Alpha values
-    alphas.push(0.2);
-    alphas.push(0.2);
+    // 4. Populate Attributes (2 vertices per line segment)
+    // BASE_EDGE_ALPHA (0.45) is used as the default visibility
+    alphas.push(0.45, 0.45); 
+    
+    // Add the time data for BOTH vertices of the edge
+    startTimes.push(edgeStart, edgeStart);
+    endTimes.push(edgeEnd, edgeEnd);
 
-    // 4. Positions
+    // Positions
     const x1 = Number.isFinite(src.x) ? src.x : 0;
     const y1 = Number.isFinite(src.y) ? src.y : 0;
     const z1 = Number.isFinite(src.z) ? src.z : 0;
@@ -338,10 +353,9 @@ function buildBatchedEdges(graphData, nodesById) {
     const y2 = Number.isFinite(tgt.y) ? tgt.y : 0;
     const z2 = Number.isFinite(tgt.z) ? tgt.z : 0;
 
-    positions.push(x1, y1, z1);
-    positions.push(x2, y2, z2);
+    positions.push(x1, y1, z1, x2, y2, z2);
 
-    // 5. Record indices for the map
+    // 5. Record indices for the selection map
     const key = getEdgeKey(link.source.id ?? link.source, link.target.id ?? link.target);
     edgeVertexMap.set(key, { start: vIndex, end: vIndex + 1 });
     vIndex += 2;
@@ -351,32 +365,46 @@ function buildBatchedEdges(graphData, nodesById) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setAttribute('alpha', new THREE.Float32BufferAttribute(alphas, 1));
-
-  // ============================================================
-  // Custom ShaderMaterial for batched edges
-  //
-  // We use a custom shader so each edge can have its own opacity.
-  // - Each vertex stores an `alpha` attribute (0.0 → invisible, 1.0 → fully visible).
-  // - Vertex shader: passes per-vertex color and alpha down to the fragment shader.
-  // - Fragment shader: blends edges using the alpha value. If alpha <= 0.0, we
-  //   call `discard` so the fragment is not drawn at all (prevents black lines).
-  //
-  // This is GLSL (OpenGL Shading Language), which looks like C but runs on the GPU.
-  // ============================================================
+  
+  // Attributes for GPU-side time filtering
+  geometry.setAttribute('startTime', new THREE.Float32BufferAttribute(startTimes, 1));
+  geometry.setAttribute('endTime', new THREE.Float32BufferAttribute(endTimes, 1));
 
   const material = new THREE.ShaderMaterial({
     transparent: true,
     vertexColors: true,
-    depthWrite: false,            // <--- important so transparent lines don’t occlude
-    blending: THREE.NormalBlending, // <--- standard alpha blending
-    uniforms: {},
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      uTimeStart: { value: 0.0 },
+      uTimeEnd: { value: 1000000.0 }
+    },
     vertexShader: `
       attribute float alpha;
+      attribute float startTime;
+      attribute float endTime;
+      
+      uniform float uTimeStart;
+      uniform float uTimeEnd;
+
       varying vec3 vColor;
       varying float vAlpha;
+
       void main() {
         vColor = color;
-        vAlpha = alpha;
+        
+        float isVisible = 1.0;
+
+        // 1. If edge has no data (our -1.0 fallback), hide it.
+        if (startTime < 0.0) {
+            isVisible = 0.0;
+        }
+        // 2. Standard Temporal Overlap logic
+        else if (startTime > uTimeEnd || endTime < uTimeStart) {
+            isVisible = 0.0;
+        }
+
+        vAlpha = alpha * isVisible; 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -384,13 +412,11 @@ function buildBatchedEdges(graphData, nodesById) {
       varying vec3 vColor;
       varying float vAlpha;
       void main() {
-        if (vAlpha <= 0.0) discard;   // <--- don't draw invisible edges at all
+        if (vAlpha <= 0.0) discard;
         gl_FragColor = vec4(vColor, vAlpha);
       }
     `
   });
-
-
 
   return new THREE.LineSegments(geometry, material);
 }
@@ -581,30 +607,36 @@ const graphController = new GraphVisualController({
 });
 
 
-await loadDataset(selectedDatasetKey)
-applyDataset(dataset, periods)
-
-// ========================
-// EXPERIMENTAL: Temporal Hierarchy Autoplay
-// ========================
 
 
-// ========================
-// SLIDING TIMELINE SETUP
-// ========================
+const datasetInfo = await loadDataset(selectedDatasetKey);
+// Now 'dataset' and 'periods' are globally assigned within loadDataset, 
+// but let's use the returned values for safety:
+dataset = datasetInfo.datasetValues;
+periods = datasetInfo.periodLabelsValues;
 
-// Use the ORIGINAL dataset, not ForceGraph-mutated data
+// ... inside the main logic where you calculate T ...
 const allTimes = dataset.__allTimes ?? [];
 const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
-console.log("VALUE T: ", T);
 
-const globalStart = 0;
-const globalDuration = T - globalStart;
+// ASSIGN to the global variables we declared at the top
+globalStart = 0; 
+globalDuration = T - globalStart;
 
-
-// NOW WE INITIALIZE IT!
+graphController.setTimelineContext(globalStart, globalDuration);
 timelineManager = new SlidingTimelineManager(globalStart, globalDuration);
 
+// Now this will work because globalStart and globalDuration are defined!
+// const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
+
+// THE FIX: Set the initial window to 10% of the dataset so it actually clips things.
+const initialWindow = Math.max(10, Math.min(500, globalDuration * 0.1));
+timelineManager.setWindowSize(initialWindow);
+
+// Force the GPU to reset to a full view initially
+graphController.updateEdgeUniforms(0, globalDuration); 
+
+applyDataset(dataset, periods);
 // We will update the inside of this panel in the next step!
 const temporalPanel = createTemporalDrillPanel({
   cameraGroup: cameraGroup,
@@ -842,8 +874,8 @@ uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
 //panel for insight 
 
-const insightPanel = new InsightPanel();
-cameraGroup.add(insightPanel.getObject3D());
+// const insightPanel = new InsightPanel();
+// cameraGroup.add(insightPanel.getObject3D());
 
 // Add the insight panel to the controller subscribers
 // This allows them to listen to any selection done in the graph and update
@@ -886,19 +918,22 @@ graphController.setSelectionListener((nodeId) => {
   uiPanel.userData.updateSelectedNodeLabel?.(nodeId);
 });
 
-// update scented widget
+
+let frameSkip = 0;
+
 function updateTimeWindow() {
   const newBucket = timelineManager.getCurrentBucket();
 
-  // Clear cache (important for performance)
-  graphController.bucketActiveNodes.clear();
+  // 1. ALWAYS update the GPU Edges (This is instant)
+  graphController.updateEdgeUniforms(newBucket.start, newBucket.end);
 
-  // Update graph
-  graphController.highlightBucket(newBucket);
-
-  // Update histogram (visual highlight box)
-  if (histogram) {
-    histogram.onTimeChange(newBucket);
+  // 2. THROTTLE the CPU Node/Selection logic
+  // Only run this every 5 frames to keep VR at 90FPS
+  frameSkip++;
+  if (frameSkip % 5 === 0) {
+    graphController.highlightBucket(newBucket);
+    if (histogram) histogram.onTimeChange(newBucket);
+    frameSkip = 0;
   }
 }
 
@@ -935,21 +970,18 @@ resetBtn.addEventListener('click', () => {
 });
 
 
+// main.js
+
 export function resetGraph() {
-  // Instead of resetting the whole thing, just reset the selection :)
-  graphController.clearAllSelection()
+  // 1. Clear the selection states
+  graphController.clearAllSelection();
 
-  // graphController.clearGroupFilter()
-  // updatePeroidLabel('Default');
-  // uiPanel.userData.updateSelectedNodeLabel?.(null);
+  // 2. NEW: Force the controller to ignore the performance gate 
+  // and reset all edge alphas to BASE_EDGE_ALPHA
+  graphController._modeChanged = true; 
 
-  // graphController.resetAll()
-  // histogram.reset()
-  // // updateBarGauge(timeGauge, 0, "Default");
-  // if (navigator && root) {
-  //   navigator.selectNode(root); // Point the brain back to the top of the tree
-  //   dispatchTemporalUpdate();   // Force the Panel, Graph, and UI to sync to the root
-  // }
+  // 3. Trigger the update
+  graphController.update();
 }
 
 
