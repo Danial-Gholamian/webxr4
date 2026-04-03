@@ -296,22 +296,40 @@ const colorScale = scaleOrdinal(schemeCategory10)
 
 function buildBatchedEdges(graphData, nodesById) {
   console.log("buildBatchedEdges called")
-  // edgeVertexMap.clear()
   const positions = [];
   const colors = [];
-  const color = new THREE.Color();
 
   let vIndex = 0;
   const alphas = [];
 
   graphData.links.forEach(link => {
+    // 1. Get the actual node objects
     const src = nodesById[link.source.id ?? link.source];
     const tgt = nodesById[link.target.id ?? link.target];
+    
     if (!src || !tgt) return;
 
-    // each edge has 2 vertices, so you MUST push 2 alpha values
+    // 2. Logic for Edge Coloring (Intra vs Inter)
+    // FIX: Use 'src' and 'tgt' (the variables you actually defined above)
+    const srcGroup = src.group;
+    const tgtGroup = tgt.group;
+
+    if (srcGroup === tgtGroup) {
+        // INTRA: Same community -> Use Group Color
+        const c = new THREE.Color(colorScale(srcGroup));
+        colors.push(c.r, c.g, c.b); // Vertex 1
+        colors.push(c.r, c.g, c.b); // Vertex 2
+    } else {
+        // INTER: Different communities -> Pure White
+        colors.push(1, 1, 1); // Vertex 1
+        colors.push(1, 1, 1); // Vertex 2
+    }
+
+    // 3. Alpha values
     alphas.push(0.2);
     alphas.push(0.2);
+
+    // 4. Positions
     const x1 = Number.isFinite(src.x) ? src.x : 0;
     const y1 = Number.isFinite(src.y) ? src.y : 0;
     const z1 = Number.isFinite(src.z) ? src.z : 0;
@@ -320,16 +338,10 @@ function buildBatchedEdges(graphData, nodesById) {
     const y2 = Number.isFinite(tgt.y) ? tgt.y : 0;
     const z2 = Number.isFinite(tgt.z) ? tgt.z : 0;
 
-    // // positions
     positions.push(x1, y1, z1);
     positions.push(x2, y2, z2);
 
-    // default colors
-    color.setRGB(0.65, 0.75, 0.9);
-    colors.push(color.r, color.g, color.b);
-    colors.push(color.r, color.g, color.b);
-
-    // record indices (two vertices per link)
+    // 5. Record indices for the map
     const key = getEdgeKey(link.source.id ?? link.source, link.target.id ?? link.target);
     edgeVertexMap.set(key, { start: vIndex, end: vIndex + 1 });
     vIndex += 2;
@@ -835,8 +847,8 @@ cameraGroup.add(insightPanel.getObject3D());
 
 // Add the insight panel to the controller subscribers
 // This allows them to listen to any selection done in the graph and update
-graphController.subscribeToSelection((stats, nodeSelected) => {
-  insightPanel.update(stats, colorScale, nodeSelected);
+graphController.subscribeToSelection((stats, nodeSelected, edgeMode) => {
+  insightPanel.update(stats, colorScale, nodeSelected, edgeMode);
 });
 
 // // Hook it into the controller's update loop
@@ -1337,7 +1349,12 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleYButtonInput(xrFrame, () => {
-      temporalPanel.toggle();
+      // temporalPanel.toggle();
+      const modes = ['ALL', 'INTRA_ONLY', 'INTER_ONLY'];
+      const currentIndex = modes.indexOf(graphController.state.edgeMode);
+      const nextMode = modes[(currentIndex + 1) % modes.length];
+      
+      graphController.setEdgeMode(nextMode);
       [controller1, controller2].forEach(c => {
         const gp = c.userData.inputSource?.gamepad;
         const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
@@ -1346,6 +1363,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         } else if (navigator.vibrate) {
           navigator.vibrate(100);
         }
+        console.log(`Switched Edge Mode to: ${nextMode}`);
       });
     })
 

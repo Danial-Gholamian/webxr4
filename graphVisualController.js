@@ -49,7 +49,8 @@ export class GraphVisualController {
                 active: false,
                 nodeIds: new Set(),
                 edgeIds: new Set()
-            }
+            },
+            edgeMode: 'ALL' // Modes: 'ALL', 'INTRA_ONLY', 'INTER_ONLY'
         };
 
         // --- Cached temporal data ---
@@ -374,24 +375,41 @@ export class GraphVisualController {
         return true;
     }
 
-    _isEdgeVisible(link, ctx) {
-        const src = this.adapter.getEdgeSource(link);
-        const tgt = this.adapter.getEdgeTarget(link);
-        const key = this._getEdgeKey(src, tgt);
 
+    _isEdgeVisible(link, ctx) {
+        // Get full node objects to check groups
+        const srcId = this.adapter.getEdgeSource(link);
+        const tgtId = this.adapter.getEdgeTarget(link);
+        
+        // Crucial: Use the original graph data to find group info
+        const allNodes = this.graph.graphData().nodes;
+        const srcNode = allNodes.find(n => n.id === srcId);
+        const tgtNode = allNodes.find(n => n.id === tgtId);
+
+        if (!srcNode || !tgtNode) return false;
+
+        // Mode Logic
+        const isIntra = srcNode.group === tgtNode.group;
+
+        if (this.state.edgeMode === 'INTRA_ONLY' && !isIntra) return false;
+        if (this.state.edgeMode === 'INTER_ONLY' && isIntra) return false;
+
+        // Standard Temporal Filtering
         if (ctx.activeBucket && !this._edgeInBucket(link, ctx.activeBucket)) return false;
 
-
-        if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
-
+        // Selection/Group Filtering
         if (ctx.selection.active) {
-            return (
-                src === ctx.selection.selectedNodeId ||
-                tgt === ctx.selection.selectedNodeId
-            );
+            return (srcId === ctx.selection.selectedNodeId || tgtId === ctx.selection.selectedNodeId);
         }
+        if (ctx.group.active && !ctx.group.edgeIds.has(this._getEdgeKey(srcId, tgtId))) return false;
 
         return true;
+    }
+
+    // A public method to toggle
+    setEdgeMode(mode) {
+        this.state.edgeMode = mode; // 'ALL', 'INTRA_ONLY', 'INTER_ONLY'
+        this.update();
     }
 
     // ------------------------------
@@ -623,7 +641,9 @@ export class GraphVisualController {
     }
 
     _notifyInsights(stats) {
-        this.selection_subscribers.forEach(fn => fn(stats, this.state.selection.active));
+        this.selection_subscribers.forEach(fn => 
+            fn(stats, this.state.selection.active, this.state.edgeMode) // Pass edgeMode as 3rd arg
+        );
     }
 
     /**

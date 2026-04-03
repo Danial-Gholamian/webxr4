@@ -52,6 +52,8 @@ export class InsightPanel {
         this.group.position.set(2.8, 1.9, -3.3);
         this.group.rotation.y = -Math.PI / 2.95;
         this.group.scale.set(1.3, 1.3, 1.3);
+        this.modeGroup = new THREE.Group();
+        this.group.add(this.modeGroup);
     }
 
     _createText(text, size = FONT_SIZE, y, color) {
@@ -78,11 +80,12 @@ export class InsightPanel {
 
     }
 
-    update(stats, colorScale, nodeSelected) {
+    update(stats, colorScale, nodeSelected, edgeMode = 'ALL') {
 
         if (!stats) return;
         this.leftTextGroup.clear();
         this.rightTextGroup.clear();
+        this.modeGroup.clear();
 
         // 1. Clear existing dots
         // this.rowGroup.clear();
@@ -152,6 +155,15 @@ export class InsightPanel {
 
 
         });
+        // 3. Add EDGE MODE Readout 
+        let modeColor = 0x00ff00; // Default Green for ALL
+        if (edgeMode === 'INTRA_ONLY') modeColor = 0x4444ff; // Blue for Intra
+        if (edgeMode === 'INTER_ONLY') modeColor = 0xffffff; // White for Inter
+
+        const modeLabel = this._createText(`MODE: ${edgeMode.replace('_', ' ')}`, 75, -0.42, modeColor);
+        modeLabel.position.x = 0.25;
+        this.modeGroup.add(modeLabel);
+
         // POSITION THE WHOLE ROW
         rowGroup.position.x = (0.1);
         this.rightTextGroup.add(rowGroup)
