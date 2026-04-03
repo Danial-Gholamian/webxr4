@@ -52,6 +52,8 @@ export class InsightPanel {
         this.group.position.set(2.8, 1.9, -3.3);
         this.group.rotation.y = -Math.PI / 2.95;
         this.group.scale.set(1.3, 1.3, 1.3);
+        this.modeGroup = new THREE.Group();
+        this.group.add(this.modeGroup);
     }
 
     _createText(text, size = FONT_SIZE, y, color) {
@@ -78,11 +80,12 @@ export class InsightPanel {
 
     }
 
-    update(stats, colorScale, nodeSelected) {
+    update(stats, colorScale, nodeSelected, edgeMode = 'ALL') {
 
         if (!stats) return;
         this.leftTextGroup.clear();
         this.rightTextGroup.clear();
+        this.modeGroup.clear();
 
         // 1. Clear existing dots
         // this.rowGroup.clear();
@@ -134,7 +137,7 @@ export class InsightPanel {
 
             // TEXT
             const row = this._createText(`${g.name} (${g.count})`, FONT_SIZE, yRight, 0xffffff);
-            row.position.x = 0.15; // relative to rowGroup
+            row.position.x = 0.20; // relative to rowGroup
             rowGroup.add(row);
 
             // DOT
@@ -152,6 +155,15 @@ export class InsightPanel {
 
 
         });
+        // 3. Add EDGE MODE Readout 
+        let modeColor = 0x00ff00; // Default Green for ALL
+        if (edgeMode === 'INTRA_ONLY') modeColor = 0x4444ff; // Blue for Intra
+        if (edgeMode === 'INTER_ONLY') modeColor = 0xffffff; // White for Inter
+
+        const modeLabel = this._createText(`MODE: ${edgeMode.replace('_', ' ')}`, 75, -0.42, modeColor);
+        modeLabel.position.x = 0.25;
+        this.modeGroup.add(modeLabel);
+
         // POSITION THE WHOLE ROW
         rowGroup.position.x = (0.1);
         this.rightTextGroup.add(rowGroup)
@@ -162,6 +174,7 @@ export class InsightPanel {
         density.position.x = 0.25;
 
         yRight -= HEADER_SPACING;
+
 
         if (stats.bestFriends?.length) {
 
@@ -187,8 +200,24 @@ export class InsightPanel {
 
         //  IF NODE IS SELECTED CLEAR THE RIGHT COLUMN, TOP NODES AND QUIET NODES INFO NOT NEEDED
         if (nodeSelected) {
-            this.leftTextGroup.clear()
-            this.rightTextGroup.position.x = -0.25
+            this.leftTextGroup.clear();
+
+            // Guard: If no nodes are visible in this time window, stats.topHubs will be empty
+            const selectedNodeInfo = stats.topHubs && stats.topHubs.length > 0 ? stats.topHubs[0] : null;
+
+            if (selectedNodeInfo) {
+                yRight -= ROW_SPACING;
+                const selected = this._createText(`SELECTED NODE: ID ${selectedNodeInfo.id}`, SUB_HEADING_FONT_SIZE, y, 0xffffff);
+                selected.position.x = 0.25;
+                this.rightTextGroup.add(selected);
+            } else {
+                // Optional: Show a message that the selected node is currently inactive
+                const inactiveMsg = this._createText(`NODE INACTIVE IN THIS WINDOW`, FONT_SIZE, y, 0xff6666);
+                inactiveMsg.position.x = 0.25;
+                this.rightTextGroup.add(inactiveMsg);
+            }
+
+            this.rightTextGroup.position.x = -0.25;
         }
     }
 

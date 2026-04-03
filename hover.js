@@ -70,7 +70,7 @@ export function initLabels(nodeId, groupNum, nodeColorHex, camera, cameraGroup) 
 
   // --- Draw the Background Plate ---
   const radius = 30;
-  ctx.fillStyle = 'rgba(20, 25, 35, 0.9)'; 
+  ctx.fillStyle = 'rgba(20, 25, 35, 0.9)';
   ctx.beginPath();
   ctx.moveTo(radius, 0);
   ctx.lineTo(canvasWidth - radius, 0);
@@ -90,10 +90,10 @@ export function initLabels(nodeId, groupNum, nodeColorHex, camera, cameraGroup) 
   ctx.textBaseline = "middle";
   ctx.font = 'bold 65px Arial';
   ctx.fillText(`Node ${nodeId}`, canvasWidth / 2, canvasHeight / 2 - 25);
-  
+
   ctx.font = '50px Arial';
   // Use the dynamically passed color, or fallback to green if it fails
-  ctx.fillStyle = nodeColorHex || '#00ffaa'; 
+  ctx.fillStyle = nodeColorHex || '#00ffaa';
   ctx.fillText(`Group: ${groupNum}`, canvasWidth / 2, canvasHeight / 2 + 45);
 
   // --- Create the Material (Matching your filter UI exactly!) ---
@@ -110,10 +110,10 @@ export function initLabels(nodeId, groupNum, nodeColorHex, camera, cameraGroup) 
   });
 
   const aspect = canvasWidth / canvasHeight;
-  const geometry = new THREE.PlaneGeometry(0.15 * aspect, 0.15); 
+  const geometry = new THREE.PlaneGeometry(0.15 * aspect, 0.15);
   const idLabelMesh = new THREE.Mesh(geometry, material);
-  
-  idLabelMesh.renderOrder = 9999; 
+
+  idLabelMesh.renderOrder = 9999;
 
   panel.add(idLabelMesh);
   cameraGroup.add(panel);
@@ -221,7 +221,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
           controller.userData.lastHoveredButton = btnMesh;
         }
       }
-      return; 
+      return;
     }
 
     // CASE B: UI BACKGROUND (Swallow ray but don't highlight)
@@ -278,10 +278,10 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
           triggerHaptic();
           controller.userData.lastPulseTime = now;
         }
-        
+
         // Extract the exact hex color of the 3D node you are pointing at
         const colorHex = '#' + hit.material.color.getHexString();
-        
+
         // Pass the colorHex into our updated function!
         initLabels(nodeId, groupNum, colorHex, camera, cameraGroup);
       }

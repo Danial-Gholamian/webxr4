@@ -34,6 +34,9 @@ export class GraphVisualController {
         this.temporal_subscribers = new Set();
         this.selection_subscribers = new Set();
 
+        this.globalStart = 0;
+        this.globalDuration = 1;
+
         // --- Internal interaction state ---
         this.state = {
             activeBucket: null, // { id, start, end, level?, index? }
@@ -49,8 +52,11 @@ export class GraphVisualController {
                 active: false,
                 nodeIds: new Set(),
                 edgeIds: new Set()
-            }
+            },
+            edgeMode: 'ALL' // Modes: 'ALL', 'INTRA_ONLY', 'INTER_ONLY'
         };
+
+        
 
         // --- Cached temporal data ---
         this.bucketActiveNodes = new Map(); // bucketId -> Set(nodeId)
@@ -61,6 +67,8 @@ export class GraphVisualController {
         this._needsUpdate = false;
 
         // --- Baseline edge opacity ---
+        this._modeChanged = false;
+        this._bucketChanged = false; // ADD THIS
         this.BASE_EDGE_ALPHA = 0.45;
 
         this._onSelectionChange = null
@@ -78,16 +86,35 @@ export class GraphVisualController {
      */
     setDataset(dataset) {
         this.dataset = dataset;
+        this.nodesById = new Map(dataset.nodes.map(n => [String(n.id), n]));
+        const numSlots = 200; 
+        this.numSlots = numSlots;
+
+        this.dataset.links.forEach(link => {
+            const times = this.adapter.getEdgeTimes(link);
+            const mask = new Uint8Array(numSlots); 
+
+            times.forEach(t => {
+                // FIXED: Now this.globalStart and duration are defined
+                const ratio = (t - this.globalStart) / this.globalDuration;
+                const slot = Math.floor(ratio * (numSlots - 1));
+                
+                if (slot >= 0 && slot < numSlots) {
+                    mask[slot] = 1; 
+                }
+            });
+            link._bitmask = mask;
+        });
 
         this._resetState();
         this.bucketActiveNodes.clear();
-        this._bucketIndex = null;
-
-        // this.update();
-        // NOTE: UNCOMMENTING THIS MAKES THE GRAPH UPDATE EVERYTIME 
-        // WHEN Graph.onEnginestop is called in main.js
+        this.update();
     }
 
+    setTimelineContext(start, duration) {
+        this.globalStart = start;
+        this.globalDuration = duration;
+    }
 
     setEdgeLayer(lineSegments, edgeVertexMap) {
         this.lineSegments = lineSegments
@@ -194,6 +221,10 @@ export class GraphVisualController {
     
 
     highlightBucket(bucket) {
+        console.log(bucket)
+        if (this.state.activeBucket?.id !== bucket?.id) {
+        this._bucketChanged = true; 
+        }
         if (bucket && !this.bucketActiveNodes.has(bucket.id)) {
             // console.log(`[GraphController] Cache miss for bucket ${bucket.id}. Computing active nodes...`);
 
@@ -230,20 +261,26 @@ export class GraphVisualController {
 
     _updateSelectionForBucket(bucket) {
         const selectedId = this.state.selection.selectedNodeId;
-
-        if (!selectedId) return;
+        if (!selectedId || !bucket) return;
 
         this.state.selection.neighbors.clear();
 
-        this.graph.graphData().links.forEach(link => {
+        // 1. Only check links actually connected to the selected node
+        const localLinks = this.graph.graphData().links.filter(link => {
+            const s = this.adapter.getEdgeSource(link);
+            const t = this.adapter.getEdgeTarget(link);
+            return s === selectedId || t === selectedId;
+        });
 
+        // 2. Only add neighbors if the edge is active in the current bucket (Bitmask check)
+        localLinks.forEach(link => {
             if (!this._edgeInBucket(link, bucket)) return;
 
             const src = this.adapter.getEdgeSource(link);
             const tgt = this.adapter.getEdgeTarget(link);
 
-            if (src === selectedId) this.state.selection.neighbors.add(tgt);
-            else if (tgt === selectedId) this.state.selection.neighbors.add(src);
+            const neighborId = (src === selectedId) ? tgt : src;
+            this.state.selection.neighbors.add(neighborId);
         });
     }
 
@@ -270,7 +307,7 @@ export class GraphVisualController {
         this.update();
 
     }
-
+//THIS CHNAGED
     // =========================================================
     // Public API — Update hook
     // =========================================================
@@ -280,26 +317,41 @@ export class GraphVisualController {
      * This replaces updateAllVisuals().
      */
     update() {
-        console.log("edgeVertexMap size:", this.edgeVertexMap.size);
-        // console.trace("GraphVisualController.update");
+        if (this.state.selection.active && this.state.activeBucket) {
+            this._updateSelectionForBucket(this.state.activeBucket);
+        }
+
         const ctx = this._buildVisibilityContext();
-
         this._updateNodeVisuals(ctx);
-        this._updateEdgeVisuals(ctx);
 
+        if (this.state.activeBucket) {
+            this.updateEdgeUniforms(this.state.activeBucket.start, this.state.activeBucket.end);
+        }
+
+        this._updateEdgeVisuals(ctx);
         this.graph.d3ReheatSimulation?.();
 
-        // CALCULATE THE VALUES FOR INSIGHT PANEL and notify the UI object
+        // --- CRITICAL FIX: EFFECTIVE VISIBILITY ---
         const { nodes, links } = this.getFilteredData();
+        const selectedId = this.state.selection.selectedNodeId;
+        
+        // Is the selected node actually visible in the current time/group filter?
+        const isSelectedNodeVisible = nodes.some(n => String(n.id) === selectedId);
+        
+        // This is what the UI should actually care about
+        const effectiveSelectionActive = this.state.selection.active && isSelectedNodeVisible;
 
         const selection = {
-            type: this.state.selection.active ? 'NODE' : 'NONE',
-            id: this.state.selection.selectedNodeId
+            type: effectiveSelectionActive ? 'NODE' : 'NONE',
+            id: selectedId
         };
 
         const stats = calculateInsights(nodes, links, selection);
 
-        this._notifyInsights(stats);
+        // Notify subscribers with the EFFECTIVE visibility
+        this.selection_subscribers.forEach(fn => 
+            fn(stats, effectiveSelectionActive, this.state.edgeMode)
+        );
     }
 
 
@@ -333,64 +385,58 @@ export class GraphVisualController {
 
 
     _isNodeVisible(nodeId, ctx) {
-        //ALWAYS show selected node (even if inactive)
-        if (ctx.selection.active && nodeId === ctx.selection.selectedNodeId) {
-            return true;
-        }
-
-        // Period constraint (hard)
-        if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
-            return false;
-        }
-
-
-        // Group constraint
-        if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) {
-            return false;
-        }
-
-        // election constraint (period-aware!)
+        // 1. SELECTION LOGIC: If selection is active, only show the node or active neighbors
         if (ctx.selection.active) {
-            const selId = ctx.selection.selectedNodeId;
+            return nodeId === ctx.selection.selectedNodeId || ctx.selection.neighbors.has(nodeId);
+        }
 
-            if (!ctx.activeBucket) {
-                return (
-                    nodeId === selId ||
-                    ctx.selection.neighbors.has(nodeId)
-                );
-            }
+        // 2. GROUP LOGIC
+        if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
 
-            // Period-scoped neighbors
-            const bucketNeighbors = this._getBucketNeighbors(selId, ctx.activeBucket);
+        // 3. TEMPORAL LOGIC (General View)
+        if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) return false;
+
+        return true;
+    }
 
 
-            return (
-                nodeId === selId ||
-                bucketNeighbors.has(nodeId)
-            );
+
+
+    _isEdgeVisible(link, ctx) {
+        const srcId = this.adapter.getEdgeSource(link);
+        const tgtId = this.adapter.getEdgeTarget(link);
+
+        // 1. TEMPORAL FILTER (Always check the bitmask!)
+        if (ctx.activeBucket && !this._edgeInBucket(link, ctx.activeBucket)) return false;
+
+        // 2. MODE LOGIC (Intra/Inter)
+        if (this.state.edgeMode !== 'ALL') {
+            const srcNode = this.nodesById.get(srcId);
+            const tgtNode = this.nodesById.get(tgtId);
+            if (!srcNode || !tgtNode) return false;
+
+            const isIntra = srcNode.group === tgtNode.group;
+            if (this.state.edgeMode === 'INTRA_ONLY' && !isIntra) return false;
+            if (this.state.edgeMode === 'INTER_ONLY' && isIntra) return false;
+        }
+
+        // 3. SELECTION/GROUP FILTERING
+        if (ctx.selection.active) {
+            return (srcId === ctx.selection.selectedNodeId || tgtId === ctx.selection.selectedNodeId);
+        }
+        
+        if (ctx.group.active) {
+            return ctx.group.edgeIds.has(this._getEdgeKey(srcId, tgtId));
         }
 
         return true;
     }
 
-    _isEdgeVisible(link, ctx) {
-        const src = this.adapter.getEdgeSource(link);
-        const tgt = this.adapter.getEdgeTarget(link);
-        const key = this._getEdgeKey(src, tgt);
-
-        if (ctx.activeBucket && !this._edgeInBucket(link, ctx.activeBucket)) return false;
-
-
-        if (ctx.group.active && !ctx.group.edgeIds.has(key)) return false;
-
-        if (ctx.selection.active) {
-            return (
-                src === ctx.selection.selectedNodeId ||
-                tgt === ctx.selection.selectedNodeId
-            );
-        }
-
-        return true;
+    // A public method to toggle
+    setEdgeMode(mode) {
+        this.state.edgeMode = mode; 
+        this._modeChanged = true; // Set flag to force a full edge redraw
+        this.update();
     }
 
     // ------------------------------
@@ -469,19 +515,25 @@ export class GraphVisualController {
     }
 
     _updateEdgeVisuals(ctx) {
-        const alphas = this.lineSegments.geometry.attributes.alpha.array;
-        console.log(
-            "edges:",
-            this.lineSegments.geometry.attributes.alpha.array.length
-        );
+        if (!this.lineSegments) return;
 
+        const isStandardAllMode = !ctx.selection.active && !ctx.group.active && this.state.edgeMode === 'ALL';
+        
+        // The Gate now opens if mode changed OR if the timeline bucket changed
+        if (isStandardAllMode && !this._modeChanged && !this._bucketChanged) {
+            return; 
+        }
+        
+        this._modeChanged = false; 
+        this._bucketChanged = false; // Reset the flag
+
+        const alphas = this.lineSegments.geometry.attributes.alpha.array;
         this.graph.graphData().links.forEach(link => {
-            const src = this.adapter.getEdgeSource(link);
-            const tgt = this.adapter.getEdgeTarget(link);
-            const key = this._getEdgeKey(src, tgt);
+            const key = this._getEdgeKey(this.adapter.getEdgeSource(link), this.adapter.getEdgeTarget(link));
             const entry = this.edgeVertexMap.get(key);
             if (!entry) return;
 
+            // Use the accurate bitmask check
             const visible = this._isEdgeVisible(link, ctx);
             const a = visible ? this.BASE_EDGE_ALPHA : 0.0;
 
@@ -538,12 +590,26 @@ export class GraphVisualController {
         return t >= bucket.start && t < bucket.end;
     }
 
+
+
     _edgeInBucket(link, bucket) {
-        if (!bucket) return true;
-        const times = this.adapter.getEdgePeriods(link) || []; // currently returns edge.times (compat)
-        for (const t of times) {
-            if (this._isTimeInBucket(t, bucket)) return true;
+        if (!bucket || !link._bitmask) return true;
+
+        // Convert bucket start/end to slot indices (0 to 199)
+        const startRatio = (bucket.start - this.globalStart) / this.globalDuration;
+        const endRatio = (bucket.end - this.globalStart) / this.globalDuration;
+        
+        let startSlot = Math.floor(startRatio * (this.numSlots - 1));
+        let endSlot = Math.floor(endRatio * (this.numSlots - 1));
+
+        // Clamp indices to array bounds
+        startSlot = Math.max(0, Math.min(startSlot, this.numSlots - 1));
+        endSlot = Math.max(0, Math.min(endSlot, this.numSlots - 1));
+
+        for (let i = startSlot; i <= endSlot; i++) {
+            if (link._bitmask[i] === 1) return true;
         }
+
         return false;
     }
 
@@ -622,7 +688,9 @@ export class GraphVisualController {
     }
 
     _notifyInsights(stats) {
-        this.selection_subscribers.forEach(fn => fn(stats, this.state.selection.active));
+        this.selection_subscribers.forEach(fn => 
+            fn(stats, this.state.selection.active, this.state.edgeMode) // Pass edgeMode as 3rd arg
+        );
     }
 
     /**
@@ -643,7 +711,21 @@ export class GraphVisualController {
 
 
     clearAllSelection() {
-        this._clearNodeSelectionState()
-        this.clearGroupFilter()
+        this._clearNodeSelectionState();
+        this.clearGroupFilter();
+        
+        // Ensure the next update() call treats this as a "Full Redraw"
+        this._modeChanged = true; 
+        this.update();
     }
+
+
+    updateEdgeUniforms(start, end) {
+        if (!this.lineSegments || !this.lineSegments.material.uniforms) return;
+
+        // Update the uniforms we defined in buildBatchedEdges
+        this.lineSegments.material.uniforms.uTimeStart.value = start;
+        this.lineSegments.material.uniforms.uTimeEnd.value = end;
+    }
+
 }

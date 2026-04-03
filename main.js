@@ -30,7 +30,7 @@ import {
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
-import { registerNetworkHandlers, broadcastAvatar, broadcastNodeSelection, setScene, broadcastGraphReset, userAvatars, avatarInterpolation, setUIPanel, broadcastPeriodStackToggle, setUsername } from './network.js';
+import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUIPanel, setUsername } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
@@ -47,6 +47,7 @@ import { createSky, gridGeo, gridMaterial, keepUserNearGraph } from './skybox.js
 import { calculateInsights } from './insightSystem.js';
 import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
+import { SlidingTimelineManager } from './SlidingTimelineManager.js';
 
 // INTIALIZE THE START MENU AND GLOBAL VARIABLES
 const { datasetKey, deltaMin, username } = await initStartMenu();
@@ -55,11 +56,20 @@ let selectedDatasetKey = datasetKey;
 setUsername(username)
 export const myUsername = username
 
+let stickHoldTimer = 0;
+const HOLD_THRESHOLD = 0.2; // Seconds before a click turns into a slide
+const SLIDE_SPEED = 50; // Steps per second while holding
 
+let triggerHoldTime = 0;
+const TRIGGER_HOLD_THRESHOLD = 0.25; // seconds
+let wasTriggerPressed = false;
 
-let levelIndex = 0;
-let bucketIndex = null;
-let autoplayInterval = null;
+// ONLY DECLARE IT HERE. DO NOT INITIALIZE IT YET.
+export let timelineManager = null;
+
+let globalStart = 0;
+let globalDuration = 1;
+let insightPanel = null;
 
 
 // Graph data variables
@@ -91,7 +101,7 @@ let graphUpdateMode = null;
 let graphUpdateNodeId = null;
 
 
-const roomCenter = new THREE.Vector3();
+const roomCenter = new THREE.Vector3(0, 0, 0);
 
 
 // ========================
@@ -127,7 +137,7 @@ grid.renderOrder = -1;
 // ======== LOAD VR ROOM / LAB ROOM ========
 const loader = new GLTFLoader();
 let labRoom;
-let roomHalfSize = new THREE.Vector2(); // XZ half size we allow the user to move in
+let roomHalfSize = new THREE.Vector2(500, 500); // XZ half size we allow the user to move in
 
 // loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
 //   labRoom = gltf.scene;
@@ -215,6 +225,8 @@ const cameraGroup = new THREE.Group();
 cameraGroup.add(camera);
 scene.add(cameraGroup);
 
+insightPanel = new InsightPanel();
+cameraGroup.add(insightPanel.getObject3D());
 
 // ========================
 // User Guide Panel Setup 
@@ -278,7 +290,7 @@ function enableGraphRotation(controller) {
 enableGraphRotation(controller1)
 enableGraphRotation(controller2)
 
-
+// THIS CHNAGED
 
 // ========================
 // Graph Data and Maps
@@ -293,23 +305,52 @@ export let periodStack = null;
 const colorScale = scaleOrdinal(schemeCategory10)
 
 function buildBatchedEdges(graphData, nodesById) {
-  console.log("buildBatchedEdges called")
-  // edgeVertexMap.clear()
+  console.log("buildBatchedEdges called with GPU filtering (Fixed)");
+  
   const positions = [];
   const colors = [];
-  const color = new THREE.Color();
+  const alphas = [];
+  const startTimes = []; 
+  const endTimes = [];   
 
   let vIndex = 0;
-  const alphas = [];
 
   graphData.links.forEach(link => {
+    // 1. Get the actual node objects
     const src = nodesById[link.source.id ?? link.source];
     const tgt = nodesById[link.target.id ?? link.target];
+    
     if (!src || !tgt) return;
 
-    // each edge has 2 vertices, so you MUST push 2 alpha values
-    alphas.push(0.2);
-    alphas.push(0.2);
+    // 2. Extract Temporal Data for this edge
+    // FIX: If there are no times, we set values to -1.0. 
+    // Since the timeline slider is always >= 0, these will be hidden by the shader.
+    const times = link.times || [];
+    const edgeStart = times.length > 0 ? Math.min(...times) : -1.0;
+    const edgeEnd = times.length > 0 ? Math.max(...times) : -1.0;
+
+    // 3. Logic for Edge Coloring (Intra vs Inter)
+    const srcGroup = src.group;
+    const tgtGroup = tgt.group;
+
+    if (srcGroup === tgtGroup) {
+        // INTRA: Same community -> Use Group Color
+        const c = new THREE.Color(colorScale(srcGroup));
+        colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+    } else {
+        // INTER: Different communities -> Pure White
+        colors.push(1, 1, 1, 1, 1, 1);
+    }
+
+    // 4. Populate Attributes (2 vertices per line segment)
+    // BASE_EDGE_ALPHA (0.45) is used as the default visibility
+    alphas.push(0.45, 0.45); 
+    
+    // Add the time data for BOTH vertices of the edge
+    startTimes.push(edgeStart, edgeStart);
+    endTimes.push(edgeEnd, edgeEnd);
+
+    // Positions
     const x1 = Number.isFinite(src.x) ? src.x : 0;
     const y1 = Number.isFinite(src.y) ? src.y : 0;
     const z1 = Number.isFinite(src.z) ? src.z : 0;
@@ -318,16 +359,9 @@ function buildBatchedEdges(graphData, nodesById) {
     const y2 = Number.isFinite(tgt.y) ? tgt.y : 0;
     const z2 = Number.isFinite(tgt.z) ? tgt.z : 0;
 
-    // // positions
-    positions.push(x1, y1, z1);
-    positions.push(x2, y2, z2);
+    positions.push(x1, y1, z1, x2, y2, z2);
 
-    // default colors
-    color.setRGB(0.65, 0.75, 0.9);
-    colors.push(color.r, color.g, color.b);
-    colors.push(color.r, color.g, color.b);
-
-    // record indices (two vertices per link)
+    // 5. Record indices for the selection map
     const key = getEdgeKey(link.source.id ?? link.source, link.target.id ?? link.target);
     edgeVertexMap.set(key, { start: vIndex, end: vIndex + 1 });
     vIndex += 2;
@@ -337,32 +371,46 @@ function buildBatchedEdges(graphData, nodesById) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setAttribute('alpha', new THREE.Float32BufferAttribute(alphas, 1));
-
-  // ============================================================
-  // Custom ShaderMaterial for batched edges
-  //
-  // We use a custom shader so each edge can have its own opacity.
-  // - Each vertex stores an `alpha` attribute (0.0 → invisible, 1.0 → fully visible).
-  // - Vertex shader: passes per-vertex color and alpha down to the fragment shader.
-  // - Fragment shader: blends edges using the alpha value. If alpha <= 0.0, we
-  //   call `discard` so the fragment is not drawn at all (prevents black lines).
-  //
-  // This is GLSL (OpenGL Shading Language), which looks like C but runs on the GPU.
-  // ============================================================
+  
+  // Attributes for GPU-side time filtering
+  geometry.setAttribute('startTime', new THREE.Float32BufferAttribute(startTimes, 1));
+  geometry.setAttribute('endTime', new THREE.Float32BufferAttribute(endTimes, 1));
 
   const material = new THREE.ShaderMaterial({
     transparent: true,
     vertexColors: true,
-    depthWrite: false,            // <--- important so transparent lines don’t occlude
-    blending: THREE.NormalBlending, // <--- standard alpha blending
-    uniforms: {},
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      uTimeStart: { value: 0.0 },
+      uTimeEnd: { value: 1000000.0 }
+    },
     vertexShader: `
       attribute float alpha;
+      attribute float startTime;
+      attribute float endTime;
+      
+      uniform float uTimeStart;
+      uniform float uTimeEnd;
+
       varying vec3 vColor;
       varying float vAlpha;
+
       void main() {
         vColor = color;
-        vAlpha = alpha;
+        
+        float isVisible = 1.0;
+
+        // 1. If edge has no data (our -1.0 fallback), hide it.
+        if (startTime < 0.0) {
+            isVisible = 0.0;
+        }
+        // 2. Standard Temporal Overlap logic
+        else if (startTime > uTimeEnd || endTime < uTimeStart) {
+            isVisible = 0.0;
+        }
+
+        vAlpha = alpha * isVisible; 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -370,13 +418,11 @@ function buildBatchedEdges(graphData, nodesById) {
       varying vec3 vColor;
       varying float vAlpha;
       void main() {
-        if (vAlpha <= 0.0) discard;   // <--- don't draw invisible edges at all
+        if (vAlpha <= 0.0) discard;
         gl_FragColor = vec4(vColor, vAlpha);
       }
     `
   });
-
-
 
   return new THREE.LineSegments(geometry, material);
 }
@@ -567,90 +613,42 @@ const graphController = new GraphVisualController({
 });
 
 
-await loadDataset(selectedDatasetKey)
-applyDataset(dataset, periods)
-
-// ========================
-// EXPERIMENTAL: Temporal Hierarchy Autoplay
-// ========================
 
 
+const datasetInfo = await loadDataset(selectedDatasetKey);
+// Now 'dataset' and 'periods' are globally assigned within loadDataset, 
+// but let's use the returned values for safety:
+dataset = datasetInfo.datasetValues;
+periods = datasetInfo.periodLabelsValues;
 
-const b = 4;
-// const deltaMin = 50; // arbitrary test value
-// Use the ORIGINAL dataset, not ForceGraph-mutated data
 const allTimes = dataset.__allTimes ?? [];
-
-// ==========
 const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
-console.log("VALUE T: ", T)
 
+// ASSIGN to the global variables we declared at the top
+globalStart = 0; 
+globalDuration = T - globalStart;
 
+graphController.setTimelineContext(globalStart, globalDuration);
+timelineManager = new SlidingTimelineManager(globalStart, globalDuration);
 
-let levels = buildTemporalHierarchy({ T, deltaMin: userDeltaMin, b: 4 });
-let root = buildTemporalTree(levels, 4);
-let navigator = createTemporalNavigator(root);
+// Now this will work because globalStart and globalDuration are defined!
+// const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 
+// THE FIX: Set the initial window to 10% of the dataset so it actually clips things.
+const initialWindow = Math.max(10, Math.min(500, globalDuration * 0.1));
+timelineManager.setWindowSize(initialWindow);
+
+// Force the GPU to reset to a full view initially
+graphController.updateEdgeUniforms(0, globalDuration); 
+
+applyDataset(dataset, periods);
+// We will update the inside of this panel in the next step!
 const temporalPanel = createTemporalDrillPanel({
   cameraGroup: cameraGroup,
   camera: camera,
-  navigator: navigator,
-  graphController: graphController,
-  onStateChange: dispatchTemporalUpdate,    // NEW
-  getDeltaMin: () => userDeltaMin,          // NEW
-  onDeltaChange: updateDeltaMin             // NEW
+  timelineManager: timelineManager,
+  graphController: graphController
 });
-
-// --- UNIFIED TEMPORAL DISPATCHER ---
-export function dispatchTemporalUpdate() {
-  const activeBucket = navigator.getCurrentNode();
-  if (!activeBucket) return;
-
-  graphController.highlightBucket(activeBucket);
-
-  if (temporalPanel.group.visible) {
-    temporalPanel.show();
-  }
-}
-
-// experiment
-// window.getVRInsights = () => {
-//     const controller = getGraphController();
-
-//     // 1. Get the data that the user is actually seeing right now
-//     const { nodes, links } = controller.getFilteredData();
-
-//     // 2. Determine the current selection state
-//     const selection = {
-//         type: 'NONE',
-//         id: null
-//     };
-
-//     if (controller.state.selection.active) {
-//         selection.type = 'NODE';
-//         selection.id = controller.state.selection.selectedNodeId;
-//     } else if (controller.state.group.active) {
-//         selection.type = 'GROUP';
-//         // Note: You might need to store the raw group name in state 
-//         // if you want to show group-specific insights later.
-//     }
-
-//     // 3. Calculate
-//     const stats = calculateInsights(nodes, links, selection);
-
-//     // 4. Output to console for your testing
-//     console.log("%c--- INSIGHT REPORT ---", "color: #00ff00; font-weight: bold;");
-//     console.log(`Visible Nodes: ${nodes.length} | Visible Edges: ${links.length}`);
-//     console.log("Top 3 Active Students:", stats.topHubs);
-//     console.log("Top 3 Active Groups:", stats.topGroups);
-
-//     if (selection.type === 'NODE') {
-//         console.log(`%cSelection (Node ${selection.id}): Rank ${stats.nodeRank}`, "color: #00aaff");
-//         console.log("Best Friends:", stats.bestFriends);
-//     }
-
-//     return stats;
-// };
 
 // --- NEW: REBUILD TREE FUNCTION ---
 export function updateDeltaMin(amount) {
@@ -672,18 +670,8 @@ export function updateDeltaMin(amount) {
   dispatchTemporalUpdate();
 }
 
-function handleTemporalShift(direction) {
-  // -1 to the left
-  //  1 to the right
-  const newNode = navigator.shiftSibling(direction);
-  if (newNode) {
-    dispatchTemporalUpdate();
-  }
-}
 
-const globalStart = 0; // Or math.min(...dataset.__allTimes) if it doesn't start at 0
-const globalDuration = T - globalStart;
-// // Create 60 bars across the timeline
+
 const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 
 
@@ -693,12 +681,20 @@ const histogram = new HistogramGauge({
   globalStart,
   globalDuration,
   onBucketSelected: (bucket) => {
-    graphController.highlightBucket(bucket);
+    timelineManager.currentStart = bucket.start;
+
+    const newBucket = timelineManager.getCurrentBucket();
+
+    graphController.bucketActiveNodes.clear();
+    graphController.highlightBucket(newBucket);
+    histogram.onTimeChange(newBucket);
   }
 });
 
 // Add it to the VR camera space
 cameraGroup.add(histogram.getObject3D());
+cameraGroup.userData.histogram = histogram;
+window.histogramRef = histogram
 
 
 // Subscribe to controller temporal updates
@@ -883,13 +879,13 @@ uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
 //panel for insight 
 
-const insightPanel = new InsightPanel();
-cameraGroup.add(insightPanel.getObject3D());
+// const insightPanel = new InsightPanel();
+// cameraGroup.add(insightPanel.getObject3D());
 
 // Add the insight panel to the controller subscribers
 // This allows them to listen to any selection done in the graph and update
-graphController.subscribeToSelection((stats, nodeSelected) => {
-  insightPanel.update(stats, colorScale, nodeSelected);
+graphController.subscribeToSelection((stats, nodeSelected, edgeMode) => {
+  insightPanel.update(stats, colorScale, nodeSelected, edgeMode);
 });
 
 // // Hook it into the controller's update loop
@@ -928,6 +924,25 @@ graphController.setSelectionListener((nodeId) => {
 });
 
 
+let frameSkip = 0;
+
+function updateTimeWindow() {
+  const newBucket = timelineManager.getCurrentBucket();
+
+  // 1. ALWAYS update the GPU Edges (This is instant)
+  graphController.updateEdgeUniforms(newBucket.start, newBucket.end);
+
+  // 2. THROTTLE the CPU Node/Selection logic
+  // Only run this every 5 frames to keep VR at 90FPS
+  frameSkip++;
+  if (frameSkip % 5 === 0) {
+    graphController.highlightBucket(newBucket);
+    if (histogram) histogram.onTimeChange(newBucket);
+    frameSkip = 0;
+  }
+}
+
+
 setUIPanel(uiPanel);
 
 export function highlightSubgraph(nodeId) {
@@ -960,21 +975,18 @@ resetBtn.addEventListener('click', () => {
 });
 
 
+// main.js
+
 export function resetGraph() {
-  // Instead of resetting the whole thing, just reset the selection :)
-  graphController.clearAllSelection()
+  // 1. Clear the selection states
+  graphController.clearAllSelection();
 
-  // graphController.clearGroupFilter()
-  // updatePeroidLabel('Default');
-  // uiPanel.userData.updateSelectedNodeLabel?.(null);
+  // 2. NEW: Force the controller to ignore the performance gate 
+  // and reset all edge alphas to BASE_EDGE_ALPHA
+  graphController._modeChanged = true; 
 
-  // graphController.resetAll()
-  // histogram.reset()
-  // // updateBarGauge(timeGauge, 0, "Default");
-  // if (navigator && root) {
-  //   navigator.selectNode(root); // Point the brain back to the top of the tree
-  //   dispatchTemporalUpdate();   // Force the Panel, Graph, and UI to sync to the root
-  // }
+  // 3. Trigger the update
+  graphController.update();
 }
 
 
@@ -1031,14 +1043,11 @@ renderer.xr.addEventListener('sessionend', () => {
 
 
 
-setInterval(() => {
-  if (inVR) {
-
-    broadcastAvatar(camera, controller1, controller2);
-
-    // console.log('Hellow');
-  }
-}, 100);
+// setInterval(() => {
+//   if (inVR && timelineManager) {
+//     broadcastAvatar(camera, controller1, controller2, timelineManager);
+//   }
+// }, 100);
 
 function togglePanel() {
   console.log("console.log from togglePanel");
@@ -1138,8 +1147,8 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-  if (inVR && timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) {
-    broadcastAvatar(camera, controller1, controller2);
+  if (inVR && (timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) && timelineManager) {
+    broadcastAvatar(camera, controller1, controller2, timelineManager); 
     lastBroadcast = timestamp;
   }
   if (graphUpdateNeeded) {
@@ -1196,36 +1205,147 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
   const hoverPanel = cameraGroup.getObjectByName('NodeIDBillboard');
-    if (hoverPanel && inVR) {
-      // Just trigger the update. Let hover.js handle the math and coordinates!
-      hoverPanel.userData.update?.();
-    }
+  if (hoverPanel && inVR) {
+    // Just trigger the update. Let hover.js handle the math and coordinates!
+    hoverPanel.userData.update?.();
+  }
 
   if (inVR && xrFrame) {
     handleJoystickInput(xrFrame, camera, cameraGroup);
-    // clampCameraToRoom();
-    const deltaTime = (timestamp - lastTime) / 1000;
-    lastTime = timestamp;
 
-    // --- Graph scaling with stick buttons ---
-    handleLeftStickButton(xrFrame, () => {
-      handleTemporalShift(-1);
-      if (userGuidePanel.visible) {
-        prevGuidePage(userGuidePanel);
-      };
-
-      console.log("Left stick clicked")
-    });
+    // // Calculate deltaTime for smooth sliding and timers
+    // const deltaTime = (timestamp - lastTime) / 1000;
+    // lastTime = timestamp;
+    clampCameraToRoom();
     animatePuppetHands(xrFrame, renderer);
-    handleRightStickButton(xrFrame, () => {
-      console.log("Right stick clicked")
-      handleTemporalShift(1);
-      if (userGuidePanel.visible) {
-        nextGuidePage(userGuidePanel);
-      };
-      // temporalPanel.toggle();
-    });
 
+    // ============================================================
+    // NEW: "Click-to-Step, Hold-to-Slide" Logic
+    // ============================================================
+    let isLeftStickPressed = false;
+    let isRightStickPressed = false;
+    let isLeftTriggerPressed = false;
+    let isRightTriggerPressed = false;
+
+
+
+    // 1. Manually check raw stick button state (index 3)
+    for (const source of xrFrame.session.inputSources) {
+      // Listen for holding the trigger button
+      for (const source of xrFrame.session.inputSources) {
+        if (source.gamepad) {
+          const gp = source.gamepad;
+
+          if (source.handedness === 'left') {
+            isLeftTriggerPressed = gp.buttons[0]?.pressed;
+            if (isLeftTriggerPressed) {
+              console.log("LEFT TRIGGER");
+            }
+          }
+
+          if (source.handedness === 'right') {
+            isRightTriggerPressed = gp.buttons[0]?.pressed;
+            if (isRightTriggerPressed) {
+              console.log("RIGHT TRIGGER");
+            }
+          }
+        }
+      }
+
+      if (source.gamepad && source.gamepad.buttons.length > 3) {
+        if (source.handedness === 'left') {
+          isLeftStickPressed = source.gamepad.buttons[3].pressed;
+        } else if (source.handedness === 'right') {
+          isRightStickPressed = source.gamepad.buttons[3].pressed;
+        }
+      }
+
+      const isTriggerPressed = isLeftTriggerPressed || isRightTriggerPressed;
+
+      if (isTriggerPressed) {
+        triggerHoldTime += deltaTime;
+      } else {
+        // Trigger released → check if it was a tap
+        if (wasTriggerPressed && triggerHoldTime < TRIGGER_HOLD_THRESHOLD) {
+          // 👉 THIS IS A CLICK (tap)
+          console.log("TRIGGER TAP → should select");
+
+          // Let your existing raycast click system run
+          // (do nothing special here)
+        }
+
+        triggerHoldTime = 0;
+      }
+
+      wasTriggerPressed = isTriggerPressed;
+    }
+
+
+
+
+    // 2. Process the input
+    let shifted = false;
+    let direction = 0;
+    let slideAmount = 0;
+
+    // Determine direction
+    if (isLeftStickPressed) direction = -1;
+    if (isRightStickPressed) direction = 1;
+
+    if (direction !== 0) {
+      stickHoldTimer += deltaTime;
+
+      if (stickHoldTimer < HOLD_THRESHOLD) {
+        // --- TAP (single step) ---
+        slideAmount = 5; // small step
+      } else {
+        // --- HOLD (continuous) ---
+        slideAmount = SLIDE_SPEED * deltaTime;
+      }
+
+      shifted = true;
+
+    } else {
+      // Released
+      if (stickHoldTimer > 0) {
+        Graph.d3ReheatSimulation?.();
+      }
+
+      stickHoldTimer = 0;
+    }
+    // 3. Apply the shift if needed
+    if (shifted) {
+      timelineManager.shift(direction, slideAmount);
+      updateTimeWindow()
+    }
+
+
+    // Handle increase in window size
+    const RESIZE_SPEED = 200; // tweak this
+
+    let resized = false;
+
+
+    if (!cameraGroup.userData.temporalPanel?.visible) {
+      if (isLeftTriggerPressed) {
+        timelineManager.setWindowSize(
+          timelineManager.windowSize - RESIZE_SPEED * deltaTime
+        );
+        updateTimeWindow();
+      }
+
+      if (isRightTriggerPressed) {
+        timelineManager.setWindowSize(
+          timelineManager.windowSize + RESIZE_SPEED * deltaTime
+        );
+        updateTimeWindow();
+      }
+    }
+
+    if (resized) {
+      updateTimeWindow();
+    }
+    // ============================================================
 
     // Smoothly interpolate scale
     const currentScale = graphRoot.scale.x;
@@ -1261,32 +1381,20 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     handleBButtonInput(xrFrame, () => {
       // Show the user guide panel
       userGuidePanel.visible = !userGuidePanel.visible;
-    
+
       // This part ensures the video plays/pauses
       if (userGuidePanel.onToggle) {
-          userGuidePanel.onToggle(userGuidePanel.visible);
+        userGuidePanel.onToggle(userGuidePanel.visible);
       }
-
-      // const state = graphController.getState();
-
-      // const context = {
-      //   groupName: state.activeGroup,
-      //   period: state.activePeriod,
-      //   selectedNodeId: state.selectedNodeId
-      // };
-
-      // if (!periodStack || periodStack.group.visible === false) {
-      //   rebuildPeriodStack();
-      //   periodStack.show();
-      //   broadcastPeriodStackToggle(true, context);
-      // } else {
-      //   periodStack.hide();
-      //   broadcastPeriodStackToggle(false, context);
-      // }
     });
 
     handleYButtonInput(xrFrame, () => {
-      temporalPanel.toggle();
+      // temporalPanel.toggle();
+      const modes = ['ALL', 'INTRA_ONLY', 'INTER_ONLY'];
+      const currentIndex = modes.indexOf(graphController.state.edgeMode);
+      const nextMode = modes[(currentIndex + 1) % modes.length];
+      
+      graphController.setEdgeMode(nextMode);
       [controller1, controller2].forEach(c => {
         const gp = c.userData.inputSource?.gamepad;
         const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
@@ -1295,9 +1403,9 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         } else if (navigator.vibrate) {
           navigator.vibrate(100);
         }
+        console.log(`Switched Edge Mode to: ${nextMode}`);
       });
     })
-
 
     if (!periodStack?.group?.visible) {
       detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);

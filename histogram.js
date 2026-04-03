@@ -42,6 +42,11 @@ export class HistogramGauge {
     this._buildHistogram(bins);
     this._buildHighlightWindow();
     this._buildLabel();
+    this.currentWindowSize = globalDuration; // default
+
+    // Plane for user interaction 
+
+    this._buildInteractionPlane();
 
     // === Preserve your spatial configuration ===
 
@@ -67,8 +72,8 @@ export class HistogramGauge {
    */
   _buildHistogram(bins) {
     const maxBinCount = Math.max(...bins) || 1;
-    const numBins = bins.length;
-    const binWidth = this.width / numBins;
+    this.numBins = bins.length;
+    const binWidth = this.width / this.numBins;
     const binDepth = 0.05;
 
     const barsGroup = new THREE.Group();
@@ -109,6 +114,15 @@ export class HistogramGauge {
 
       // Center vertically so base rests at y = 0
       barMesh.position.y = h / 2;
+
+      // This makes the bars clickable and interactive
+      // barMesh.userData = {
+      //   isInteractable: true,
+      //   isHistogramBar: true,
+      //   onClick: () => {
+      //     this._handleBarClick(i, numBins);
+      //   }
+      // };
 
       barsGroup.add(barMesh);
       this.binMeshes.push(barMesh);
@@ -178,6 +192,7 @@ export class HistogramGauge {
       this.reset();
       return;
     }
+    this.currentWindowSize = bucket.end - bucket.start;
 
     const startRatio =
       (bucket.start - this.globalStart) / this.globalDuration;
@@ -253,6 +268,134 @@ export class HistogramGauge {
     });
 
     this.group.add(this.label);
+  }
+
+  // Can be used later if we want to implement selection
+
+  _handleBarClick(binIndex, numBins) {
+    console.log("CLICKING BAR HISTOGRAM...")
+    if (!this.onBucketSelected) return;
+
+    const ratio = binIndex / numBins;
+
+    const time =
+      this.globalStart +
+      ratio * this.globalDuration;
+
+    // Center the window around clicked point
+    const halfWindow = this.currentWindowSize / 2;
+
+    const start = time - halfWindow;
+    const end = time + halfWindow;
+
+    this.onBucketSelected({
+      start,
+      end
+    });
+  }
+
+  _buildInteractionPlane() {
+    const geom = new THREE.PlaneGeometry(
+      this.width,
+      this.maxHeight * 1.5
+    );
+
+    const mat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.0, // invisible
+      depthWrite: false
+    });
+
+    this.interactionPlane = new THREE.Mesh(geom, mat);
+
+    // Put it slightly behind bars
+    this.interactionPlane.position.z = 0.05;
+    this.interactionPlane.renderOrder = 999;
+
+    this.interactionPlane.userData = {
+      isInteractable: true,
+      isHistogram: true,
+      onClick: (intersection) => {
+        this._handlePlaneClick(intersection);
+      }
+    };
+
+    this.group.add(this.interactionPlane);
+  }
+
+  _handlePlaneClick(intersection) {
+    if (!intersection || !intersection.point) return;
+
+    const localPoint = this.interactionPlane.worldToLocal(
+      intersection.point.clone()
+    );
+
+    const normalized =
+      (localPoint.x + this.width / 2) / this.width;
+
+    const clamped = Math.max(0, Math.min(normalized, 1));
+
+    // Convert to bin
+    const binIndex = Math.floor(clamped * this.numBins);
+
+    
+    const safeIndex = Math.max(0, Math.min(binIndex, this.numBins - 1));
+
+    this._handleBarClick(safeIndex, this.numBins);
+  }
+
+  _buildRemoteWindow(id) {
+    
+    const hash = id.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
+    const hue = (Math.abs(hash) % 30) / 360;
+    
+    const geom = new THREE.BoxGeometry(this.width, this.maxHeight * 1.05, 0.08);
+    const mat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color().setHSL(hue, 0.8, 0.5), // Vibrant Red/Orange
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.y = this.maxHeight / 2; 
+    mesh.position.z = 0.06; 
+    mesh.renderOrder = 20;
+    this.group.add(mesh);
+    return mesh;
+  }
+
+  updateRemoteWindow(id, start, end) {
+    if (!this.remoteWindows) this.remoteWindows = {};
+    if (!this.remoteWindows[id]) {
+      this.remoteWindows[id] = this._buildRemoteWindow(id);
+    }
+
+    const mesh = this.remoteWindows[id];
+    const startRatio = (start - this.globalStart) / this.globalDuration;
+    const widthRatio = (end - start) / this.globalDuration;
+    const clampedWidth = Math.max(0.001, widthRatio);
+    const clampedStart = Math.max(0, Math.min(startRatio, 1));
+    mesh.scale.x = clampedWidth;
+    const actualWidthInMeters = this.width * clampedWidth;
+    mesh.position.x = 
+      (-this.width / 2) + 
+      (this.width * clampedStart) + 
+      (actualWidthInMeters / 2);
+  }
+
+  removeRemoteWindow(id) {
+    if (this.remoteWindows && this.remoteWindows[id]) {
+      const mesh = this.remoteWindows[id];
+      this.group.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) mesh.material.dispose();
+
+      delete this.remoteWindows[id];
+      
+      console.log(`Cleaned up remote window for user: ${id}`);
+    }
   }
 
 }
