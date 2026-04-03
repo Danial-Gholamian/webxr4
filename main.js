@@ -43,7 +43,7 @@ import {
   createTemporalNavigator
 } from './temporalHierarchy.js';
 import { createTemporalDrillPanel } from './temporalDrillPanel.js';
-import { createSky, gridGeo, gridMaterial, keepUserNearGraph } from './skybox.js';
+import { createSky, gridGeo, gridMaterial} from './skybox.js';
 import { calculateInsights } from './insightSystem.js';
 import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
@@ -1116,7 +1116,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   }
   //setupNinjaHands(scene, renderer)
 
-  keepUserNearGraph()
 
   const deltaTime = (timestamp - lastTime) / 1000; // seconds
   lastTime = timestamp;
