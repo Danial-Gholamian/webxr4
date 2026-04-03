@@ -615,7 +615,6 @@ const datasetInfo = await loadDataset(selectedDatasetKey);
 dataset = datasetInfo.datasetValues;
 periods = datasetInfo.periodLabelsValues;
 
-// ... inside the main logic where you calculate T ...
 const allTimes = dataset.__allTimes ?? [];
 const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
 
