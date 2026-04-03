@@ -310,7 +310,7 @@ function buildBatchedEdges(graphData, nodesById) {
     if (!src || !tgt) return;
 
     // 2. Logic for Edge Coloring (Intra vs Inter)
-    // FIX: Use 'src' and 'tgt' (the variables you actually defined above)
+  
     const srcGroup = src.group;
     const tgtGroup = tgt.group;
 
