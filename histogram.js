@@ -392,7 +392,7 @@ export class HistogramGauge {
 
     if (!this.remoteWindows[id]) {
       const mesh = this._buildRemoteWindow(id);
-      const label = this._buildRemoteLabel(mesh.material.color);
+      const label = this._buildRemoteLabel(`#${mesh.material.color.getHexString()}`);
       console.log("------------------", mesh.material.color)
 
       this.group.add(label);
@@ -416,7 +416,7 @@ export class HistogramGauge {
       (actualWidthInMeters / 2);
 
     label.position.x = mesh.position.x;
-    label.position.y = -0.12;
+    label.position.y = -0.15;
     label.position.z = 0.08;
 
 

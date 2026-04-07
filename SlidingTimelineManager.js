@@ -42,7 +42,7 @@ export class SlidingTimelineManager {
     return {
       id: `window_${this.currentStart.toFixed(2)}_${this.windowSize}`,
       start: this.currentStart,
-      end: this.currentStart + this.windowSize
+      end: Math.floor(this.currentStart + this.windowSize)
     };
   }
 }
