@@ -218,7 +218,7 @@ export class HistogramGauge {
     this.group.remove(this.label);
 
     this.label = createCapsuleLabel(
-      `${Math.floor(bucket.start)} - ${Math.floor(bucket.end)}`,
+      `${bucket.start} - ${bucket.end}`,
       {
         fontSize: 48,
         color: 0x00ff00,
@@ -387,12 +387,13 @@ export class HistogramGauge {
   }
 
   updateRemoteWindow(id, start, end) {
-    console.log("")
+    console.log("00000000000000 GLOBAL DURATION: ", this.globalDuration)
     if (!this.remoteWindows) this.remoteWindows = {};
 
     if (!this.remoteWindows[id]) {
       const mesh = this._buildRemoteWindow(id);
       const label = this._buildRemoteLabel(mesh.material.color);
+      console.log("------------------", mesh.material.color)
 
       this.group.add(label);
 

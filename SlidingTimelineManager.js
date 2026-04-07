@@ -13,13 +13,15 @@ export class SlidingTimelineManager {
   }
 
   shift(direction, amount = this.stepResolution) {
-    this.currentStart += (direction * amount);
+    this.currentStart = Math.round(this.currentStart + (direction * amount));
 
     // Clamp to boundaries so we don't scroll past the end or before the beginning
     this.currentStart = Math.max(
       this.globalStart,
       Math.min(this.currentStart, this.maxTime - this.windowSize)
     );
+
+    console.log(`start:${this.currentStart}, end: ${this.currentStart + this.windowSize}`)
   }
 
 

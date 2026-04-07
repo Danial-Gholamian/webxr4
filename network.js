@@ -207,8 +207,8 @@ export function broadcastAvatar(camera, controller1, controller2, timelineManage
     rightRot: compressRot(controller2.quaternion),
     leftLaserL: leftLaser,
     rightLaserL: rightLaser,
-    windowStart: Math.floor(currentBucket.start), // Now using the one from the top
-    windowEnd: Math.floor(currentBucket.end)
+    windowStart: currentBucket.start, // Now using the one from the top
+    windowEnd: currentBucket.end
   });
 
   lastAvatarUpdate = now;
