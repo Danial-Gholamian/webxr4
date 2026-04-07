@@ -370,9 +370,10 @@ export function createCapsuleLabel(text, {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
-
+  
+  let labelText = text;
   function drawCapsule(bgColor) {
-    let labelText = text;
+    
 
     ctx.globalAlpha = 1;
 
@@ -405,7 +406,7 @@ export function createCapsuleLabel(text, {
     ctx.fillStyle = textColor;
 
     ctx.font = `bold ${fontSize}px Arial`;   // fixed pixel size
-    const metrics = ctx.measureText(text);
+    const metrics = ctx.measureText(labelText);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 

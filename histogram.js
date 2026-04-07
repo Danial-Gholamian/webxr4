@@ -338,17 +338,17 @@ export class HistogramGauge {
     // Convert to bin
     const binIndex = Math.floor(clamped * this.numBins);
 
-    
+
     const safeIndex = Math.max(0, Math.min(binIndex, this.numBins - 1));
 
     this._handleBarClick(safeIndex, this.numBins);
   }
 
   _buildRemoteWindow(id) {
-    
+
     const hash = id.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0);
     const hue = (Math.abs(hash) % 30) / 360;
-    
+
     const geom = new THREE.BoxGeometry(this.width, this.maxHeight * 1.05, 0.08);
     const mat = new THREE.MeshBasicMaterial({
       color: new THREE.Color().setHSL(hue, 0.8, 0.5), // Vibrant Red/Orange
@@ -359,41 +359,82 @@ export class HistogramGauge {
     });
 
     const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.y = this.maxHeight / 2; 
-    mesh.position.z = 0.06; 
+    mesh.position.y = this.maxHeight / 2;
+    mesh.position.z = 0.06;
     mesh.renderOrder = 20;
     this.group.add(mesh);
+
     return mesh;
   }
 
+  _buildRemoteLabel(color) {
+    const remoteLabel = createCapsuleLabel('All Time', {
+      fontSize: 48,
+      color: 0x00ff00,
+      textColor: color,
+      opacity: 0.0 // transparent background, text only
+    });
+
+    remoteLabel.position.set(0, -0.12, 0.01);
+    remoteLabel.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.renderOrder = 999;
+        child.material.depthTest = false;
+        child.material.depthWrite = false;
+      }
+    });
+    return remoteLabel
+  }
+
   updateRemoteWindow(id, start, end) {
+    console.log("")
     if (!this.remoteWindows) this.remoteWindows = {};
+
     if (!this.remoteWindows[id]) {
-      this.remoteWindows[id] = this._buildRemoteWindow(id);
+      const mesh = this._buildRemoteWindow(id);
+      const label = this._buildRemoteLabel(mesh.material.color);
+
+      this.group.add(label);
+
+      this.remoteWindows[id] = {
+        mesh,
+        label
+      };
     }
 
-    const mesh = this.remoteWindows[id];
+    const { mesh, label } = this.remoteWindows[id];
     const startRatio = (start - this.globalStart) / this.globalDuration;
     const widthRatio = (end - start) / this.globalDuration;
     const clampedWidth = Math.max(0.001, widthRatio);
     const clampedStart = Math.max(0, Math.min(startRatio, 1));
     mesh.scale.x = clampedWidth;
     const actualWidthInMeters = this.width * clampedWidth;
-    mesh.position.x = 
-      (-this.width / 2) + 
-      (this.width * clampedStart) + 
+    mesh.position.x =
+      (-this.width / 2) +
+      (this.width * clampedStart) +
       (actualWidthInMeters / 2);
+
+    label.position.x = mesh.position.x;
+    label.position.y = -0.12;
+    label.position.z = 0.08;
+
+
+    // Update the remote label
+    label.userData.setText(`${start} - ${end}`);
   }
 
   removeRemoteWindow(id) {
     if (this.remoteWindows && this.remoteWindows[id]) {
-      const mesh = this.remoteWindows[id];
+      const { mesh, label } = this.remoteWindows[id];
+
       this.group.remove(mesh);
-      if (mesh.geometry) mesh.geometry.dispose();
-      if (mesh.material) mesh.material.dispose();
+      this.group.remove(label);
+
+      mesh.geometry?.dispose();
+      mesh.material?.dispose();
 
       delete this.remoteWindows[id];
-      
+
       console.log(`Cleaned up remote window for user: ${id}`);
     }
   }
