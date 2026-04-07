@@ -45,9 +45,11 @@ function resetAllHoverStates(controller, cameraGroup) {
     }
   }
 
-  // 3. Clear Node Labels
+  // 3. Clear Node Labels - ONLY if this controller was the one holding the ID
   const oldPanel = cameraGroup.getObjectByName('NodeIDBillboard');
-  if (oldPanel) cameraGroup.remove(oldPanel);
+  if (oldPanel && controller.userData.lastHoveredNodeId !== null) {
+    cameraGroup.remove(oldPanel);
+  }
 
   controller.userData.lastHoveredObject = null;
   controller.userData.lastHoveredNodeId = null;

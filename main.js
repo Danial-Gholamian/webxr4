@@ -43,7 +43,7 @@ import {
   createTemporalNavigator
 } from './temporalHierarchy.js';
 import { createTemporalDrillPanel } from './temporalDrillPanel.js';
-import { createSky, gridGeo, gridMaterial} from './skybox.js';
+import { createSky, gridGeo, gridMaterial } from './skybox.js';
 import { calculateInsights } from './insightSystem.js';
 import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
@@ -306,12 +306,12 @@ const colorScale = scaleOrdinal(schemeCategory10)
 
 function buildBatchedEdges(graphData, nodesById) {
   console.log("buildBatchedEdges called with GPU filtering (Fixed)");
-  
+
   const positions = [];
   const colors = [];
   const alphas = [];
-  const startTimes = []; 
-  const endTimes = [];   
+  const startTimes = [];
+  const endTimes = [];
 
   let vIndex = 0;
 
@@ -319,7 +319,7 @@ function buildBatchedEdges(graphData, nodesById) {
     // 1. Get the actual node objects
     const src = nodesById[link.source.id ?? link.source];
     const tgt = nodesById[link.target.id ?? link.target];
-    
+
     if (!src || !tgt) return;
 
     // 2. Extract Temporal Data for this edge
@@ -334,18 +334,18 @@ function buildBatchedEdges(graphData, nodesById) {
     const tgtGroup = tgt.group;
 
     if (srcGroup === tgtGroup) {
-        // INTRA: Same community -> Use Group Color
-        const c = new THREE.Color(colorScale(srcGroup));
-        colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+      // INTRA: Same community -> Use Group Color
+      const c = new THREE.Color(colorScale(srcGroup));
+      colors.push(c.r, c.g, c.b, c.r, c.g, c.b);
     } else {
-        // INTER: Different communities -> Pure White
-        colors.push(1, 1, 1, 1, 1, 1);
+      // INTER: Different communities -> Pure White
+      colors.push(1, 1, 1, 1, 1, 1);
     }
 
     // 4. Populate Attributes (2 vertices per line segment)
     // BASE_EDGE_ALPHA (0.45) is used as the default visibility
-    alphas.push(0.45, 0.45); 
-    
+    alphas.push(0.45, 0.45);
+
     // Add the time data for BOTH vertices of the edge
     startTimes.push(edgeStart, edgeStart);
     endTimes.push(edgeEnd, edgeEnd);
@@ -371,7 +371,7 @@ function buildBatchedEdges(graphData, nodesById) {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setAttribute('alpha', new THREE.Float32BufferAttribute(alphas, 1));
-  
+
   // Attributes for GPU-side time filtering
   geometry.setAttribute('startTime', new THREE.Float32BufferAttribute(startTimes, 1));
   geometry.setAttribute('endTime', new THREE.Float32BufferAttribute(endTimes, 1));
@@ -625,7 +625,7 @@ const allTimes = dataset.__allTimes ?? [];
 const T = allTimes.reduce((max, t) => (t > max ? t : max), -Infinity) + 1;
 
 // ASSIGN to the global variables we declared at the top
-globalStart = 0; 
+globalStart = 0;
 globalDuration = T - globalStart;
 
 graphController.setTimelineContext(globalStart, globalDuration);
@@ -639,7 +639,7 @@ const initialWindow = Math.max(10, Math.min(500, globalDuration * 0.1));
 timelineManager.setWindowSize(initialWindow);
 
 // Force the GPU to reset to a full view initially
-graphController.updateEdgeUniforms(0, globalDuration); 
+graphController.updateEdgeUniforms(0, globalDuration);
 
 applyDataset(dataset, periods);
 // We will update the inside of this panel in the next step!
@@ -983,7 +983,7 @@ export function resetGraph() {
 
   // 2. NEW: Force the controller to ignore the performance gate 
   // and reset all edge alphas to BASE_EDGE_ALPHA
-  graphController._modeChanged = true; 
+  graphController._modeChanged = true;
 
   // 3. Trigger the update
   graphController.update();
@@ -1147,7 +1147,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
   if (inVR && (timestamp - lastBroadcast > AVATAR_UPDATE_INTERVAL) && timelineManager) {
-    broadcastAvatar(camera, controller1, controller2, timelineManager); 
+    broadcastAvatar(camera, controller1, controller2, timelineManager);
     lastBroadcast = timestamp;
   }
   if (graphUpdateNeeded) {
@@ -1392,7 +1392,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       const modes = ['ALL', 'INTRA_ONLY', 'INTER_ONLY'];
       const currentIndex = modes.indexOf(graphController.state.edgeMode);
       const nextMode = modes[(currentIndex + 1) % modes.length];
-      
+
       graphController.setEdgeMode(nextMode);
       [controller1, controller2].forEach(c => {
         const gp = c.userData.inputSource?.gamepad;
@@ -1407,8 +1407,16 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     })
 
     if (!periodStack?.group?.visible) {
+      // 1. Run detection for both controller
       detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
       detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
+
+      // 2. Update the label position ONLY once per frame
+      // This ensures the label follows the camera regardless of which hand triggered it
+      const label = cameraGroup.getObjectByName('NodeIDBillboard');
+      if (label && typeof label.userData.update === 'function') {
+        label.userData.update();
+      }
     }
 
     pollGraphSwitchButtons();
