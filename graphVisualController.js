@@ -56,7 +56,7 @@ export class GraphVisualController {
             edgeMode: 'ALL' // Modes: 'ALL', 'INTRA_ONLY', 'INTER_ONLY'
         };
 
-        
+
 
         // --- Cached temporal data ---
         this.bucketActiveNodes = new Map(); // bucketId -> Set(nodeId)
@@ -87,20 +87,20 @@ export class GraphVisualController {
     setDataset(dataset) {
         this.dataset = dataset;
         this.nodesById = new Map(dataset.nodes.map(n => [String(n.id), n]));
-        const numSlots = 200; 
+        const numSlots = 200;
         this.numSlots = numSlots;
 
         this.dataset.links.forEach(link => {
             const times = this.adapter.getEdgeTimes(link);
-            const mask = new Uint8Array(numSlots); 
+            const mask = new Uint8Array(numSlots);
 
             times.forEach(t => {
                 // FIXED: Now this.globalStart and duration are defined
                 const ratio = (t - this.globalStart) / this.globalDuration;
                 const slot = Math.floor(ratio * (numSlots - 1));
-                
+
                 if (slot >= 0 && slot < numSlots) {
-                    mask[slot] = 1; 
+                    mask[slot] = 1;
                 }
             });
             link._bitmask = mask;
@@ -166,16 +166,16 @@ export class GraphVisualController {
     }
 
     _clearNodeSelectionState() {
-    this.state.selection.active = false;
-    this.state.selection.selectedNodeId = null;
-    this.state.selection.neighbors.clear();
+        this.state.selection.active = false;
+        this.state.selection.selectedNodeId = null;
+        this.state.selection.neighbors.clear();
 
-    this._onSelectionChange?.(null);
-}
+        this._onSelectionChange?.(null);
+    }
 
     highlightGroup(groupId) {
         // // Clear any node selection that might be in place as well TODO
-        if(this.state.selection.active) {
+        if (this.state.selection.active) {
             this._clearNodeSelectionState()
         }
         const normalized = String(groupId).toLowerCase();
@@ -218,12 +218,12 @@ export class GraphVisualController {
         this.update();
     }
 
-    
+
 
     highlightBucket(bucket) {
         console.log(bucket)
         if (this.state.activeBucket?.id !== bucket?.id) {
-        this._bucketChanged = true; 
+            this._bucketChanged = true;
         }
         if (bucket && !this.bucketActiveNodes.has(bucket.id)) {
             // console.log(`[GraphController] Cache miss for bucket ${bucket.id}. Computing active nodes...`);
@@ -307,7 +307,7 @@ export class GraphVisualController {
         this.update();
 
     }
-//THIS CHNAGED
+    //THIS CHNAGED
     // =========================================================
     // Public API — Update hook
     // =========================================================
@@ -334,10 +334,10 @@ export class GraphVisualController {
         // --- CRITICAL FIX: EFFECTIVE VISIBILITY ---
         const { nodes, links } = this.getFilteredData();
         const selectedId = this.state.selection.selectedNodeId;
-        
+
         // Is the selected node actually visible in the current time/group filter?
         const isSelectedNodeVisible = nodes.some(n => String(n.id) === selectedId);
-        
+
         // This is what the UI should actually care about
         const effectiveSelectionActive = this.state.selection.active && isSelectedNodeVisible;
 
@@ -349,7 +349,7 @@ export class GraphVisualController {
         const stats = calculateInsights(nodes, links, selection);
 
         // Notify subscribers with the EFFECTIVE visibility
-        this.selection_subscribers.forEach(fn => 
+        this.selection_subscribers.forEach(fn =>
             fn(stats, effectiveSelectionActive, this.state.edgeMode)
         );
     }
@@ -424,7 +424,7 @@ export class GraphVisualController {
         if (ctx.selection.active) {
             return (srcId === ctx.selection.selectedNodeId || tgtId === ctx.selection.selectedNodeId);
         }
-        
+
         if (ctx.group.active) {
             return ctx.group.edgeIds.has(this._getEdgeKey(srcId, tgtId));
         }
@@ -434,7 +434,7 @@ export class GraphVisualController {
 
     // A public method to toggle
     setEdgeMode(mode) {
-        this.state.edgeMode = mode; 
+        this.state.edgeMode = mode;
         this._modeChanged = true; // Set flag to force a full edge redraw
         this.update();
     }
@@ -498,10 +498,22 @@ export class GraphVisualController {
             if (isSelected) {
                 if (!ring) {
                     ring = createSelectionRing();
+                    ring.renderOrder = 999;
+                    ring.material.depthTest = false;
                     obj.add(ring);
+                    if (obj.material.emissive) {
+                        obj.material.emissive.set(0x00ffff);
+                        obj.material.emissiveIntensity = 0.6;
+                    }
                 }
 
                 ring.visible = true;
+                // Ensure ring sits centered on node
+                ring.position.set(0, 0, 0);
+
+                // Scale ring relative to node size
+                const nodeScale = obj.scale?.x || 1;
+                ring.scale.setScalar(nodeScale * 4);
 
                 // Always face camera (billboard effect)
                 ring.quaternion.copy(this.graph.camera().quaternion);
@@ -518,13 +530,13 @@ export class GraphVisualController {
         if (!this.lineSegments) return;
 
         const isStandardAllMode = !ctx.selection.active && !ctx.group.active && this.state.edgeMode === 'ALL';
-        
+
         // The Gate now opens if mode changed OR if the timeline bucket changed
         if (isStandardAllMode && !this._modeChanged && !this._bucketChanged) {
-            return; 
+            return;
         }
-        
-        this._modeChanged = false; 
+
+        this._modeChanged = false;
         this._bucketChanged = false; // Reset the flag
 
         const alphas = this.lineSegments.geometry.attributes.alpha.array;
@@ -598,7 +610,7 @@ export class GraphVisualController {
         // Convert bucket start/end to slot indices (0 to 199)
         const startRatio = (bucket.start - this.globalStart) / this.globalDuration;
         const endRatio = (bucket.end - this.globalStart) / this.globalDuration;
-        
+
         let startSlot = Math.floor(startRatio * (this.numSlots - 1));
         let endSlot = Math.floor(endRatio * (this.numSlots - 1));
 
@@ -688,7 +700,7 @@ export class GraphVisualController {
     }
 
     _notifyInsights(stats) {
-        this.selection_subscribers.forEach(fn => 
+        this.selection_subscribers.forEach(fn =>
             fn(stats, this.state.selection.active, this.state.edgeMode) // Pass edgeMode as 3rd arg
         );
     }
@@ -713,9 +725,9 @@ export class GraphVisualController {
     clearAllSelection() {
         this._clearNodeSelectionState();
         this.clearGroupFilter();
-        
+
         // Ensure the next update() call treats this as a "Full Redraw"
-        this._modeChanged = true; 
+        this._modeChanged = true;
         this.update();
     }
 

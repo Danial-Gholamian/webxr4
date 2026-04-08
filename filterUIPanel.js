@@ -370,10 +370,10 @@ export function createCapsuleLabel(text, {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
-  
+
   let labelText = text;
   function drawCapsule(bgColor) {
-    
+
 
     ctx.globalAlpha = 1;
 
@@ -539,22 +539,19 @@ function layoutVertical(container, startY, spacing) {
 
 }
 
-
 export function createSelectionRing() {
-  const geometry = new THREE.RingGeometry(0.12, 0.18, 32);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffff00,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.9,
-    depthWrite: false
-  });
+    const geometry = new THREE.RingGeometry(1.2, 1.6, 32);
 
-  const ring = new THREE.Mesh(geometry, material);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,  
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.9
+    });
 
-  // Make it face camera
-  ring.userData.isSelectionRing = true;
+    const ring = new THREE.Mesh(geometry, material);
+    ring.userData.isSelectionRing = true;
 
-  return ring;
+    ring.scale.set(3, 3, 3)
+    return ring;
 }
-
