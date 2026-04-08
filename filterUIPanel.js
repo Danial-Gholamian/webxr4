@@ -550,7 +550,7 @@ export function createSelectionRing() {
     });
 
     const ring = new THREE.Mesh(geometry, material);
-    ring.userData.isSelectionRing = true;
+    ring.userData.isRemoteRing = true;
 
     ring.scale.set(3, 3, 3)
     return ring;

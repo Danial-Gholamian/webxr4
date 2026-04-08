@@ -34,6 +34,11 @@ export class GraphVisualController {
         this.temporal_subscribers = new Set();
         this.selection_subscribers = new Set();
 
+        // Node selection highlight
+        this._isRemoteUpdate;
+        this.remoteSelectedNodeId = null;
+        this._previousSelectedNodeId = null;
+
         this.globalStart = 0;
         this.globalDuration = 1;
 
@@ -126,11 +131,16 @@ export class GraphVisualController {
     // =========================================================
 
     highlightNode(nodeId) {
+        this.clearNodeSelection()
         // Clear any existing group selection 
         if (this.state.group.active) {
             this.clearGroupFilter()
         }
         const id = String(nodeId);
+
+        if (this._previousSelectedNodeId && this._previousSelectedNodeId !== id) {
+            this._removeRingFromNode(this._previousSelectedNodeId);
+        }
 
         this.state.selection.active = true;
         this.state.selection.selectedNodeId = id;
@@ -151,8 +161,30 @@ export class GraphVisualController {
 
         this._onSelectionChange?.(nodeId)
 
+        // BROADCAST NODE SELECTION (HIGHLIGHT RING)
+
+        this._broadcastSelection(id);
+
         this.update();
     }
+
+    _broadcastSelection(nodeId) {
+        if (this._isRemoteUpdate) return;
+
+        if (this._selectionBroadcaster) {
+            this._selectionBroadcaster(nodeId);
+        }
+    }
+
+    setSelectionBroadcaster(fn) {
+        this._selectionBroadcaster = fn;
+    }
+
+    setRemoteSelection(nodeId) {
+        this.remoteSelectedNodeId = nodeId ? String(nodeId) : null;
+        this.update();
+    }
+
 
     setSelectionListener(fn) {
         this._onSelectionChange = fn;
@@ -162,6 +194,8 @@ export class GraphVisualController {
         this.state.selection.active = false;
         this.state.selection.selectedNodeId = null;
         this.state.selection.neighbors.clear();
+        this._broadcastSelection(null);
+
         this.update();
     }
 
@@ -480,6 +514,10 @@ export class GraphVisualController {
                 ctx.selection.active &&
                 nodeId === ctx.selection.selectedNodeId;
 
+            const isRemoteSelected =
+                this.remoteSelectedNodeId &&
+                nodeId === this.remoteSelectedNodeId;
+
             const isInBucket =
                 ctx.activeBucket
                     ? ctx.bucketNodes?.has(nodeId)
@@ -493,35 +531,31 @@ export class GraphVisualController {
             // ============================
 
             // Check if ring already exists
-            let ring = obj.children.find(c => c.userData?.isSelectionRing);
+            // LOCAL ring (your selection)
+            let localRing = obj.children.find(c => c.userData?.isLocalRing);
 
-            if (isSelected) {
-                if (!ring) {
-                    ring = createSelectionRing();
-                    ring.renderOrder = 999;
-                    ring.material.depthTest = false;
-                    obj.add(ring);
-                    if (obj.material.emissive) {
-                        obj.material.emissive.set(0x00ffff);
-                        obj.material.emissiveIntensity = 0.6;
-                    }
+            // REMOTE ring (other user)
+            let remoteRing = obj.children.find(c => c.userData?.isRemoteRing);
+
+            if (isRemoteSelected) {
+                if (!remoteRing) {
+                    remoteRing = createSelectionRing();
+                    remoteRing.userData.isRemoteRing = true;
+
+                    remoteRing.material.color.set(0xff0000); // RED other user
+                    remoteRing.material.depthTest = false;
+                    remoteRing.renderOrder = 1000;
+
+                    obj.add(remoteRing);
                 }
 
-                ring.visible = true;
-                // Ensure ring sits centered on node
-                ring.position.set(0, 0, 0);
+                remoteRing.visible = true;
+                remoteRing.position.set(0, 0, 0);
+                remoteRing.scale.setScalar((obj.scale?.x || 1) * 4);
+                remoteRing.quaternion.copy(this.graph.camera().quaternion);
 
-                // Scale ring relative to node size
-                const nodeScale = obj.scale?.x || 1;
-                ring.scale.setScalar(nodeScale * 4);
-
-                // Always face camera (billboard effect)
-                ring.quaternion.copy(this.graph.camera().quaternion);
-
-            } else {
-                if (ring) {
-                    ring.visible = false;
-                }
+            } else if (remoteRing) {
+                remoteRing.visible = false;
             }
         });
     }

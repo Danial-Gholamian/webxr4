@@ -30,7 +30,7 @@ import {
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
-import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUIPanel, setUsername } from './network.js';
+import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUIPanel, setUsername, broadcastNodeSelection } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
@@ -702,6 +702,11 @@ graphController.subscribeToTimeChanges(
   histogram.onTimeChange.bind(histogram)
 );
 
+// Subscribe to selection inorder to broadcast later
+graphController.setSelectionBroadcaster((nodeId) => {
+    broadcastNodeSelection(nodeId);
+});
+
 // Initialize the highlight of the histogram
 graphController.highlightBucket(null);
 
@@ -774,8 +779,8 @@ export function getGraphController() {
 
 registerNetworkHandlers({
   onNodeSelect: (nodeId) => {
-    graphController.highlightNode(nodeId);
-
+    console.log("NODE SELECTED", nodeId)
+    graphController.setRemoteSelection(nodeId);
     // keep legacy UI side-effects
     // uiPanel.userData.updateSelectedNodeLabel?.(String(nodeId));
   },
