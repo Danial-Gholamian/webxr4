@@ -93,7 +93,7 @@ export class InsightPanel {
         // 2. Generate Node Text (Left)
         let y = 0.25;
 
-        const header = this._createText("TOP NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
+        const header = this._createText("HIGH DEGREE NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
         header.position.x = -0.4;
         this.leftTextGroup.add(header)
 
@@ -108,7 +108,7 @@ export class InsightPanel {
 
         y -= SECTION_GAP;
 
-        const quietHeader = this._createText("QUIET NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
+        const quietHeader = this._createText("LOW DEGREE NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
         quietHeader.position.x = -0.4;
         this.leftTextGroup.add(quietHeader)
         y -= HEADER_SPACING;
@@ -124,7 +124,7 @@ export class InsightPanel {
         // 2. Generate Node Text (Right)
         let yRight = 0.25;
 
-        const groupHeader = this._createText("TOP GROUPS", SUB_HEADING_FONT_SIZE, yRight, 0xffffff);
+        const groupHeader = this._createText("MOST ACTIVE GROUPS", SUB_HEADING_FONT_SIZE, yRight, 0xffffff);
         groupHeader.position.x = 0.25;
         this.rightTextGroup.add(groupHeader)
 
@@ -179,7 +179,7 @@ export class InsightPanel {
         if (stats.bestFriends?.length) {
 
             const friends = this._createText(
-                `FRIENDS: ${stats.bestFriends.join(", ")}`,
+                `TOP NEIGHBOURS: ${stats.bestFriends.join(", ")}`,
                 FONT_SIZE,
                 yRight,
                 0xffffff
@@ -193,7 +193,7 @@ export class InsightPanel {
 
         // ADD THE RANKING OF THE SELECTED NODE AMONG THE OTHER NODES
         if (stats.nodeRank && !nodeSelected) {
-            const rank = this._createText(`RANK: ${stats.nodeRank}`, FONT_SIZE, yRight, 0xffffff);
+            const rank = this._createText(`DEGREE RANK: ${stats.nodeRank}`, FONT_SIZE, yRight, 0xffffff);
             rank.position.x = 0.30
             this.rightTextGroup.add(rank)
         }
@@ -207,7 +207,7 @@ export class InsightPanel {
 
             if (selectedNodeInfo) {
                 yRight -= ROW_SPACING;
-                const selected = this._createText(`SELECTED NODE: ID ${selectedNodeInfo.id}`, FONT_SIZE, yRight, 0xffffff);
+                const selected = this._createText(`NODE ID: ${selectedNodeInfo.id}`, FONT_SIZE, yRight, 0xffffff);
                 selected.position.x = 0.25;
                 this.rightTextGroup.add(selected);
             } else {
