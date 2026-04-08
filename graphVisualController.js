@@ -757,6 +757,7 @@ export class GraphVisualController {
 
 
     clearAllSelection() {
+        this.clearNodeSelection()
         this._clearNodeSelectionState();
         this.clearGroupFilter();
 
