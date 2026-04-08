@@ -7,7 +7,7 @@ import { broadcastGroupSelection } from './network.js';
 import { getGraphController } from './main.js';
 
 
-const PANEL_SCALE = 0.35;       // 30% of view width
+const PANEL_SCALE = 0.28;       // 30% of view width
 const PANEL_WIDTH = 1.5;
 const PANEL_HEIGHT = 2.5; // Taller to fit list
 // const PANEL_MARGIN = 0.1;      // 10% margin from bottom
@@ -36,7 +36,7 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   uiPanel.name = 'FilterUIPanel';
 
   const aspect = window.innerWidth / window.innerHeight;
-  uiPanel.position.set(0, -0.3, -0.8);
+  // uiPanel.position.set(0, -0.6, -0.8);
   uiPanel.scale.set(PANEL_SCALE, PANEL_SCALE, 1);
 
 

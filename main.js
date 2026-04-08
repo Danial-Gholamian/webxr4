@@ -90,7 +90,7 @@ export function getDatasets() {
 // ========================
 
 let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
-const PANEL_HIDDEN_POS = new THREE.Vector3(0, -0.3, -0.8);
+const PANEL_HIDDEN_POS = new THREE.Vector3(0, -2, -0.8);
 
 let currentPeriodIndex = 0;
 let targetScale = 0.1;      // starting size
