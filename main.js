@@ -1233,14 +1233,23 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     // Reset states at the start of the frame check
     isLeftTriggerPressed = false;
     isRightTriggerPressed = false;
+    isLeftStickPressed = false;
+    isRightStickPressed = false;
 
     for (const source of xrFrame.session.inputSources) {
       if (source.gamepad) {
         const gp = source.gamepad;
         const triggerPressed = gp.buttons[0]?.pressed;
+        const stickPressed = gp.buttons[3]?.pressed;
 
-        if (source.handedness === 'left') isLeftTriggerPressed = triggerPressed;
-        if (source.handedness === 'right') isRightTriggerPressed = triggerPressed;
+        if (source.handedness === 'left') {
+          isLeftTriggerPressed = triggerPressed;
+          isLeftStickPressed = stickPressed;
+        } 
+        if (source.handedness === 'right') {
+          isRightTriggerPressed = triggerPressed;
+          isRightStickPressed = stickPressed;
+        } 
       }
     }
 
