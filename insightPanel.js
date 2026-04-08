@@ -192,7 +192,7 @@ export class InsightPanel {
         yRight -= SECTION_GAP;
 
         // ADD THE RANKING OF THE SELECTED NODE AMONG THE OTHER NODES
-        if (stats.nodeRank) {
+        if (stats.nodeRank && !nodeSelected) {
             const rank = this._createText(`RANK: ${stats.nodeRank}`, FONT_SIZE, yRight, 0xffffff);
             rank.position.x = 0.30
             this.rightTextGroup.add(rank)
