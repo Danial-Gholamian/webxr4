@@ -1228,56 +1228,36 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-    // 1. Manually check raw stick button state (index 3)
+
+
+    // Reset states at the start of the frame check
+    isLeftTriggerPressed = false;
+    isRightTriggerPressed = false;
+
     for (const source of xrFrame.session.inputSources) {
-      // Listen for holding the trigger button
-      for (const source of xrFrame.session.inputSources) {
-        if (source.gamepad) {
-          const gp = source.gamepad;
+      if (source.gamepad) {
+        const gp = source.gamepad;
+        const triggerPressed = gp.buttons[0]?.pressed;
 
-          if (source.handedness === 'left') {
-            isLeftTriggerPressed = gp.buttons[0]?.pressed;
-            if (isLeftTriggerPressed) {
-              console.log("LEFT TRIGGER");
-            }
-          }
-
-          if (source.handedness === 'right') {
-            isRightTriggerPressed = gp.buttons[0]?.pressed;
-            if (isRightTriggerPressed) {
-              console.log("RIGHT TRIGGER");
-            }
-          }
-        }
+        if (source.handedness === 'left') isLeftTriggerPressed = triggerPressed;
+        if (source.handedness === 'right') isRightTriggerPressed = triggerPressed;
       }
-
-      if (source.gamepad && source.gamepad.buttons.length > 3) {
-        if (source.handedness === 'left') {
-          isLeftStickPressed = source.gamepad.buttons[3].pressed;
-        } else if (source.handedness === 'right') {
-          isRightStickPressed = source.gamepad.buttons[3].pressed;
-        }
-      }
-
-      const isTriggerPressed = isLeftTriggerPressed || isRightTriggerPressed;
-
-      if (isTriggerPressed) {
-        triggerHoldTime += deltaTime;
-      } else {
-        // Trigger released → check if it was a tap
-        if (wasTriggerPressed && triggerHoldTime < TRIGGER_HOLD_THRESHOLD) {
-          // 👉 THIS IS A CLICK (tap)
-          console.log("TRIGGER TAP → should select");
-
-          // Let your existing raycast click system run
-          // (do nothing special here)
-        }
-
-        triggerHoldTime = 0;
-      }
-
-      wasTriggerPressed = isTriggerPressed;
     }
+
+    const isTriggerActive = isLeftTriggerPressed || isRightTriggerPressed;
+
+    if (isTriggerActive) {
+      triggerHoldTime += deltaTime; // Timer starts counting up
+    } else {
+      // Trigger released
+      if (wasTriggerPressed && triggerHoldTime < TRIGGER_HOLD_THRESHOLD) {
+        // This was a quick tap! 
+        // Note: Selection is already handled by 'selectstart' in vrSetup.js
+        console.log("Trigger Tap Detected");
+      }
+      triggerHoldTime = 0; // Reset timer for the next press
+    }
+    wasTriggerPressed = isTriggerActive;
 
 
 
@@ -1326,18 +1306,23 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
     if (!cameraGroup.userData.temporalPanel?.visible) {
-      if (isLeftTriggerPressed) {
-        timelineManager.setWindowSize(
-          timelineManager.windowSize - RESIZE_SPEED * deltaTime
-        );
-        updateTimeWindow();
-      }
+      
 
-      if (isRightTriggerPressed) {
-        timelineManager.setWindowSize(
-          timelineManager.windowSize + RESIZE_SPEED * deltaTime
-        );
-        updateTimeWindow();
+      if (triggerHoldTime > TRIGGER_HOLD_THRESHOLD) {
+        
+        if (isLeftTriggerPressed) {
+          timelineManager.setWindowSize(
+            timelineManager.windowSize - RESIZE_SPEED * deltaTime
+          );
+          resized = true; // Set our resized flag
+        }
+
+        if (isRightTriggerPressed) {
+          timelineManager.setWindowSize(
+            timelineManager.windowSize + RESIZE_SPEED * deltaTime
+          );
+          resized = true; // Set our resized flag
+        }
       }
     }
 
