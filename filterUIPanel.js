@@ -1,7 +1,7 @@
 // filterUIPanel.js
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
-import { broadcastDatasetChange, knownUsers } from './network.js';
+import { broadcastDatasetChange } from './network.js';
 import { buildGroupColorList, highlightGroup, switchDataset } from './main.js'
 import { broadcastGroupSelection } from './network.js';
 import { getGraphController } from './main.js';
@@ -39,9 +39,6 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
   uiPanel.position.set(0, -0.3, -0.8);
   uiPanel.scale.set(PANEL_SCALE, PANEL_SCALE, 1);
 
-  const userListGroup = new THREE.Group();
-  userListGroup.position.set(0.4, 0.1, 0.01);
-  uiPanel.add(userListGroup);
 
   const bgPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(PANEL_WIDTH, PANEL_HEIGHT),
@@ -100,28 +97,6 @@ export async function createFilterPanel(options = { groupColors: [], camera: nul
       const camPos = cameraRef.getWorldPosition(new THREE.Vector3());
       uiPanel.lookAt(camPos);
     }
-  };
-
-  uiPanel.userData.refreshUsers = (selfId) => {
-    while (userListGroup.children.length > 0) userListGroup.remove(userListGroup.children[0]);
-
-    Object.entries(knownUsers).forEach(([id, name], index) => {
-      console.log("USERNAME------------------------", name)
-      const label = id === selfId ? `${name} (you)` : name;
-
-      const capsule = createCapsuleLabel(label, {
-        // fontSize: 0.038,
-        color: 0x333333,
-        hoverColor: 0x555577,
-        padding: 0.025,
-        onClick: () => console.log(`Clicked ${label}`)
-      });
-
-
-      const yPos = 0.1 - index * ROW_SPACING * 0.85;
-      capsule.position.set(0, yPos, 0);
-      userListGroup.add(capsule);
-    });
   };
 
 

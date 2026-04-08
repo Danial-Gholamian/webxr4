@@ -125,7 +125,7 @@ export class InsightPanel {
         let yRight = 0.25;
 
         const groupHeader = this._createText("MOST ACTIVE GROUPS", SUB_HEADING_FONT_SIZE, yRight, 0xffffff);
-        groupHeader.position.x = 0.25;
+        groupHeader.position.x = 0.3;
         this.rightTextGroup.add(groupHeader)
 
         yRight -= HEADER_SPACING;
@@ -200,6 +200,7 @@ export class InsightPanel {
 
         //  IF NODE IS SELECTED CLEAR THE RIGHT COLUMN, TOP NODES AND QUIET NODES INFO NOT NEEDED
         if (nodeSelected) {
+            groupHeader.position.x = 0.25;
             this.leftTextGroup.clear();
 
             // Guard: If no nodes are visible in this time window, stats.topHubs will be empty
