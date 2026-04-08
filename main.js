@@ -992,7 +992,7 @@ export function resetGraph() {
 export function completeResetGraph() {
 
   // 1. Set timeline to full range
-  timelineManager.currentStart = globalStart;
+  timelineManager.reset()
   timelineManager.setWindowSize(globalDuration);
 
   // 2. Get the FULL bucket

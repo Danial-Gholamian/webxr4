@@ -2,6 +2,7 @@
 
 export class SlidingTimelineManager {
   constructor(globalStart, globalDuration) {
+    this.globalDuration = globalDuration
     this.globalStart = globalStart;
     this.maxTime = globalStart + globalDuration;
 
@@ -20,15 +21,16 @@ export class SlidingTimelineManager {
       this.globalStart,
       Math.min(this.currentStart, this.maxTime - this.windowSize)
     );
-
     console.log(`start:${this.currentStart}, end: ${this.currentStart + this.windowSize}`)
   }
 
 
   setWindowSize(newSize) {
-    this.windowSize = Math.max(1, newSize); // Prevent window size of 0
-
-    // Re-clamp in case expanding the window pushes it past maxTime
+    // Clamp window size to global duration
+    this.windowSize = Math.max(
+      1,
+      Math.min(newSize, this.globalDuration)
+    );    // Re-clamp in case expanding the window pushes it past maxTime
     this.currentStart = Math.max(
       this.globalStart,
       Math.round(
@@ -39,12 +41,22 @@ export class SlidingTimelineManager {
 
 
   getCurrentBucket() {
+    const start = Math.round(this.currentStart);
+    const end = Math.min(
+      this.maxTime,
+      Math.round(start + this.windowSize)
+    );
+
     return {
-      id: `window_${this.currentStart.toFixed(2)}_${this.windowSize}`,
-      start: this.currentStart,
-      end: Math.floor(this.currentStart + this.windowSize)
+      id: `window_${start}_${end}`,
+      start,
+      end
     };
   }
 
-  
+  reset() {
+    this.currentStart = this.globalStart
+    this.windowSize = this.initialWindowSize
+  }
+
 }

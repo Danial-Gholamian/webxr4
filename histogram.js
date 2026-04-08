@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { Text } from 'troika-three-text';
 import { createCapsuleLabel } from './filterUIPanel';
 import { completeResetGraph } from './main';
 
@@ -45,12 +44,6 @@ export class HistogramGauge {
     this._buildLabel();
     this._resetWindow()
     this.currentWindowSize = globalDuration; // default
-
-    // Plane for user interaction 
-
-    this._buildInteractionPlane();
-
-    // === Preserve your spatial configuration ===
 
     // Increase the scale of the histogram
     this.group.scale.set(1.3, 1.3, 1.3);
@@ -191,7 +184,7 @@ export class HistogramGauge {
       color: 0x882222,
       hoverColor: 0xaa4444,
       opacity: 0.75,
-      onClick: () => {completeResetGraph()}
+      onClick: () => { completeResetGraph() }
     })
 
     this.resetButton.position.set(0, -0.3, 0.01);
@@ -285,78 +278,10 @@ export class HistogramGauge {
     this.group.add(this.label);
   }
 
-  // Can be used later if we want to implement selection
+  resetHistogram() {
+    this.reset()
+    // re initialize the variables
 
-  _handleBarClick(binIndex, numBins) {
-    console.log("CLICKING BAR HISTOGRAM...")
-    if (!this.onBucketSelected) return;
-
-    const ratio = binIndex / numBins;
-
-    const time =
-      this.globalStart +
-      ratio * this.globalDuration;
-
-    // Center the window around clicked point
-    const halfWindow = this.currentWindowSize / 2;
-
-    const start = time - halfWindow;
-    const end = time + halfWindow;
-
-    this.onBucketSelected({
-      start,
-      end
-    });
-  }
-
-  _buildInteractionPlane() {
-    const geom = new THREE.PlaneGeometry(
-      this.width,
-      this.maxHeight * 1.5
-    );
-
-    const mat = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0.0, // invisible
-      depthWrite: false
-    });
-
-    this.interactionPlane = new THREE.Mesh(geom, mat);
-
-    // Put it slightly behind bars
-    this.interactionPlane.position.z = 0.05;
-    this.interactionPlane.renderOrder = 999;
-
-    this.interactionPlane.userData = {
-      isInteractable: true,
-      isHistogram: true,
-      onClick: (intersection) => {
-        this._handlePlaneClick(intersection);
-      }
-    };
-
-    this.group.add(this.interactionPlane);
-  }
-
-  _handlePlaneClick(intersection) {
-    if (!intersection || !intersection.point) return;
-
-    const localPoint = this.interactionPlane.worldToLocal(
-      intersection.point.clone()
-    );
-
-    const normalized =
-      (localPoint.x + this.width / 2) / this.width;
-
-    const clamped = Math.max(0, Math.min(normalized, 1));
-
-    // Convert to bin
-    const binIndex = Math.floor(clamped * this.numBins);
-
-
-    const safeIndex = Math.max(0, Math.min(binIndex, this.numBins - 1));
-
-    this._handleBarClick(safeIndex, this.numBins);
   }
 
   _buildRemoteWindow(id) {
