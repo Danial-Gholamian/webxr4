@@ -989,6 +989,30 @@ export function resetGraph() {
   graphController.update();
 }
 
+export function completeResetGraph() {
+
+  // 1. Set timeline to full range
+  timelineManager.currentStart = globalStart;
+  timelineManager.setWindowSize(globalDuration);
+
+  // 2. Get the FULL bucket
+  const bucket = timelineManager.getCurrentBucket();
+
+  // 3. Sync GPU edges (VERY IMPORTANT)
+  graphController.updateEdgeUniforms(bucket.start, bucket.end);
+
+  // 4. Sync graph logic
+  graphController.bucketActiveNodes.clear();
+  graphController.highlightBucket(bucket);
+
+  // 5. Reset selection ONLY (not full reset)
+  graphController.clearAllSelection();
+
+  // 6. Sync histogram UI
+  histogram.reset()
+
+  console.log("Reset to ALL TIME (stable)");
+}
 
 
 export function highlightPeriod(periodValue) {
@@ -1306,10 +1330,10 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
     if (!cameraGroup.userData.temporalPanel?.visible) {
-      
+
 
       if (triggerHoldTime > TRIGGER_HOLD_THRESHOLD) {
-        
+
         if (isLeftTriggerPressed) {
           timelineManager.setWindowSize(
             timelineManager.windowSize - RESIZE_SPEED * deltaTime

@@ -45,4 +45,6 @@ export class SlidingTimelineManager {
       end: Math.floor(this.currentStart + this.windowSize)
     };
   }
+
+  
 }

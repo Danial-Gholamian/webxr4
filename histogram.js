@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
 import { createCapsuleLabel } from './filterUIPanel';
+import { completeResetGraph } from './main';
 
 /**
  * HistogramGauge
@@ -42,6 +43,7 @@ export class HistogramGauge {
     this._buildHistogram(bins);
     this._buildHighlightWindow();
     this._buildLabel();
+    this._resetWindow()
     this.currentWindowSize = globalDuration; // default
 
     // Plane for user interaction 
@@ -181,6 +183,19 @@ export class HistogramGauge {
       }
     });
     this.group.add(this.label);
+  }
+
+  _resetWindow() {
+    this.resetButton = createCapsuleLabel('Reset', {
+      fontSize: 48,
+      color: 0x882222,
+      hoverColor: 0xaa4444,
+      opacity: 0.75,
+      onClick: () => {completeResetGraph()}
+    })
+
+    this.resetButton.position.set(0, -0.3, 0.01);
+    this.group.add(this.resetButton);
   }
 
   /**
