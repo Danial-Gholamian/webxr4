@@ -327,7 +327,6 @@ export class HistogramGauge {
   }
 
   updateRemoteWindow(id, start, end) {
-    console.log("00000000000000 GLOBAL DURATION: ", this.globalDuration)
     if (!this.remoteWindows) this.remoteWindows = {};
 
     if (!this.remoteWindows[id]) {

@@ -232,7 +232,7 @@ cameraGroup.add(insightPanel.getObject3D());
 // User Guide Panel Setup 
 // in Camera Group
 // ========================
-const userGuidePanel = createUserGuidePanel();
+export const userGuidePanel = createUserGuidePanel();
 cameraGroup.add(userGuidePanel);
 
 userGuidePanel.traverse(obj => {
@@ -1269,11 +1269,11 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         if (source.handedness === 'left') {
           isLeftTriggerPressed = triggerPressed;
           isLeftStickPressed = stickPressed;
-        } 
+        }
         if (source.handedness === 'right') {
           isRightTriggerPressed = triggerPressed;
           isRightStickPressed = stickPressed;
-        } 
+        }
       }
     }
 
@@ -1364,6 +1364,7 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     }
     // ============================================================
 
+
     // Smoothly interpolate scale
     const currentScale = graphRoot.scale.x;
     const newScale = THREE.MathUtils.lerp(currentScale, targetScale, scaleLerpSpeed);
@@ -1423,6 +1424,20 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
         console.log(`Switched Edge Mode to: ${nextMode}`);
       });
     })
+
+    handleLeftStickButton(xrFrame, () => {
+      if (userGuidePanel.visible) {
+        console.log("LEFT STICK CLICKED FOR PAGE")
+        prevGuidePage(userGuidePanel);
+      }
+    });
+
+    handleRightStickButton(xrFrame, () => {
+      if (userGuidePanel.visible) {
+        console.log("RIGHT STICK CLICKED FOR PAGE")
+        nextGuidePage(userGuidePanel);
+      }
+    });
 
     if (!periodStack?.group?.visible) {
       // 1. Run detection for both controller
