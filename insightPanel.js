@@ -170,10 +170,10 @@ export class InsightPanel {
 
         yRight -= SECTION_GAP;
 
-        const density = this._createText(`AVG DENSITY: ${stats.avgDensity}`, FONT_SIZE, yRight, 0xffffff);
-        density.position.x = 0.25;
+        // const density = this._createText(`AVG DENSITY: ${stats.avgDensity}`, FONT_SIZE, yRight, 0xffffff);
+        // density.position.x = 0.25;
 
-        yRight -= HEADER_SPACING;
+        // yRight -= ROW_SPACING;
 
 
         if (stats.bestFriends?.length) {
@@ -185,11 +185,11 @@ export class InsightPanel {
                 0xffffff
             );
 
-            friends.position.x = 0.30;
+            friends.position.x = 0.25;
             this.rightTextGroup.add(friends)
         }
 
-        yRight -= SECTION_GAP;
+        yRight -= ROW_SPACING;
 
         // ADD THE RANKING OF THE SELECTED NODE AMONG THE OTHER NODES
         if (stats.nodeRank && !nodeSelected) {
@@ -207,7 +207,7 @@ export class InsightPanel {
 
             if (selectedNodeInfo) {
                 yRight -= ROW_SPACING;
-                const selected = this._createText(`SELECTED NODE: ID ${selectedNodeInfo.id}`, SUB_HEADING_FONT_SIZE, y, 0xffffff);
+                const selected = this._createText(`SELECTED NODE: ID ${selectedNodeInfo.id}`, FONT_SIZE, yRight, 0xffffff);
                 selected.position.x = 0.25;
                 this.rightTextGroup.add(selected);
             } else {
