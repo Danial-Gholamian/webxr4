@@ -590,7 +590,7 @@ if (linkForce?.distance) {
 }
 
 const charge = Graph.d3Force('charge');
-if (charge?.strength) charge.strength(-150); // more negative = more repulsion
+if (charge?.strength) charge.strength(-500); // more negative = more repulsion
 
 initVoice();
 
@@ -630,7 +630,7 @@ globalDuration = T - globalStart;
 
 graphController.setTimelineContext(globalStart, globalDuration);
 timelineManager = new SlidingTimelineManager(globalStart, globalDuration);
-
+window.timelineManager = timelineManager;
 // Now this will work because globalStart and globalDuration are defined!
 // const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
 

@@ -43,8 +43,26 @@ export function calculateInsights(nodes, links, currentSelection = { type: 'NONE
   const totalActiveNodes = sortedGlobalNodes.length || 1; // Fallback to 1 to prevent divide-by-zero
   
   const stats = {
-    topHubs: sortedNodes.slice(0, 3).map(n => ({ id: n[0], count: n[1] })),
-    bottomNodes: sortedNodes.slice(-3).reverse().map(n => ({ id: n[0], count: n[1] })),
+    topHubs: sortedNodes.slice(0, 3).map(n => {
+      const nodeId = n[0];
+      const nodeData = nodeLookup.get(nodeId); // Look up the full node info
+      return { 
+        id: nodeId, 
+        count: n[1], 
+        group: nodeData ? nodeData.group : 'N/A' //  Attach the group here
+      };
+    }),
+    
+    bottomNodes: sortedNodes.slice(-3).reverse().map(n => {
+      const nodeId = n[0];
+      const nodeData = nodeLookup.get(nodeId); // Look up the full node info
+      return { 
+        id: nodeId, 
+        count: n[1], 
+        group: nodeData ? nodeData.group : 'N/A' //  Attach the group here
+      };
+    }),
+
     topGroups: sortedGroups.slice(0, 3).map(g => ({ name: g[0], count: g[1] })),
     avgDensity: (rankingSource.length / totalActiveNodes).toFixed(2) 
   };

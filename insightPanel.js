@@ -100,7 +100,8 @@ export class InsightPanel {
         y -= HEADER_SPACING;
 
         stats.topHubs.forEach((h, i) => {
-            const row = this._createText(`${i + 1}. ID ${h.id} (${h.count})`, FONT_SIZE, y, 0xffffff);
+            //  Modified: Added group tag [Group]
+            const row = this._createText(`${i + 1}. ID ${h.id} [${h.group || 'N/A'}] (${h.count})`, FONT_SIZE, y, 0xffffff);
             row.position.x = -0.4;
             y -= ROW_SPACING;
             this.leftTextGroup.add(row)
@@ -114,7 +115,8 @@ export class InsightPanel {
         y -= HEADER_SPACING;
 
         stats.bottomNodes.forEach((n, i) => {
-            const row = this._createText(`${i + 1}. ID ${n.id} (${n.count})`, FONT_SIZE, y, 0xffffff);
+            //  Modified: Added group tag [Group]
+            const row = this._createText(`${i + 1}. ID ${n.id} [${n.group || 'N/A'}] (${n.count})`, FONT_SIZE, y, 0xffffff);
             row.position.x = -0.4;
             y -= ROW_SPACING;
             this.leftTextGroup.add(row)
@@ -203,16 +205,15 @@ export class InsightPanel {
             groupHeader.position.x = 0.25;
             this.leftTextGroup.clear();
 
-            // Guard: If no nodes are visible in this time window, stats.topHubs will be empty
             const selectedNodeInfo = stats.topHubs && stats.topHubs.length > 0 ? stats.topHubs[0] : null;
 
             if (selectedNodeInfo) {
                 yRight -= ROW_SPACING;
-                const selected = this._createText(`NODE ID: ${selectedNodeInfo.id}`, FONT_SIZE, yRight, 0xffffff);
+                //  Modified: Added group to the detail view as well
+                const selected = this._createText(`NODE: ${selectedNodeInfo.id} [${selectedNodeInfo.group || 'N/A'}]`, FONT_SIZE, yRight, 0xffffff);
                 selected.position.x = 0.25;
                 this.rightTextGroup.add(selected);
             } else {
-                // Optional: Show a message that the selected node is currently inactive
                 const inactiveMsg = this._createText(`NODE INACTIVE IN THIS WINDOW`, FONT_SIZE, y, 0xff6666);
                 inactiveMsg.position.x = 0.25;
                 this.rightTextGroup.add(inactiveMsg);
