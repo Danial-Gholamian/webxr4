@@ -16,21 +16,32 @@ export class QuestionPanel {
         this.canvasWidth = 2048; 
         this.canvasHeight = 2048;
 
+        // Updated questionPanel.js logic
         this.pages = [
             {
-                question: "1. Look at the 1554-unit view. Is Node 1564 a significant hub?",
-                answers: ["Yes, it's Rank #1", "No, it is Rank #218", "It's in the Top 3", "It is a teacher"],
+                question: "TASK 1: Adjust window size to match one histogram bar width. What are the top 3 active groups?",
+                answers: ["Group 1A, 2B, 3C", "Teachers, 1B, 2A", "Group 4, 5, 6", "Others"],
+                correct: 0 
+            },
+            {
+                question: "TASK 2: Select a Teacher. Review activity over 2 days. Which student class do they manage?",
+                answers: ["Class A", "Class B", "Class C", "Class D"],
                 correct: 1
             },
             {
-                question: "2. Which group does Node 1564 belong to?",
-                answers: ["Group 1A", "Group 2B", "Teachers", "Unknown"],
+                question: "TASK 3: Set window 4300-5600. Note top groups. Now traverse with window size 100. Discuss findings.",
+                answers: ["Consistency found", "New groups appeared", "Activity peaked later", "No change"],
                 correct: 0
             },
             {
-                question: "3. Is Node 1564 directly connected to the highlighted cluster?",
-                answers: ["Yes", "No", "Only temporally", "Only through teachers"],
-                correct: 0
+                question: "TASK 4: Set INTRA, window size 1. Traverse 1-1540 & 4600-5800. Identify lunch times (No Teacher interaction).",
+                answers: ["700-850 & 5000-5200", "1000-1100 & 4800-4900", "1200-1300 & 5300-5450", "Unknown"],
+                correct: 2
+            },
+            {
+                question: "TASK 5: Based on the global timeline activity, can you identify the groups that leave the school early?",
+                answers: ["Group 1A", "Teachers", "Group 3B", "Group 2C"],
+                correct: 3
             }
         ];
 
