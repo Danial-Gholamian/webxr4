@@ -132,12 +132,11 @@ export function initLabels(nodeId, groupNum, nodeColorHex, camera, cameraGroup) 
     panel.quaternion.copy(camera.quaternion);
   };
 }
-
 export function markHoverCacheDirty() {
   cacheNeedsUpdate = true;
 }
 
-export function detectHover(controller, graphScene, camera, cameraGroup) {
+export function detectHover(controller, graphScene, camera, cameraGroup, scene) {
   if (!controller || !graphScene) return;
 
   const interactables = [];
@@ -159,6 +158,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   raycaster.far = 200;
 
   // --- 3. COLLECT OBJECTS ---
+  // A. Graph Nodes
   if (cacheNeedsUpdate) {
     nodeMeshesCache = [];
     graphScene.traverse(obj => {
@@ -171,25 +171,24 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   }
   interactables.push(...nodeMeshesCache);
 
-  const panelsToCheck = [
-    graphScene.getObjectByName('FilterUIPanel'),
-    cameraGroup.getObjectByName('FilterUIPanel'),
-    cameraGroup.getObjectByName('TemporalDrillPanel')
-  ];
-
-  panelsToCheck.forEach(panel => {
-    if (panel && panel.visible) {
-      const bg = panel.getObjectByName('uiPanelBackground');
-      if (bg) interactables.push(bg);
-      panel.traverse(child => {
-        if (child.name === 'capsuleHitbox' && child.userData.interactive) {
-          interactables.push(child);
-        }
-      });
-    }
+  // B. UI Elements (Globally traverse scene and cameraGroup to find hitboxes)
+  const rootsToSearch = [scene, cameraGroup];
+  rootsToSearch.forEach(root => {
+    if (!root) return;
+    root.traverse(obj => {
+      // Collect hitboxes
+      if ((obj.name === 'capsuleHitbox' || obj.name === 'questionHitbox') && obj.userData?.interactive) {
+        interactables.push(obj);
+      }
+      // Collect background panels (for absorbing rays/resetting hover)
+      if (obj.name === 'uiPanelBackground' || obj.name === 'GiganticQuestionPanel') {
+        interactables.push(obj);
+      }
+    });
   });
 
-  const intersections = raycaster.intersectObjects(interactables, false);
+  // Use recursive raycasting (true) to account for panel transformations
+  const intersections = raycaster.intersectObjects(interactables, true);
 
   const triggerHaptic = () => {
     const gp = controller.userData.inputSource?.gamepad;
@@ -198,18 +197,33 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
   // --- 4. INTERSECTION LOGIC ---
   if (intersections.length > 0) {
-    const hit = intersections[0].object;
-    const dist = intersections[0].distance;
+    // Filter out the laser itself
+    const validIntersections = intersections.filter(i => !i.object.userData.isLaser);
+    if (validIntersections.length === 0) return;
 
-    // Correctly shorten laser to the hit point
+    const hit = validIntersections[0].object;
+    const dist = validIntersections[0].distance;
+
     if (line) line.scale.z = dist;
 
-    // CASE A: UI BUTTON HIT
-    if (hit.name === 'capsuleHitbox') {
+    // CASE A: UI HITBOX (Question Panel or Filter UI)
+    if (hit.name === 'capsuleHitbox' || hit.name === 'questionHitbox') {
+      
+      // Handle QuestionPanel (Canvas-based)
+      if (hit.userData.parentPanel) {
+        const panel = hit.userData.parentPanel;
+        if (panel.hoverIndex !== hit.userData.index) {
+          panel.hoverIndex = hit.userData.index;
+          panel.draw(); // Repaint the high-res canvas
+          triggerHaptic();
+        }
+        return; 
+      }
+
+      // Handle Standard Filter UI Buttons (Mesh-based)
       if (hit.userData.target) {
         const btnMesh = hit.userData.target;
         if (controller.userData.lastHoveredButton && controller.userData.lastHoveredButton !== btnMesh) {
-          // Reset previous button color before highlighting new one
           const prevBtn = controller.userData.lastHoveredButton;
           const prevColor = prevBtn.userData.isSelected ? prevBtn.userData.selectedColor : prevBtn.userData.defaultColor;
           if (prevBtn.userData.redraw) prevBtn.userData.redraw(prevColor);
@@ -226,9 +240,20 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       return;
     }
 
-    // CASE B: UI BACKGROUND (Swallow ray but don't highlight)
-    if (hit.name === "uiPanelBackground" || hit.userData.absorbsOnly) {
-      // Clear any previously hovered button/node but keep laser shortened
+    // CASE B: UI BACKGROUND (Reset hover state if laser is on panel but off-button)
+    if (hit.name === "uiPanelBackground" || hit.name === "GiganticQuestionPanel" || hit.userData.absorbsOnly) {
+      
+      // Reset Question Panel Canvas
+      const gPanel = scene.getObjectByName('GiganticQuestionPanel');
+      if (gPanel && gPanel.userData.instance) {
+        const inst = gPanel.userData.instance;
+        if (inst.hoverIndex !== null) {
+          inst.hoverIndex = null;
+          inst.draw();
+        }
+      }
+
+      // Reset Filter UI Mesh Colors
       if (controller.userData.lastHoveredButton) {
         const btn = controller.userData.lastHoveredButton;
         const col = btn.userData.isSelected ? btn.userData.selectedColor : btn.userData.defaultColor;
@@ -239,12 +264,13 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     }
 
     // CASE C: GRAPH NODE HIT
+
     if (hit.__data?.id) {
       const nodeId = String(hit.__data.id);
       const groupNum = String(hit.__data.group);
       const now = performance.now();
 
-      // Reset UI if looking at graph
+      // 1. Cleanup UI hover state when moving to nodes
       if (controller.userData.lastHoveredButton) {
         const btn = controller.userData.lastHoveredButton;
         const col = btn.userData.isSelected ? btn.userData.selectedColor : btn.userData.defaultColor;
@@ -252,39 +278,44 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
         controller.userData.lastHoveredButton = null;
       }
 
-      // Restore previous node material if moving between nodes
+      // 2. Handle Material Cloning and Emissive Glow
       const prev = controller.userData.lastHoveredObject;
-      if (prev && prev !== hit && prev.material?.__originalEmissive !== undefined) {
-        prev.material.emissive.copy(prev.material.__originalEmissive);
-        prev.material.emissiveIntensity = prev.material.__originalEmissiveIntensity;
-        delete prev.material.__originalEmissive;
-        delete prev.material.__originalEmissiveIntensity;
+      
+      // If we move from one node to another, reset the previous one
+      if (prev && prev !== hit) {
+        if (prev.material && prev.material.__originalEmissive !== undefined) {
+          prev.material.emissive.copy(prev.material.__originalEmissive);
+          prev.material.emissiveIntensity = prev.material.__originalEmissiveIntensity;
+          // Clean up the temporary emissive markers
+          delete prev.material.__originalEmissive;
+          delete prev.material.__originalEmissiveIntensity;
+        }
       }
 
-      // Setup Highlight
+      // 3. Apply Glow to current node
       if (!hit.userData.wasClonedForHover) {
         hit.userData.originalMaterial = hit.material;
-        hit.material = hit.material.clone();
+        hit.material = hit.material.clone(); // Clone so we don't glow every node in the group
         hit.userData.wasClonedForHover = true;
       }
-      if (!hit.material.__originalEmissive) {
+
+      if (hit.material.__originalEmissive === undefined) {
+        // Store the original state
         hit.material.__originalEmissive = hit.material.emissive.clone();
         hit.material.__originalEmissiveIntensity = hit.material.emissiveIntensity;
-        hit.material.emissive = hit.material.color.clone();
-        hit.material.emissiveIntensity = 0.8;
+        
+        // Apply the "Glow"
+        hit.material.emissive.copy(hit.material.color);
+        hit.material.emissiveIntensity = 2.0; // Boosted intensity for a noticeable glow
       }
 
-      // Feedback
+      // 4. Update Node Labels (ID Billboard)
       if (nodeId !== controller.userData.lastHoveredNodeId) {
         if (now - controller.userData.lastPulseTime > 500) {
           triggerHaptic();
           controller.userData.lastPulseTime = now;
         }
-
-        // Extract the exact hex color of the 3D node you are pointing at
         const colorHex = '#' + hit.material.color.getHexString();
-
-        // Pass the colorHex into our updated function!
         initLabels(nodeId, groupNum, colorHex, camera, cameraGroup);
       }
 
@@ -292,8 +323,18 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       controller.userData.lastHoveredNodeId = nodeId;
     }
   } else {
-    // --- CASE D: NO HIT (Reset Everything) ---
+    // --- CASE D: NO HIT (Global Reset) ---
     if (line) line.scale.z = LASER_DEFAULT_LENGTH;
     resetAllHoverStates(controller, cameraGroup);
+
+    // Reset Question Panel
+    const gPanel = scene.getObjectByName('GiganticQuestionPanel');
+    if (gPanel && gPanel.userData.instance) {
+      const instance = gPanel.userData.instance;
+      if (instance.hoverIndex !== null) {
+        instance.hoverIndex = null;
+        instance.draw();
+      }
+    }
   }
 }

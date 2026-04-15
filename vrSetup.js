@@ -146,50 +146,67 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     // 2. UI INTERACTION (Panel Buttons)
     // ============================================================
     // We check everything in cameraGroup (includes FilterPanel, TemporalPanel AND histogram as well)
-    const intersects = raycaster.intersectObject(cameraGroup, true);
+// ============================================================
+    // 2. UI INTERACTION (Panel Buttons)
+    // ============================================================
+    // Check cameraGroup (FilterPanel, histogram, etc.)
+    const cameraGroupHits = raycaster.intersectObject(cameraGroup, true);
 
-    // Filter hits to find the first actual "Button" (Object with onClick)
-    // We use a loop to "bubble up" from the hit point (e.g. text) to the button container
+    // NEW: Also check scene root (QuestionPanel lives here, not in cameraGroup)
+    const sceneHits = raycaster.intersectObject(scene, true);
+
+    // Merge and sort by distance so the closest hit always wins
+    const intersects = [...cameraGroupHits, ...sceneHits]
+        .filter(hit => !hit.object.userData.isLaser) // Ignore the laser mesh
+        .sort((a, b) => a.distance - b.distance);
+
     let uiHit = null;
 
     for (const hit of intersects) {
-      // Check if visible
       if (!hit.object.visible) continue;
 
       let target = hit.object;
+      
+      // If we hit our specific question hitbox directly
+      if (target.name === 'questionHitbox' && target.userData.parentPanel) {
+          uiHit = target;
+          break;
+      }
 
-      // Traverse up to find the clickable element
+      // Bubble up for standard Filter Panel capsules
       while (target) {
-        if (target.userData && target.userData.onClick) {
+        if (target.userData && (target.userData.onClick || target.userData.parentPanel)) {
           uiHit = target;
           break;
         }
-        // Stop if we hit the cameraGroup root
-        if (target === cameraGroup) break;
+        if (target === cameraGroup || target === scene) break;
         target = target.parent;
       }
-
-      if (uiHit) break; // Found a button, stop looking
+      if (uiHit) break;
     }
 
-    if (uiHit) {
+if (uiHit) {
       controller.userData.activeButton = uiHit;
-      console.log(`[VR] Clicked Button: ${uiHit.userData.label || 'Unnamed'}`);
+      console.log(`[VR] Clicked: ${uiHit.userData.label || 'Question Option'}`);
 
-      // A. Fire the Click Handler
-      uiHit.userData.onClick();
-
-      // B. Haptic Feedback (Pulse)
-      const gamepad = controller.userData.inputSource?.gamepad;
-      if (gamepad && gamepad.hapticActuators && gamepad.hapticActuators[0]) {
-        gamepad.hapticActuators[0].pulse(0.8, 20); // Strength 0.8, 20ms
+      // Handle QuestionPanel specifically using the robust handleSelect method
+      if (uiHit.userData.parentPanel) {
+        uiHit.userData.parentPanel.handleSelect();
+      } 
+      // Handle standard FilterUIPanel capsules
+      else if (uiHit.userData.onClick) {
+        uiHit.userData.onClick();
       }
 
-      // C. Legacy Highlighting (Only for FilterUIPanel capsules that need manual color change)
-      // If the button handles its own re-render (like TemporalPanel), this part is ignored.
-      if (uiHit.material && uiHit.userData.selectedColor) {
+      // Haptic Feedback
+      const gamepad = controller.userData.inputSource?.gamepad;
+      if (gamepad?.hapticActuators?.[0]) {
+        gamepad.hapticActuators[0].pulse(0.8, 20);
+      }
+
+      // Visual Highlight for standard meshes (Filter UI)
+      if (uiHit.material && uiHit.userData.selectedColor && !uiHit.userData.parentPanel) {
         if (lastSelectedCapsule && lastSelectedCapsule !== uiHit) {
-          // Reset previous
           if (lastSelectedCapsule.userData.defaultColor) {
             lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
           }
@@ -198,7 +215,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
         lastSelectedCapsule = uiHit;
       }
 
-      return; // STOP HERE. Don't click through the UI to the graph behind it.
+      return; // Stop here so we don't click through to the graph nodes
     }
     // ============================================================
     // 3. GRAPH SELECTION (Fallback)

@@ -48,6 +48,10 @@ import { calculateInsights } from './insightSystem.js';
 import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
 import { SlidingTimelineManager } from './SlidingTimelineManager.js';
+import { QuestionPanel } from './questionPanel.js';
+
+// After scene creation
+
 
 // INTIALIZE THE START MENU AND GLOBAL VARIABLES
 const { datasetKey, deltaMin, username } = await initStartMenu();
@@ -136,47 +140,9 @@ grid.renderOrder = -1;
 
 // ======== LOAD VR ROOM / LAB ROOM ========
 const loader = new GLTFLoader();
-let labRoom;
+
 let roomHalfSize = new THREE.Vector2(500, 500); // XZ half size we allow the user to move in
 
-// loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
-//   labRoom = gltf.scene;
-
-//   labRoom.scale.set(35, 35, 35);
-//   labRoom.position.set(0, -40, 0);
-
-//   labRoom.traverse((child) => {
-//     if (child.isMesh) {
-//       child.castShadow = true;
-//       child.receiveShadow = true;
-//       if (child.material) {
-//         child.material.roughness = 0.8;
-//         child.material.metalness = 0.1;
-//       }
-//     }
-//   });
-
-//   scene.add(labRoom);
-//   console.log("Lab room loaded.");
-
-//   // Compute world-space bounding box
-//   const box = new THREE.Box3().setFromObject(labRoom);
-//   box.getCenter(roomCenter);
-
-//   const size = new THREE.Vector3();
-//   box.getSize(size);
-
-//   // Define how close to the walls the player is allowed to get (in meters)
-//   const margin = 2.0;
-
-//   // "Half size" of the allowed walk area in XZ
-//   const shrinkFactor = 0.80;   // 80% of original size = tighter room
-
-//   roomHalfSize.set(
-//     (size.x * 0.5) * shrinkFactor,
-//     (size.z * 0.5) * shrinkFactor
-//   );
-// });
 
 
 function clampCameraToRoom() {
@@ -291,7 +257,10 @@ enableGraphRotation(controller1)
 enableGraphRotation(controller2)
 
 // THIS CHNAGED
+const questPanel = new QuestionPanel(scene);
 
+// If you want to move it specifically:
+questPanel.group.position.set(250, 25.8, 8);
 // ========================
 // Graph Data and Maps
 // ========================
@@ -1446,8 +1415,8 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
     if (!periodStack?.group?.visible) {
       // 1. Run detection for both controller
-      detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
-      detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
+      detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup, scene);
+      detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup, scene);
 
       // 2. Update the label position ONLY once per frame
       // This ensures the label follows the camera regardless of which hand triggered it
