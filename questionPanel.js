@@ -84,8 +84,8 @@ export class QuestionPanel {
 
         this.hitboxes = new THREE.Group();
         this.group.add(this.hitboxes);
-        this.group.scale.set(3, 3, 3);
-        this.group.position.set(-120, 35, 200);
+        this.group.scale.set(1, 1, 1);
+        this.group.position.set(-120, 15, 200);
         this.group.rotation.y = 0.8;
         scene.add(this.group);
         this.group.updateMatrixWorld(true);

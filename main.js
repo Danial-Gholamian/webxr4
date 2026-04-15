@@ -279,7 +279,7 @@ function enableGraphRotation(controller) {
 const questPanel = new QuestionPanel(scene);
 
 // If you want to move it specifically:
-questPanel.group.position.set(-120, 100, 18);
+questPanel.group.position.set(-120, 30, 18);
 // questPanel.group.rotation.x
 // questPanel.group.rotation.y
 // questPanel.group.rotation.z
