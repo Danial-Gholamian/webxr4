@@ -17,6 +17,7 @@ const bBuutonIndex = 5;
 const leftStickButtonIndex = 3;   // L3
 const rightStickButtonIndex = 3;  // R3
 
+
 let currentPeriodIndex = 0;
 // --- 1. Controller Setup (with laser + teleport) ---
 function setupController(controller, index, renderer, cameraGroup) {

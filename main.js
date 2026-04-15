@@ -75,6 +75,13 @@ let insightPanel = null;
 // Graph data variables
 let dataset = null
 let periods = null
+// main.js - Near your other constants
+const BASE_SLIDE_SPEED = 50; // Initial speed
+const SPEED_TIER_2 = 250;    // Speed after 3 seconds
+const SPEED_TIER_3 = 800;    // Speed after 6 seconds
+
+const TIER_2_THRESHOLD = 3.0; // Seconds
+const TIER_3_THRESHOLD = 6.0; // Seconds
 
 
 // A getter for the periods
@@ -1334,25 +1341,36 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     if (controller2.userData.isSqueezing) direction = 1;
 
 
+// Inside renderer.setAnimationLoop ...
+
     if (direction !== 0) {
       stickHoldTimer += deltaTime;
 
       if (stickHoldTimer < HOLD_THRESHOLD) {
         // --- TAP (single step) ---
-        slideAmount = 5; // small step
+        slideAmount = 5; 
       } else {
-        // --- HOLD (continuous) ---
-        slideAmount = SLIDE_SPEED * deltaTime;
+        // --- HOLD (continuous with acceleration) ---
+        let currentSpeed = BASE_SLIDE_SPEED;
+
+        // Stage 2: After 3 seconds
+        if (stickHoldTimer >= TIER_3_THRESHOLD) {
+          currentSpeed = SPEED_TIER_3;
+        } 
+        // Stage 1: Initial Hold
+        else if (stickHoldTimer >= TIER_2_THRESHOLD) {
+          currentSpeed = SPEED_TIER_2;
+        }
+
+        slideAmount = currentSpeed * deltaTime;
       }
 
       shifted = true;
-
     } else {
-      // Released
+      // Released - Reset everything
       if (stickHoldTimer > 0) {
         Graph.d3ReheatSimulation?.();
       }
-
       stickHoldTimer = 0;
     }
     // 3. Apply the shift if needed
