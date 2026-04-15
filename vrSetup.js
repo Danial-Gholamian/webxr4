@@ -185,15 +185,18 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
       if (uiHit) break;
     }
 
-if (uiHit) {
+    if (uiHit) {
       controller.userData.activeButton = uiHit;
-      console.log(`[VR] Clicked: ${uiHit.userData.label || 'Question Option'}`);
 
-      // Handle QuestionPanel specifically using the robust handleSelect method
       if (uiHit.userData.parentPanel) {
-        uiHit.userData.parentPanel.handleSelect();
+        const panel = uiHit.userData.parentPanel;
+        // USE THE INDEX FROM THE HITBOX DIRECTLY
+        const index = uiHit.userData.index;
+        
+        // Call a specific selection method that takes an index
+        // This prevents the "interference" of shared hoverIndex
+        panel.toggleSelection(index); 
       } 
-      // Handle standard FilterUIPanel capsules
       else if (uiHit.userData.onClick) {
         uiHit.userData.onClick();
       }

@@ -173,23 +173,18 @@ export class QuestionPanel {
     }
 
     toggleSelection(index) {
-    if (index === -1) {
-        this.nextPage();
-        return;
-    }
-
-    if (index === -2) {
-        this.prevPage();
-        return;
-    }
-
-    if (this.selectedIndices.has(index)) {
-        this.selectedIndices.delete(index);
-    } else {
-        this.selectedIndices.add(index);
-    }
-
-    this.draw();
+        if (index === -1) {
+            this.nextPage();
+        } else if (index === -2) {
+            this.prevPage();
+        } else {
+            if (this.selectedIndices.has(index)) {
+                this.selectedIndices.delete(index);
+            } else {
+                this.selectedIndices.add(index);
+            }
+        }
+        this.draw();
     }
 
     wrapText(context, text, x, y, maxWidth, lineHeight) {
@@ -226,27 +221,9 @@ export class QuestionPanel {
 
 
     handleSelect() {
-    if (this.hoverIndex === null) return;
-
-    const index = this.hoverIndex;
-
-    if (index === -1) {
-        this.nextPage();
-        return;
-    }
-
-    if (index === -2) {
-        this.prevPage();
-        return;
-    }
-
-    if (this.selectedIndices.has(index)) {
-        this.selectedIndices.delete(index);
-    } else {
-        this.selectedIndices.add(index);
-    }
-
-    this.draw();
+        if (this.hoverIndex !== null) {
+            this.toggleSelection(this.hoverIndex);
+        }
     }
 
     nextPage() {

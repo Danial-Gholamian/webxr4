@@ -209,12 +209,17 @@ export function detectHover(controller, graphScene, camera, cameraGroup, scene) 
     // CASE A: UI HITBOX (Question Panel or Filter UI)
     if (hit.name === 'capsuleHitbox' || hit.name === 'questionHitbox') {
       
-      // Handle QuestionPanel (Canvas-based)
       if (hit.userData.parentPanel) {
         const panel = hit.userData.parentPanel;
-        if (panel.hoverIndex !== hit.userData.index) {
-          panel.hoverIndex = hit.userData.index;
-          panel.draw(); // Repaint the high-res canvas
+        const index = hit.userData.index;
+
+        // NEW: Store the hover index on the specific controller's userData
+        if (controller.userData.currentHoverIndex !== index) {
+          controller.userData.currentHoverIndex = index;
+          
+          // Only update the panel's visual hover if this controller is the primary interactor
+          panel.hoverIndex = index; 
+          panel.draw(); 
           triggerHaptic();
         }
         return; 
