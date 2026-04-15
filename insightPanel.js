@@ -89,37 +89,42 @@ export class InsightPanel {
 
         // 1. Clear existing dots
         // this.rowGroup.clear();
+        this.rightTextGroup.position.x = 0.1; 
+        this.leftTextGroup.visible = true; // Make sure left is visible
 
         // 2. Generate Node Text (Left)
+
         let y = 0.25;
 
+        // --- HIGH DEGREE SECTION ---
         const header = this._createText("HIGH DEGREE NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
         header.position.x = -0.4;
-        this.leftTextGroup.add(header)
-
+        this.leftTextGroup.add(header);
         y -= HEADER_SPACING;
 
         stats.topHubs.forEach((h, i) => {
-            //  Modified: Added group tag [Group]
-            const row = this._createText(`${i + 1}. ID ${h.id} [${h.group || 'N/A'}] (${h.count})`, FONT_SIZE, y, 0xffffff);
+            const groupColor = h.group !== 'N/A' ? colorScale(h.group) : 0xffffff;
+            const row = this._createText(`${i + 1}. ID ${h.id} [${h.group || 'N/A'}] (${h.count})`, FONT_SIZE, y, groupColor);
             row.position.x = -0.4;
             y -= ROW_SPACING;
-            this.leftTextGroup.add(row)
+            this.leftTextGroup.add(row);
         });
 
-        y -= SECTION_GAP;
+        // --- SPACE BETWEEN SECTIONS ---
+        y -= SECTION_GAP; 
 
+        // --- LOW DEGREE SECTION ---
         const quietHeader = this._createText("LOW DEGREE NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);
         quietHeader.position.x = -0.4;
-        this.leftTextGroup.add(quietHeader)
+        this.leftTextGroup.add(quietHeader);
         y -= HEADER_SPACING;
 
         stats.bottomNodes.forEach((n, i) => {
-            //  Modified: Added group tag [Group]
-            const row = this._createText(`${i + 1}. ID ${n.id} [${n.group || 'N/A'}] (${n.count})`, FONT_SIZE, y, 0xffffff);
+            const groupColor = n.group !== 'N/A' ? colorScale(n.group) : 0xffffff;
+            const row = this._createText(`${i + 1}. ID ${n.id} [${n.group || 'N/A'}] (${n.count})`, FONT_SIZE, y, groupColor);
             row.position.x = -0.4;
             y -= ROW_SPACING;
-            this.leftTextGroup.add(row)
+            this.leftTextGroup.add(row);
         });
 
 
