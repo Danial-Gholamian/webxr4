@@ -98,7 +98,7 @@ export function initLabels(nodeId, groupNum, nodeColorHex, camera, cameraGroup) 
   ctx.fillStyle = nodeColorHex || '#00ffaa';
   ctx.fillText(`Group: ${groupNum}`, canvasWidth / 2, canvasHeight / 2 + 45);
 
-  // --- Create the Material (Matching your filter UI exactly!) ---
+  // --- Create the Material (Matching our filter UI exactly!) ---
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearFilter;

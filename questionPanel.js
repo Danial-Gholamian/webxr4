@@ -55,6 +55,16 @@ export class QuestionPanel {
         border.position.z = -0.1; 
         this.group.add(border);
 
+        const backGeo = new THREE.PlaneGeometry(this.width + 1.2, this.height + 1.2);
+        const backMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.BackSide
+        });
+
+        const backPanel = new THREE.Mesh(backGeo, backMat);
+        backPanel.position.z = -0.2; // slightly behind everything
+        this.group.add(backPanel);
+
         const uiGeo = new THREE.PlaneGeometry(this.width, this.height);
         const uiMat = new THREE.MeshBasicMaterial({ map: this.texture, transparent: false });
         this.uiMesh = new THREE.Mesh(uiGeo, uiMat);
@@ -63,8 +73,8 @@ export class QuestionPanel {
 
         this.hitboxes = new THREE.Group();
         this.group.add(this.hitboxes);
-
-        this.group.position.set(-60, 45, 180);
+        this.group.scale.set(3, 3, 3);
+        this.group.position.set(-120, 35, 200);
         this.group.rotation.y = 0.8;
         scene.add(this.group);
         this.group.updateMatrixWorld(true);
