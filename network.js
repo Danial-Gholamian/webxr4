@@ -174,9 +174,7 @@ export function broadcastAvatar(camera, controller1, controller2, timelineManage
   const now = Date.now();
   if (now - lastAvatarUpdate < AVATAR_UPDATE_INTERVAL) return;
 
-  // 1. Get the bucket once at the start
   const currentBucket = timelineManager ? timelineManager.getCurrentBucket() : { start: 0, end: 0 };
-
   const compressRot = q => [
     Math.round(q.x * ROTATION_COMPRESSION_FACTOR),
     Math.round(q.y * ROTATION_COMPRESSION_FACTOR),
@@ -184,30 +182,36 @@ export function broadcastAvatar(camera, controller1, controller2, timelineManage
     Math.round(q.w * ROTATION_COMPRESSION_FACTOR)
   ];
 
-  const headPos = new THREE.Vector3();
-  const leftPos = new THREE.Vector3();
-  const rightPos = new THREE.Vector3();
+  // --- THE FIX: MANUAL WORLD POSITION ---
+  // We take the CameraGroup position (the platform) 
+  // and add the local offsets. This preserves the "Rig" 
+  // but sends absolute coordinates that the Scene can understand.
+  const rigPos = camera.parent.position; // This is your cameraGroup
+  const rigQuat = camera.parent.quaternion;
 
-  camera.getWorldPosition(headPos);
-  controller1.getWorldPosition(leftPos);
-  controller2.getWorldPosition(rightPos);
+  const headPos = new THREE.Vector3().copy(camera.position).applyQuaternion(rigQuat).add(rigPos);
+  const leftPos = new THREE.Vector3().copy(controller1.position).applyQuaternion(rigQuat).add(rigPos);
+  const rightPos = new THREE.Vector3().copy(controller2.position).applyQuaternion(rigQuat).add(rigPos);
+
+  // For rotations, we must combine the Rig rotation with the local rotation
+  const headRot = new THREE.Quaternion().copy(rigQuat).multiply(camera.quaternion);
+  const leftRot = new THREE.Quaternion().copy(rigQuat).multiply(controller1.quaternion);
+  const rightRot = new THREE.Quaternion().copy(rigQuat).multiply(controller2.quaternion);
 
   const leftLaser = controller1.userData.laser?.scale.z || 0;
   const rightLaser = controller2.userData.laser?.scale.z || 0;
-
-  // REMOVED the second 'const currentBucket' line that was here
 
   socket.emit('user-update', {
     id: socket.id,
     head: headPos.toArray(),
     left: leftPos.toArray(),
     right: rightPos.toArray(),
-    headRot: compressRot(camera.quaternion),
-    leftRot: compressRot(controller1.quaternion),
-    rightRot: compressRot(controller2.quaternion),
+    headRot: compressRot(headRot),
+    leftRot: compressRot(leftRot),
+    rightRot: compressRot(rightRot),
     leftLaserL: leftLaser,
     rightLaserL: rightLaser,
-    windowStart: currentBucket.start, // Now using the one from the top
+    windowStart: currentBucket.start,
     windowEnd: currentBucket.end
   });
 

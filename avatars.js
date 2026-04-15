@@ -8,32 +8,27 @@ const loader = new GLTFLoader();
 // Paths to your models
 const HEADSET_MODEL = '/webxr4/models/meta_quest_3.glb';
 const CONTROLLER_MODEL = '/webxr4/models/vr_controller.glb';
-
 export async function createAvatar(name = '') {
-  // NEW — root group
   const avatarRoot = new THREE.Group();
-  avatarRoot.scale.set(20, 20, 20);  // scale avatar 2× (change to any size you want)
+  // REMOVE: avatarRoot.scale.set(20, 20, 20); 
+  // Keep root at scale 1 so world positions map 1:1
 
   const head = new THREE.Group();
   const left = new THREE.Group();
   const right = new THREE.Group();
+  head.rotation.z = Math.PI;
+  avatarRoot.add(head, left, right);
 
-  avatarRoot.add(head);
-  avatarRoot.add(left);
-  avatarRoot.add(right);
-
-  // Headset model
   loader.load(HEADSET_MODEL, gltf => {
     const model = gltf.scene;
-    model.scale.set(5, 5, 5);
+    // Scale the model, not the group
+    model.scale.set(1, 1, 1); 
     head.add(model);
   });
 
-  // Controller model
   loader.load(CONTROLLER_MODEL, gltf => {
     const ctrl = gltf.scene;
-    ctrl.scale.set(4, 4, 4);
-
+    ctrl.scale.set(1, 1, 1);
     left.add(ctrl.clone());
     right.add(ctrl.clone());
   });
