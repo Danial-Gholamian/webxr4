@@ -220,6 +220,25 @@ const controller2 = renderer.xr.getController(1);
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
 
+// Controller listeners for moving the temporal window
+controller1.userData.isSqueezing = false;
+controller2.userData.isSqueezing = false;
+
+controller1.addEventListener('squeezestart', () => {
+  controller1.userData.isSqueezing = true;
+});
+controller1.addEventListener('squeezeend', () => {
+  controller1.userData.isSqueezing = false;
+});
+
+controller2.addEventListener('squeezestart', () => {
+  controller2.userData.isSqueezing = true;
+});
+controller2.addEventListener('squeezeend', () => {
+  controller2.userData.isSqueezing = false;
+});
+
+
 setupNinjaHands(scene, renderer);
 // ========================
 // Graph Rotation State
@@ -253,8 +272,8 @@ function enableGraphRotation(controller) {
   });
 }
 
-enableGraphRotation(controller1)
-enableGraphRotation(controller2)
+// enableGraphRotation(controller1)
+// enableGraphRotation(controller2)
 
 // THIS CHNAGED
 const questPanel = new QuestionPanel(scene);
@@ -676,7 +695,7 @@ graphController.subscribeToTimeChanges(
 
 // Subscribe to selection inorder to broadcast later
 graphController.setSelectionBroadcaster((nodeId) => {
-    broadcastNodeSelection(nodeId);
+  broadcastNodeSelection(nodeId);
 });
 
 // Initialize the highlight of the histogram
@@ -1231,11 +1250,11 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-    // Reset states at the start of the frame check
-    isLeftTriggerPressed = false;
-    isRightTriggerPressed = false;
-    isLeftStickPressed = false;
-    isRightStickPressed = false;
+    // // Reset states at the start of the frame check
+    // isLeftTriggerPressed = false;
+    // isRightTriggerPressed = false;
+    // isLeftStickPressed = false;
+    // isRightStickPressed = false;
 
     for (const source of xrFrame.session.inputSources) {
       if (source.gamepad) {
@@ -1278,8 +1297,12 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     let slideAmount = 0;
 
     // Determine direction
-    if (isLeftStickPressed) direction = -1;
-    if (isRightStickPressed) direction = 1;
+    // if (isLeftStickPressed) direction = -1;
+    // if (isRightStickPressed) direction = 1;
+
+    // squeeze controll for moving the window
+    if (controller1.userData.isSqueezing) direction = -1;
+    if (controller2.userData.isSqueezing) direction = 1;
 
     if (direction !== 0) {
       stickHoldTimer += deltaTime;
@@ -1334,6 +1357,34 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
           resized = true; // Set our resized flag
         }
       }
+    }
+
+    // HANDLE THE JOYSTICK PRESS FOR ROTATING THE GRAPH
+    if (isLeftStickPressed && !isRotatingGraph) {
+      isRotatingGraph = true;
+      grabbedController = controller1;
+
+      startControllerQuat.copy(controller1.quaternion);
+      startGraphQuat.copy(graphRoot.quaternion);
+    }
+
+    if (isRightStickPressed && !isRotatingGraph) {
+      isRotatingGraph = true;
+      grabbedController = controller2;
+
+      startControllerQuat.copy(controller2.quaternion);
+      startGraphQuat.copy(graphRoot.quaternion);
+    }
+
+    // STOP rotation when released
+    if (!isLeftStickPressed && grabbedController === controller1) {
+      isRotatingGraph = false;
+      grabbedController = null;
+    }
+
+    if (!isRightStickPressed && grabbedController === controller2) {
+      isRotatingGraph = false;
+      grabbedController = null;
     }
 
     if (resized) {
