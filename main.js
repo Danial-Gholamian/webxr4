@@ -84,6 +84,12 @@ const TIER_2_THRESHOLD = 3.0; // Seconds
 const TIER_3_THRESHOLD = 6.0; // Seconds
 
 
+const RESIZE_SPEED_BASE = 5;    // Slow start: ~5 units per second
+const RESIZE_SPEED_TIER_2 = 100; // Medium: after 3 seconds
+const RESIZE_SPEED_TIER_3 = 500; // Fast: after 6 seconds
+
+const TIER_THRESHOLD = 3.0; // Seconds to shift gear
+
 // A getter for the periods
 export function getActivePeriods() {
   return periods
@@ -1383,26 +1389,36 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     // Handle increase in window size
     const RESIZE_SPEED = 200; // tweak this
 
+
+    // Handle increase in window size
     let resized = false;
 
-
     if (!cameraGroup.userData.temporalPanel?.visible) {
-
-
       if (triggerHoldTime > TRIGGER_HOLD_THRESHOLD) {
+        
+        // 1. Calculate Dynamic Speed based on how long trigger has been held
+        let currentResizeSpeed = RESIZE_SPEED_BASE;
+        
+        // Use triggerHoldTime 
+        if (triggerHoldTime >= TIER_THRESHOLD * 2) {
+            currentResizeSpeed = RESIZE_SPEED_TIER_3;
+        } else if (triggerHoldTime >= TIER_THRESHOLD) {
+            currentResizeSpeed = RESIZE_SPEED_TIER_2;
+        }
 
+        const deltaResize = currentResizeSpeed * deltaTime;
+
+        // 2. Apply the resize
         if (isLeftTriggerPressed) {
-          timelineManager.setWindowSize(
-            timelineManager.windowSize - RESIZE_SPEED * deltaTime
-          );
-          resized = true; // Set our resized flag
+          // Shrink window
+          timelineManager.setWindowSize(timelineManager.windowSize - deltaResize);
+          resized = true;
         }
 
         if (isRightTriggerPressed) {
-          timelineManager.setWindowSize(
-            timelineManager.windowSize + RESIZE_SPEED * deltaTime
-          );
-          resized = true; // Set our resized flag
+          // Expand window
+          timelineManager.setWindowSize(timelineManager.windowSize + deltaResize);
+          resized = true;
         }
       }
     }
