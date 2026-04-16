@@ -1338,11 +1338,11 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
     // 2. Process the input
-// Add these to your global variables at the top of main.js
-let wasLeftSqueezePressed = false;
-let wasRightSqueezePressed = false;
+    // Add these to your global variables at the top of main.js
+    let wasLeftSqueezePressed = false;
+    let wasRightSqueezePressed = false;
 
-// ... inside renderer.setAnimationLoop, within if(inVR && xrFrame) block
+    // ... inside renderer.setAnimationLoop, within if(inVR && xrFrame) block
 
     // 2. Process Squeeze Input
     let shifted = false;
@@ -1354,7 +1354,7 @@ let wasRightSqueezePressed = false;
 
     if (isLeftSqueezing || isRightSqueezing) {
       direction = isLeftSqueezing ? -1 : 1;
-      
+
       // --- CLICK DETECTION (Single Step) ---
       // If this is the very first frame the button is down
       if ((isLeftSqueezing && !wasLeftSqueezePressed) || (isRightSqueezing && !wasRightSqueezePressed)) {
@@ -1405,15 +1405,15 @@ let wasRightSqueezePressed = false;
 
     if (!cameraGroup.userData.temporalPanel?.visible) {
       if (triggerHoldTime > TRIGGER_HOLD_THRESHOLD) {
-        
+
         // 1. Calculate Dynamic Speed based on how long trigger has been held
         let currentResizeSpeed = RESIZE_SPEED_BASE;
-        
+
         // Use triggerHoldTime 
         if (triggerHoldTime >= TIER_THRESHOLD * 2) {
-            currentResizeSpeed = RESIZE_SPEED_TIER_3;
+          currentResizeSpeed = RESIZE_SPEED_TIER_3;
         } else if (triggerHoldTime >= TIER_THRESHOLD) {
-            currentResizeSpeed = RESIZE_SPEED_TIER_2;
+          currentResizeSpeed = RESIZE_SPEED_TIER_2;
         }
 
         const deltaResize = currentResizeSpeed * deltaTime;
@@ -1529,16 +1529,22 @@ let wasRightSqueezePressed = false;
     })
 
     handleLeftStickButton(xrFrame, () => {
-      if (userGuidePanel.visible) {
-        console.log("LEFT STICK CLICKED FOR PAGE")
+      if (!userGuidePanel.visible) return;
+
+      if (userGuidePanel.userData.mode === "GUIDE") {
         prevGuidePage(userGuidePanel);
+      } else {
+        userGuidePanel.userData.questionPanel.prevQuestion();
       }
     });
 
     handleRightStickButton(xrFrame, () => {
-      if (userGuidePanel.visible) {
-        console.log("RIGHT STICK CLICKED FOR PAGE")
+      if (!userGuidePanel.visible) return;
+
+      if (userGuidePanel.userData.mode === "GUIDE") {
         nextGuidePage(userGuidePanel);
+      } else {
+        userGuidePanel.userData.questionPanel.nextQuestion();
       }
     });
 

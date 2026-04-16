@@ -1,18 +1,23 @@
 import * as THREE from 'three';
+import { QuestionPanel } from './questionPanel';
+import { createCapsuleLabel } from './filterUIPanel';
 
 const ITEMS_PER_PAGE = 4;
 const GUIDE_ITEMS = [
-  { text: "Right Stick → Move" },
-  { text: "Left Stick → Rotate View" },
-  { text: "Grip (Squeeze) → Rotate Graph" },
-  { text: "Trigger → Select nodes, groups, hierarchy, or time" },
-  { text: "Right Stick Press → Next Time Snapshot" },
-  { text: "Left Stick Press → Previous Time Snapshot" },
-  { text: "A → Toggle Filter Panel (select groups)" },
-  { text: "Y → Toggle Drill-Down Panel (zoom in / out of dataset)" },
-  { text: "X → Reset Graph to Default View (full aggregation)" },
-  { text: "B → Toggle User Guide Panel" }
+    { text: "Right Stick → Move" },
+    { text: "Left Stick → Rotate View" },
+    { text: "Grip (Squeeze) → Rotate Graph" },
+    { text: "Trigger → Select nodes, groups, hierarchy, or time" },
+    { text: "Right Stick Press → Next Time Snapshot" },
+    { text: "Left Stick Press → Previous Time Snapshot" },
+    { text: "A → Toggle Filter Panel (select groups)" },
+    { text: "Y → Toggle Drill-Down Panel (zoom in / out of dataset)" },
+    { text: "X → Reset Graph to Default View (full aggregation)" },
+    { text: "B → Toggle User Guide Panel" }
 ];
+
+
+
 
 let currentPage = 0;
 let totalPages = Math.ceil(GUIDE_ITEMS.length / ITEMS_PER_PAGE);
@@ -24,31 +29,80 @@ export function createUserGuidePanel() {
     const panelHeight = 1.2;
     const canvasWidth = 1024;
     const canvasHeight = 1024;
-    
+
+    // QUESTION SETUP
+    const questionPanel = new QuestionPanel();
+    questionPanel.group.visible = false;
+
+    group.add(questionPanel.group);
+
+    group.userData.questionPanel = questionPanel;
+    group.userData.mode = 'GUIDE';
+    questionPanel.group.userData.parentPanel = group;
+
+    // QUESTION BUTTON
+    const questionBtn = createCapsuleLabel("Questions", {
+        fontSize: 48,
+        color: 0x222244,
+        hoverColor: 0x444488,
+        onClick: () => {
+            console.log("Switch to Questions");
+
+            group.userData.mode = "QUESTIONS";
+            group.userData.questionPanel.group.visible = true;
+
+            // hide guide content
+            textPlane.visible = false;
+            videoMesh.visible = false;
+            group.userData.texture.needsUpdate = false;
+            questionPanel.group.visible = true;
+        }
+    });
+
+    questionBtn.position.set(0.4, -0.25, 0.01);
+    group.add(questionBtn);
+
+    // BACK TO GUIDE BUTTON
+    const backBtn = createCapsuleLabel("Back", {
+        fontSize: 48,
+        color: 0x882222,
+        onClick: () => {
+            group.userData.mode = "GUIDE";
+
+            group.userData.questionPanel.group.visible = false;
+
+            textPlane.visible = true;
+            videoMesh.visible = false;
+        }
+    });
+
+    backBtn.position.set(0, -0.5, 0.01);
+    group.add(backBtn);
+
     // --- Video Setup ---
     const video = document.createElement('video');
-    video.src = 'sample-15s.mp4'; 
+    video.src = 'sample-15s.mp4';
     video.loop = true;
-    video.muted = false;       
-    video.playsInline = true;  
+    video.muted = false;
+    video.playsInline = true;
     video.crossOrigin = "anonymous";
     video.load();
-    
+
     const videoTexture = new THREE.VideoTexture(video);
     videoTexture.colorSpace = THREE.SRGBColorSpace;
 
-    const videoWindowHeight = 0.45; 
-    const videoWindowWidth = videoWindowHeight * (16 / 9); 
+    const videoWindowHeight = 0.45;
+    const videoWindowWidth = videoWindowHeight * (16 / 9);
     const videoGeo = new THREE.PlaneGeometry(videoWindowWidth, videoWindowHeight);
-    const videoMat = new THREE.MeshBasicMaterial({ 
+    const videoMat = new THREE.MeshBasicMaterial({
         map: videoTexture,
         depthTest: false,
-        transparent: true 
+        transparent: true
     });
     const videoMesh = new THREE.Mesh(videoGeo, videoMat);
 
-    videoMesh.renderOrder = 100; 
-    videoMesh.position.set(0, 0.28, 0.02); 
+    videoMesh.renderOrder = 100;
+    videoMesh.position.set(0, 0.28, 0.02);
     videoMesh.visible = false; // Start hidden
     group.add(videoMesh);
 
@@ -57,18 +111,18 @@ export function createUserGuidePanel() {
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d');
-    
+
     const textTexture = new THREE.CanvasTexture(canvas);
     const textPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(panelHeight * (canvasWidth/canvasHeight), panelHeight),
-        new THREE.MeshBasicMaterial({ 
-            map: textTexture, 
-            transparent: true, 
-            depthTest: false 
+        new THREE.PlaneGeometry(panelHeight * (canvasWidth / canvasHeight), panelHeight),
+        new THREE.MeshBasicMaterial({
+            map: textTexture,
+            transparent: true,
+            depthTest: false
         })
     );
 
-    textPlane.renderOrder = 99; 
+    textPlane.renderOrder = 99;
     group.add(textPlane);
 
     // --- Storage & Callbacks ---
@@ -77,6 +131,25 @@ export function createUserGuidePanel() {
     group.userData.canvas = canvas;
     group.userData.ctx = ctx;
     group.userData.texture = textTexture;
+
+    const bgGeo = new THREE.PlaneGeometry(panelHeight * (canvasWidth / canvasHeight), panelHeight);
+    const bgMat = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0.0,
+        depthTest: false
+    });
+
+    const bgMesh = new THREE.Mesh(bgGeo, bgMat);
+    bgMesh.name = "uiPanelBackground";
+
+    bgMesh.userData = {
+        absorbsOnly: true
+    };
+
+    bgMesh.position.z = -0.01; // slightly behind UI
+    bgMesh.renderOrder = 98;
+
+    group.add(bgMesh);
 
     // Initial draw
     drawGuidePage(ctx, canvas, currentPage);
@@ -116,7 +189,7 @@ function updateVideoState(panel) {
 
 function drawGuidePage(ctx, canvas, page) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     ctx.fillStyle = 'rgba(17, 17, 17, 0.95)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -124,7 +197,7 @@ function drawGuidePage(ctx, canvas, page) {
     if (page === 2) {
         ctx.strokeStyle = '#ffff00'; // Yellow border for Page 3
         ctx.lineWidth = 5;
-        ctx.strokeRect(80, 50, canvas.width - 160, 420); 
+        ctx.strokeRect(80, 50, canvas.width - 160, 420);
     }
 
     ctx.fillStyle = '#ffffff';
@@ -138,7 +211,7 @@ function drawGuidePage(ctx, canvas, page) {
     const start = page * ITEMS_PER_PAGE;
     const end = Math.min(start + ITEMS_PER_PAGE, GUIDE_ITEMS.length);
 
-    let y = 600; 
+    let y = 600;
     for (let i = start; i < end; i++) {
         ctx.fillText("• " + GUIDE_ITEMS[i].text, 100, y);
         y += 85;
@@ -168,4 +241,15 @@ export function prevGuidePage(panel) {
     drawGuidePage(ctx, canvas, currentPage);
     texture.needsUpdate = true;
     updateVideoState(panel); // Sync video visibility
+}
+
+
+function switchToQuestions() {
+    guideMode = "QUESTIONS";
+    questPanel.group.visible = true;
+}
+
+function switchToGuide() {
+    guideMode = "GUIDE";
+    questPanel.group.visible = false;
 }
