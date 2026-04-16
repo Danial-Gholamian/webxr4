@@ -58,7 +58,11 @@ export const myUsername = username
 
 let stickHoldTimer = 0;
 const HOLD_THRESHOLD = 0.2; // Seconds before a click turns into a slide
-const SLIDE_SPEED = 50; // Steps per second while holding
+const SLIDE_SPEED_BASE = 8;     // Very slow start for precision
+const SLIDE_SPEED_TIER_2 = 250;
+const SLIDE_SPEED_TIER_3 = 800;
+let wasLeftSqueezePressed = false;
+let wasRightSqueezePressed = false;
 
 let triggerHoldTime = 0;
 const TRIGGER_HOLD_THRESHOLD = 0.25; // seconds
@@ -1334,55 +1338,61 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
     // 2. Process the input
+// Add these to your global variables at the top of main.js
+let wasLeftSqueezePressed = false;
+let wasRightSqueezePressed = false;
+
+// ... inside renderer.setAnimationLoop, within if(inVR && xrFrame) block
+
+    // 2. Process Squeeze Input
     let shifted = false;
     let direction = 0;
     let slideAmount = 0;
 
-    // Determine direction
-    // if (isLeftStickPressed) direction = -1;
-    // if (isRightStickPressed) direction = 1;
+    const isLeftSqueezing = controller1.userData.isSqueezing;
+    const isRightSqueezing = controller2.userData.isSqueezing;
 
-    // squeeze controll for moving the window
-    if (controller1.userData.isSqueezing) direction = -1;
-    if (controller2.userData.isSqueezing) direction = 1;
+    if (isLeftSqueezing || isRightSqueezing) {
+      direction = isLeftSqueezing ? -1 : 1;
+      
+      // --- CLICK DETECTION (Single Step) ---
+      // If this is the very first frame the button is down
+      if ((isLeftSqueezing && !wasLeftSqueezePressed) || (isRightSqueezing && !wasRightSqueezePressed)) {
+        slideAmount = 1; // Exactly 1 unit step
+        shifted = true;
+      }
 
-
-// Inside renderer.setAnimationLoop ...
-
-    if (direction !== 0) {
       stickHoldTimer += deltaTime;
 
-      if (stickHoldTimer < HOLD_THRESHOLD) {
-        // --- TAP (single step) ---
-        slideAmount = 5; 
-      } else {
-        // --- HOLD (continuous with acceleration) ---
-        let currentSpeed = BASE_SLIDE_SPEED;
+      // --- HOLD ACCELERATION ---
+      if (stickHoldTimer > HOLD_THRESHOLD) {
+        let currentSpeed = SLIDE_SPEED_BASE;
 
-        // Stage 2: After 3 seconds
         if (stickHoldTimer >= TIER_3_THRESHOLD) {
-          currentSpeed = SPEED_TIER_3;
-        } 
-        // Stage 1: Initial Hold
-        else if (stickHoldTimer >= TIER_2_THRESHOLD) {
-          currentSpeed = SPEED_TIER_2;
+          currentSpeed = SLIDE_SPEED_TIER_3;
+        } else if (stickHoldTimer >= TIER_2_THRESHOLD) {
+          currentSpeed = SLIDE_SPEED_TIER_2;
         }
 
         slideAmount = currentSpeed * deltaTime;
+        shifted = true;
       }
-
-      shifted = true;
     } else {
-      // Released - Reset everything
+      // Released
       if (stickHoldTimer > 0) {
         Graph.d3ReheatSimulation?.();
       }
       stickHoldTimer = 0;
     }
-    // 3. Apply the shift if needed
+
+    // Save state for next frame's edge detection
+    wasLeftSqueezePressed = isLeftSqueezing;
+    wasRightSqueezePressed = isRightSqueezing;
+
+    // 3. Apply the shift
     if (shifted) {
       timelineManager.shift(direction, slideAmount);
-      updateTimeWindow()
+      updateTimeWindow();
     }
 
 
