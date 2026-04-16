@@ -5,74 +5,85 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const loader = new GLTFLoader();
 
-// Paths to your models
 const HEADSET_MODEL = '/webxr4/models/meta_quest_3.glb';
 const CONTROLLER_MODEL = '/webxr4/models/vr_controller.glb';
+
 export async function createAvatar(name = '') {
   const avatarRoot = new THREE.Group();
-  // REMOVE: avatarRoot.scale.set(20, 20, 20); 
-  // Keep root at scale 1 so world positions map 1:1
-
-  const head = new THREE.Group();
+  
+  // Containers: These receive the raw Network data
+  const head = new THREE.Group(); 
   const left = new THREE.Group();
   const right = new THREE.Group();
-  head.rotation.z = Math.PI;
+
   avatarRoot.add(head, left, right);
 
+  // --- HEADSET LOAD ---
   loader.load(HEADSET_MODEL, gltf => {
     const model = gltf.scene;
-    // Scale the model, not the group
-    model.scale.set(1, 1, 1); 
+    // Rotate the model INSIDE the container to fix the file orientation
+    model.rotation.y = Math.PI; 
     head.add(model);
   });
 
+  // --- CONTROLLER LOAD ---
   loader.load(CONTROLLER_MODEL, gltf => {
     const ctrl = gltf.scene;
-    ctrl.scale.set(1, 1, 1);
-    left.add(ctrl.clone());
-    right.add(ctrl.clone());
+    
+    const leftModel = ctrl.clone();
+    const rightModel = ctrl.clone();
+
+    // Fix Controller Orientation:
+    // 1. Flip 180 (Y) so it faces away from the user
+    // 2. Tilt -45 degrees (X) so the sensor ring points forward like a laser
+    const fixX = -Math.PI / 4; 
+    const fixY = Math.PI;
+
+    leftModel.rotation.set(fixX, fixY, 0);
+    rightModel.rotation.set(fixX, fixY, 0);
+
+    // Minor position adjustment to put the "handle" in the virtual hand
+    leftModel.position.set(0, -0.03, 0.02);
+    rightModel.position.set(0, -0.03, 0.02);
+    window.debugLeft = leftModel;
+    window.debugLeft = rightModel;
+    left.add(leftModel);
+    right.add(rightModel);
   });
 
-  // Label
+  // Label - Attached to root so it doesn't flip/mirror with the head
   const nameLabel = new Text();
   nameLabel.text = name;
   nameLabel.fontSize = 0.06;
   nameLabel.anchorX = 'center';
   nameLabel.anchorY = 'bottom';
-  nameLabel.position.set(0, 0.25, 0);
-  nameLabel.sync();
-  head.add(nameLabel);
+  avatarRoot.add(nameLabel); 
 
   return { root: avatarRoot, head, left, right, nameLabel };
 }
 
-
-
-// ==========================
-// Local Avatar Update (camera + controllers)
-// ==========================
+// --- Local Sync Fix ---
 const HEAD_ROTATION_FIX = new THREE.Quaternion().setFromEuler(
   new THREE.Euler(0, Math.PI, 0)
 );
 
 export function updateLocalAvatar(avatar, camera, controller1, controller2) {
-  // Head
   avatar.head.position.copy(camera.position);
   avatar.head.quaternion.copy(camera.quaternion).multiply(HEAD_ROTATION_FIX);
 
-  // Controllers
   avatar.left.position.copy(controller1.position);
   avatar.left.quaternion.copy(controller1.quaternion);
 
   avatar.right.position.copy(controller2.position);
   avatar.right.quaternion.copy(controller2.quaternion);
+
+  // Keep label above the moving head
+  if (avatar.nameLabel) {
+    avatar.nameLabel.position.copy(camera.position);
+    avatar.nameLabel.position.y += 0.3;
+  }
 }
 
-
-
-// ==========================
-// Remote Avatar Interpolation
-// ==========================
 export function updateRemoteAvatar(avatar, targetPos, targetQuat, factor = 0.2) {
   avatar.head.position.lerp(targetPos.head, factor);
   avatar.head.quaternion.slerp(targetQuat.head, factor);
@@ -82,4 +93,9 @@ export function updateRemoteAvatar(avatar, targetPos, targetQuat, factor = 0.2) 
 
   avatar.right.position.lerp(targetPos.right, factor);
   avatar.right.quaternion.slerp(targetQuat.right, factor);
+
+  if (avatar.nameLabel) {
+    avatar.nameLabel.position.copy(avatar.head.position);
+    avatar.nameLabel.position.y += 0.3;
+  }
 }
