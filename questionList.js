@@ -14,7 +14,7 @@ export const QUESTIONS = [
             "Class A",
             "Class B",
             "Class C",
-            "No clear dominant group"
+            "No"
         ]
     },
     {
@@ -29,8 +29,8 @@ export const QUESTIONS = [
     {
         question: "Reset the graph and set the interaction filter to inter-group. Reduce the temporal window to a single timestamp and explore the timeline. During which interval does interaction between teachers and students drop significantly (indicating lunch break)?",
         answers: [
-            "Interval A–B",
-            "Interval X–Y",
+            "Interval 600 - 900",
+            "Interval 4000 - 4300",
             "Both intervals",
             "No clear interval"
         ]
