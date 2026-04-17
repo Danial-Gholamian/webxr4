@@ -174,7 +174,8 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   const panelsToCheck = [
     graphScene.getObjectByName('FilterUIPanel'),
     cameraGroup.getObjectByName('FilterUIPanel'),
-    cameraGroup.getObjectByName('TemporalDrillPanel')
+    cameraGroup.getObjectByName('TemporalDrillPanel'),
+    cameraGroup.getObjectByName('UserGuidePanel'),
   ];
 
   panelsToCheck.forEach(panel => {

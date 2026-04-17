@@ -17,6 +17,9 @@ const GUIDE_ITEMS = [
 ];
 
 
+const BUTTON_COLOR = 0x1f3a5f;
+const BUTTON_HOVER = 0x2f5f9f;
+
 
 
 let currentPage = 0;
@@ -25,6 +28,10 @@ let totalPages = Math.ceil(GUIDE_ITEMS.length / ITEMS_PER_PAGE);
 export function createUserGuidePanel() {
     const group = new THREE.Group();
     group.name = "UserGuidePanel";
+    group.userData.absorbsOnly = true
+    group.traverse(obj => {
+        obj.userData.absorbsOnly = true;
+    });
 
     const panelHeight = 1.2;
     const canvasWidth = 1024;
@@ -42,9 +49,9 @@ export function createUserGuidePanel() {
 
     // QUESTION BUTTON
     const questionBtn = createCapsuleLabel("Questions", {
-        fontSize: 48,
-        color: 0x222244,
-        hoverColor: 0x444488,
+        fontSize: 35,
+        color: BUTTON_COLOR,
+        hoverColor: BUTTON_HOVER,
         onClick: () => {
             console.log("Switch to Questions");
 
@@ -59,13 +66,14 @@ export function createUserGuidePanel() {
         }
     });
 
-    questionBtn.position.set(0.4, -0.25, 0.01);
+    questionBtn.position.set(0.4, -0.5, 0.02);
     group.add(questionBtn);
 
     // BACK TO GUIDE BUTTON
-    const backBtn = createCapsuleLabel("Back", {
-        fontSize: 48,
-        color: 0x882222,
+    const backBtn = createCapsuleLabel("Guide", {
+        fontSize: 35,
+        color: BUTTON_COLOR,
+        hoverColor: BUTTON_HOVER,
         onClick: () => {
             group.userData.mode = "GUIDE";
 
@@ -76,7 +84,7 @@ export function createUserGuidePanel() {
         }
     });
 
-    backBtn.position.set(0, -0.5, 0.01);
+    backBtn.position.set(-0.4, -0.5, 0.02);
     group.add(backBtn);
 
     // --- Video Setup ---
@@ -113,12 +121,14 @@ export function createUserGuidePanel() {
     const ctx = canvas.getContext('2d');
 
     const textTexture = new THREE.CanvasTexture(canvas);
+    textTexture.colorSpace = THREE.SRGBColorSpace
     const textPlane = new THREE.Mesh(
         new THREE.PlaneGeometry(panelHeight * (canvasWidth / canvasHeight), panelHeight),
         new THREE.MeshBasicMaterial({
             map: textTexture,
             transparent: true,
-            depthTest: false
+            depthTest: false,
+            toneMapped: false
         })
     );
 
@@ -167,7 +177,7 @@ export function createUserGuidePanel() {
     };
 
     group.visible = false;
-    group.position.set(0, 1.5, -1.5);
+    group.position.set(0, 1.2, -1.5);
 
     return group;
 }
@@ -190,7 +200,7 @@ function updateVideoState(panel) {
 function drawGuidePage(ctx, canvas, page) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = 'rgba(17, 17, 17, 0.95)';
+    ctx.fillStyle = '#111111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Only draw the video border on Page 3

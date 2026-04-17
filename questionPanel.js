@@ -27,11 +27,17 @@ export class QuestionPanel {
             color: 0x111111,
             transparent: true,
             opacity: 0.9,
-            depthTest: false
+            depthTest: false,
+            depthWrite: false
         });
 
         const bgMesh = new THREE.Mesh(bgGeo, bgMat);
         bgMesh.position.z = -0.01;
+
+        this.group.userData.absorbsOnly = true
+        this.group.traverse(obj => {
+            obj.userData.absorbsOnly = true;
+        });
 
         this.group.add(bgMesh);
 
@@ -40,7 +46,9 @@ export class QuestionPanel {
         // -------------------------
         const current = this.data[this.currentIndex];
 
-        const textPanel = createTextPanel(1024, 1024, 0.6);
+        const textPanel = createTextPanel(1024, 1024, 1.2);
+        bgMesh.renderOrder = 1;
+        textPanel.mesh.renderOrder = 2;
 
         this.questionPanel = textPanel;
         this.group.add(textPanel.mesh);
@@ -116,20 +124,34 @@ export class QuestionPanel {
         ctx.fillStyle = 'rgba(17,17,17,0.95)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+
+        // -------------------------
+        // HEADER (Question number)
+        // -------------------------
+        ctx.fillStyle = '#00ffcc';
+        ctx.font = 'bold 42px Arial';
+        ctx.textAlign = 'left';
+
+        ctx.fillText(
+            `Question ${this.currentIndex + 1} / ${this.data.length}`,
+            100,
+            80
+        );
+
         // -------------------------
         // QUESTION
         // -------------------------
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 46px Arial';
+        ctx.font = 'bold 35px Arial';
         ctx.textAlign = 'left';
 
-        let y = 150;
+        let y = 170;
 
         y = drawWrappedText(
             ctx,
             current.question,
             canvas.width - 300,
-            55,
+            70,
             100,
             y
         );
@@ -137,11 +159,11 @@ export class QuestionPanel {
         // -------------------------
         // ANSWERS (NON-INTERACTIVE)
         // -------------------------
-        ctx.font = '38px Arial';
+        ctx.font = '25px Arial';
 
         const letters = ['A', 'B', 'C', 'D'];
 
-        y += 60;
+        y += 40;
 
         current.answers.forEach((ans, i) => {
             const text = `${letters[i]}. ${ans}`;
@@ -150,7 +172,7 @@ export class QuestionPanel {
                 ctx,
                 text,
                 canvas.width - 300,
-                50,
+                60,
                 120,
                 y
             );
@@ -159,6 +181,19 @@ export class QuestionPanel {
         });
 
         texture.needsUpdate = true;
+
+        // -------------------------
+        // FOOTER
+        // -------------------------
+        ctx.fillStyle = '#aaaaaa';
+        ctx.font = '25px Arial';
+        ctx.textAlign = 'center';
+
+        ctx.fillText(
+            `Use stick to navigate`,
+            canvas.width / 2,
+            canvas.height - 60
+        );
     }
 
     _onBack() {
@@ -208,7 +243,7 @@ export class QuestionPanel {
 }
 
 
-function createTextPanel(width = 1024, height = 1024, worldHeight = 0.6) {
+function createTextPanel(width = 1024, height = 1024, worldHeight = 1.2) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -225,7 +260,8 @@ function createTextPanel(width = 1024, height = 1024, worldHeight = 0.6) {
         new THREE.MeshBasicMaterial({
             map: texture,
             transparent: true,
-            depthTest: false
+            depthTest: false,
+            depthWrite: false
         })
     );
 
