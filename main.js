@@ -29,7 +29,7 @@ import {
 } from './vrSetup.js';
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
-import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList } from './filterUIPanel.js';
+import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList, createCapsuleLabel } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUIPanel, setUsername, broadcastNodeSelection } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
@@ -733,6 +733,51 @@ cameraGroup.add(histogram.getObject3D());
 cameraGroup.userData.histogram = histogram;
 window.histogramRef = histogram
 
+
+// ========================
+// VR GUIDE / QUESTION BUTTONS
+// ========================
+
+const guideVRBtn = createCapsuleLabel("Guide", {
+  fontSize: 40,
+  color: 0x1f3a5f,
+  hoverColor: 0x2f5f9f,
+  onClick: () => {
+    userGuidePanel.visible = true;
+    userGuidePanel.userData.mode = "GUIDE";
+
+    userGuidePanel.userData.questionPanel.group.visible = false;
+
+    // restore guide content
+    userGuidePanel.children.forEach(child => {
+      if (child.name !== "QuestionPanel") child.visible = true;
+    });
+  }
+});
+
+const questionVRBtn = createCapsuleLabel("Questions", {
+  fontSize: 40,
+  color: 0x1f3a5f,
+  hoverColor: 0x2f5f9f,
+  onClick: () => {
+    userGuidePanel.visible = true;
+    userGuidePanel.userData.mode = "QUESTIONS";
+
+    userGuidePanel.userData.questionPanel.group.visible = true;
+
+    // hide guide content
+    userGuidePanel.children.forEach(child => {
+      if (child.name !== "QuestionPanel") child.visible = false;
+    });
+  }
+});
+
+
+guideVRBtn.position.set(-0.2, -0.25, -0.6);
+questionVRBtn.position.set(0.2, -0.25, -0.6);
+
+cameraGroup.add(guideVRBtn);
+cameraGroup.add(questionVRBtn);
 
 // Subscribe to controller temporal updates
 graphController.subscribeToTimeChanges(
