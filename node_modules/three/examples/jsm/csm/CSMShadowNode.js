@@ -5,12 +5,11 @@ import {
 	Matrix4,
 	Box3,
 	Object3D,
-	WebGLCoordinateSystem,
-	ShadowBaseNode
-} from 'three/webgpu';
+	WebGLCoordinateSystem
+} from 'three';
 
 import { CSMFrustum } from './CSMFrustum.js';
-import { viewZToOrthographicDepth, reference, uniform, float, vec4, vec2, If, Fn, min, renderGroup, positionView, shadow } from 'three/tsl';
+import { viewZToOrthographicDepth, reference, uniform, float, vec4, vec2, If, Fn, min, renderGroup, positionView, Node, NodeUpdateType, shadow } from 'three/tsl';
 
 const _cameraToLightMatrix = new Matrix4();
 const _lightSpaceFrustum = new CSMFrustum();
@@ -35,126 +34,36 @@ class LwLight extends Object3D {
 
 }
 
-/**
- * An implementation of Cascade Shadow Maps (CSM).
- *
- * This module can only be used with {@link WebGPURenderer}. When using {@link WebGLRenderer},
- * use {@link CSM} instead.
- *
- * @augments ShadowBaseNode
- */
-class CSMShadowNode extends ShadowBaseNode {
+class CSMShadowNode extends Node {
 
-	/**
-	 * Constructs a new CSM shadow node.
-	 *
-	 * @param {DirectionalLight} light - The CSM light.
-	 * @param {CSMShadowNode~Data} [data={}] - The CSM data.
-	 */
 	constructor( light, data = {} ) {
 
-		super( light );
+		super();
 
-		/**
-		 * The scene's camera.
-		 *
-		 * @type {?Camera}
-		 * @default null
-		 */
+		this.light = light;
 		this.camera = null;
-
-		/**
-		 * The number of cascades.
-		 *
-		 * @type {number}
-		 * @default 3
-		 */
 		this.cascades = data.cascades || 3;
-
-		/**
-		 * The maximum far value.
-		 *
-		 * @type {number}
-		 * @default 100000
-		 */
 		this.maxFar = data.maxFar || 100000;
-
-		/**
-		 * The frustum split mode.
-		 *
-		 * @type {('practical'|'uniform'|'logarithmic'|'custom')}
-		 * @default 'practical'
-		 */
 		this.mode = data.mode || 'practical';
-
-		/**
-		 * The light margin.
-		 *
-		 * @type {number}
-		 * @default 200
-		 */
 		this.lightMargin = data.lightMargin || 200;
-
-		/**
-		 * Custom split callback when using `mode='custom'`.
-		 *
-		 * @type {Function}
-		 */
 		this.customSplitsCallback = data.customSplitsCallback;
 
-		/**
-		 * Whether to fade between cascades or not.
-		 *
-		 * @type {boolean}
-		 * @default false
-		 */
 		this.fade = false;
 
-		/**
-		 * An array of numbers in the range `[0,1]` the defines how the
-		 * mainCSM frustum should be split up.
-		 *
-		 * @type {Array<number>}
-		 */
 		this.breaks = [];
 
 		this._cascades = [];
-
-		/**
-		 * The main frustum.
-		 *
-		 * @type {?CSMFrustum}
-		 * @default null
-		 */
 		this.mainFrustum = null;
-
-		/**
-		 * An array of frustums representing the cascades.
-		 *
-		 * @type {Array<CSMFrustum>}
-		 */
 		this.frustums = [];
+		this.updateBeforeType = NodeUpdateType.FRAME;
 
-		/**
-		 * An array of directional lights which cast the shadows for
-		 * the different cascades. There is one directional light for each
-		 * cascade.
-		 *
-		 * @type {Array<DirectionalLight>}
-		 */
 		this.lights = [];
 
 		this._shadowNodes = [];
 
 	}
 
-	/**
-	 * Inits the CSM shadow node.
-	 *
-	 * @private
-	 * @param {NodeBuilder} builder - The node builder.
-	 */
-	_init( { camera, renderer } ) {
+	init( { camera, renderer } ) {
 
 		this.camera = camera;
 
@@ -167,8 +76,6 @@ class CSMShadowNode extends ShadowBaseNode {
 		for ( let i = 0; i < this.cascades; i ++ ) {
 
 			const lwLight = new LwLight();
-			lwLight.castShadow = true;
-
 			const lShadow = light.shadow.clone();
 			lShadow.bias = lShadow.bias * ( i + 1 );
 
@@ -189,12 +96,7 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	}
 
-	/**
-	 * Inits the cascades according to the scene's camera and breaks configuration.
-	 *
-	 * @private
-	 */
-	_initCascades() {
+	initCascades() {
 
 		const camera = this.camera;
 		camera.updateProjectionMatrix();
@@ -204,13 +106,7 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	}
 
-	/**
-	 * Computes the breaks of this CSM instance based on the scene's camera, number of cascades
-	 * and the selected split mode.
-	 *
-	 * @private
-	 */
-	_getBreaks() {
+	getBreaks() {
 
 		const camera = this.camera;
 		const far = Math.min( camera.far, this.maxFar );
@@ -281,12 +177,7 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	}
 
-	/**
-	 * Sets the light breaks.
-	 *
-	 * @private
-	 */
-	_setLightBreaks() {
+	setLightBreaks() {
 
 		for ( let i = 0, l = this.cascades; i < l; i ++ ) {
 
@@ -299,12 +190,7 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	}
 
-	/**
-	 * Updates the shadow bounds of this CSM instance.
-	 *
-	 * @private
-	 */
-	_updateShadowBounds() {
+	updateShadowBounds() {
 
 		const frustums = this.frustums;
 
@@ -356,28 +242,19 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	}
 
-	/**
-	 * Applications must call this method every time they change camera or CSM settings.
-	 */
 	updateFrustums() {
 
-		this._getBreaks();
-		this._initCascades();
-		this._updateShadowBounds();
-		this._setLightBreaks();
+		this.getBreaks();
+		this.initCascades();
+		this.updateShadowBounds();
+		this.setLightBreaks();
 
 	}
 
-	/**
-	 * Setups the TSL when using fading.
-	 *
-	 * @private
-	 * @return {ShaderCallNodeInternal}
-	 */
-	_setupFade() {
+	setupFade() {
 
-		const cameraNear = reference( 'camera.near', 'float', this ).setGroup( renderGroup );
-		const cascades = reference( '_cascades', 'vec2', this ).setGroup( renderGroup ).label( 'cascades' );
+		const cameraNear = reference( 'camera.near', 'float', this ).setGroup( renderGroup ).label( 'cameraNear' );
+		const cascades = reference( '_cascades', 'vec2', this ).setGroup( renderGroup ).label( 'cacades' );
 
 		const shadowFar = uniform( 'float' ).setGroup( renderGroup ).label( 'shadowFar' )
 			.onRenderUpdate( () => Math.min( this.maxFar, this.camera.far ) );
@@ -385,9 +262,7 @@ class CSMShadowNode extends ShadowBaseNode {
 		const linearDepth = viewZToOrthographicDepth( positionView.z, cameraNear, shadowFar ).toVar( 'linearDepth' );
 		const lastCascade = this.cascades - 1;
 
-		return Fn( ( builder ) => {
-
-			this.setupShadowPosition( builder );
+		return Fn( () => {
 
 			const ret = vec4( 1, 1, 1, 1 ).toVar( 'shadowValue' );
 
@@ -433,7 +308,7 @@ class CSMShadowNode extends ShadowBaseNode {
 
 					if ( i === 0 ) {
 
-						// don't fade at nearest edge
+						// dont fade at nearest edge
 						ratio = linearDepth.greaterThan( cascadeCenter ).select( ratio, 1 );
 
 					}
@@ -450,25 +325,17 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	}
 
-	/**
-	 * Setups the TSL when no fading (default).
-	 *
-	 * @private
-	 * @return {ShaderCallNodeInternal}
-	 */
-	_setupStandard() {
+	setupStandard() {
 
-		const cameraNear = reference( 'camera.near', 'float', this ).setGroup( renderGroup );
-		const cascades = reference( '_cascades', 'vec2', this ).setGroup( renderGroup ).label( 'cascades' );
+		const cameraNear = reference( 'camera.near', 'float', this ).setGroup( renderGroup ).label( 'cameraNear' );
+		const cascades = reference( '_cascades', 'vec2', this ).setGroup( renderGroup ).label( 'cacades' );
 
 		const shadowFar = uniform( 'float' ).setGroup( renderGroup ).label( 'shadowFar' )
 			.onRenderUpdate( () => Math.min( this.maxFar, this.camera.far ) );
 
 		const linearDepth = viewZToOrthographicDepth( positionView.z, cameraNear, shadowFar ).toVar( 'linearDepth' );
 
-		return Fn( ( builder ) => {
-
-			this.setupShadowPosition( builder );
+		return Fn( () => {
 
 			const ret = vec4( 1, 1, 1, 1 ).toVar( 'shadowValue' );
 			const cascade = vec2().toVar( 'cascade' );
@@ -493,9 +360,9 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	setup( builder ) {
 
-		if ( this.camera === null ) this._init( builder );
+		if ( this.camera === null ) this.init( builder );
 
-		return this.fade === true ? this._setupFade() : this._setupStandard();
+		return this.fade === true ? this.setupFade() : this.setupStandard();
 
 	}
 
@@ -549,10 +416,6 @@ class CSMShadowNode extends ShadowBaseNode {
 
 	}
 
-	/**
-	 * Frees the GPU-related resources allocated by this instance. Call this
-	 * method whenever this instance is no longer used in your app.
-	 */
 	dispose() {
 
 		for ( let i = 0; i < this.lights.length; i ++ ) {
@@ -565,21 +428,8 @@ class CSMShadowNode extends ShadowBaseNode {
 
 		}
 
-		super.dispose();
-
 	}
 
 }
-
-/**
- * Constructor data of `CSMShadowNode`.
- *
- * @typedef {Object} CSMShadowNode~Data
- * @property {number} [cascades=3] - The number of cascades.
- * @property {number} [maxFar=100000] - The maximum far value.
- * @property {('practical'|'uniform'|'logarithmic'|'custom')} [mode='practical'] - The frustum split mode.
- * @property {Function} [customSplitsCallback] - Custom split callback when using `mode='custom'`.
- * @property {number} [lightMargin=200] - The light margin.
- **/
 
 export { CSMShadowNode };

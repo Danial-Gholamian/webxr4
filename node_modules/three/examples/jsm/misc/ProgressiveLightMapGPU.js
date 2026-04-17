@@ -1,10 +1,10 @@
-import { DoubleSide, FloatType, HalfFloatType, PlaneGeometry, Mesh, RenderTarget, Scene, MeshPhongNodeMaterial, NodeMaterial } from 'three/webgpu';
-import { add, float, mix, output, sub, texture, uniform, uv, vec2, vec4 } from 'three/tsl';
+import { DoubleSide, FloatType, HalfFloatType, PlaneGeometry, Mesh, RenderTarget, Scene } from 'three';
+import { add, float, mix, MeshPhongNodeMaterial, NodeMaterial, output, sub, texture, uniform, uv, vec2, vec4 } from 'three/tsl';
 
 import { potpack } from '../libs/potpack.module.js';
 
 /**
- * Progressive Light Map Accumulator, by [zalo]{@link https://github.com/zalo/}.
+ * Progressive Light Map Accumulator, by [zalo](https://github.com/zalo/)
  *
  * To use, simply construct a `ProgressiveLightMap` object,
  * `plmap.addObjectsToLightMap(object)` an array of semi-static
@@ -16,30 +16,14 @@ import { potpack } from '../libs/potpack.module.js';
  * your objects, so you can start jittering lighting to achieve
  * the texture-space effect you're looking for.
  *
- * This class can only be used with {@link WebGPURenderer}.
- * When using {@link WebGLRenderer}, import from `ProgressiveLightMap.js`.
+ * @param {WebGPURenderer} renderer An instance of WebGPURenderer.
+ * @param {number} resolution The side-long dimension of you total lightmap.
  */
 class ProgressiveLightMap {
 
-	/**
-	 * @param {WebGPURenderer} renderer - The renderer.
-	 * @param {number} [resolution=1024] - The side-long dimension of the total lightmap.
-	 */
 	constructor( renderer, resolution = 1024 ) {
 
-		/**
-		 * The renderer.
-		 *
-		 * @type {WebGPURenderer}
-		 */
 		this.renderer = renderer;
-
-		/**
-		 * The side-long dimension of the total lightmap.
-		 *
-		 * @type {number}
-		 * @default 1024
-		 */
 		this.resolution = resolution;
 
 		this._lightMapContainers = [];
@@ -66,14 +50,13 @@ class ProgressiveLightMap {
 
 		this._uvMat = new MeshPhongNodeMaterial();
 		this._uvMat.vertexNode = vec4( sub( uvNode, vec2( 0.5 ) ).mul( 2 ), 1, 1 );
-		this._uvMat.outputNode = vec4( mix( this._previousShadowMap.sample( uv( 1 ) ), output, float( 1 ).div( this._averagingWindow ) ) );
+		this._uvMat.outputNode = vec4( mix( this._previousShadowMap.uv( uv( 1 ) ), output, float( 1 ).div( this._averagingWindow ) ) );
 
 	}
 
 	/**
 	 * Sets these objects' materials' lightmaps and modifies their uv1's.
-	 *
-	 * @param {Array<Object3D>} objects - An array of objects and lights to set up your lightmap.
+	 * @param {Object3D} objects An array of objects and lights to set up your lightmap.
 	 */
 	addObjectsToLightMap( objects ) {
 
@@ -112,9 +95,9 @@ class ProgressiveLightMap {
 			object.receiveShadow = true;
 			object.renderOrder = 1000 + ob;
 
-			// Prepare UV boxes for potpack (potpack will update x and y)
+			// Prepare UV boxes for potpack
 			// TODO: Size these by object surface area
-			uv_boxes.push( { w: 1 + ( padding * 2 ), h: 1 + ( padding * 2 ), index: ob, x: 0, y: 0 } );
+			uv_boxes.push( { w: 1 + ( padding * 2 ), h: 1 + ( padding * 2 ), index: ob } );
 
 			this._lightMapContainers.push( { basicMat: object.material, object: object } );
 
@@ -166,11 +149,10 @@ class ProgressiveLightMap {
 	}
 
 	/**
-	 * This function renders each mesh one at a time into their respective surface maps.
-	 *
-	 * @param {Camera} camera - The camera the scene is rendered with.
-	 * @param {number} [blendWindow=100] - When >1, samples will accumulate over time.
-	 * @param {boolean} [blurEdges=true] - Whether to fix UV Edges via blurring.
+	 * This function renders each mesh one at a time into their respective surface maps
+	 * @param {Camera} camera Standard Rendering Camera
+	 * @param {number} blendWindow When >1, samples will accumulate over time.
+	 * @param {boolean} blurEdges  Whether to fix UV Edges via blurring
 	 */
 	update( camera, blendWindow = 100, blurEdges = true ) {
 
@@ -230,10 +212,9 @@ class ProgressiveLightMap {
 	}
 
 	/**
-	 * Draws the lightmap in the main scene. Call this after adding the objects to it.
-	 *
-	 * @param {boolean} visible - Whether the debug plane should be visible
-	 * @param {Vector3} [position] - Where the debug plane should be drawn
+	 * Draw the lightmap in the main scene.  Call this after adding the objects to it.
+	 * @param {boolean} visible Whether the debug plane should be visible.
+	 * @param {Vector3} position Where the debug plane should be drawn.
 	*/
 	showDebugLightmap( visible, position = null ) {
 
@@ -248,7 +229,7 @@ class ProgressiveLightMap {
 		if ( this._labelMesh === null ) {
 
 			const labelMaterial = new NodeMaterial();
-			labelMaterial.colorNode = texture( this._progressiveLightMap1.texture ).sample( uv().flipY() );
+			labelMaterial.colorNode = texture( this._progressiveLightMap1.texture ).uv( uv().flipY() );
 			labelMaterial.side = DoubleSide;
 
 			const labelGeometry = new PlaneGeometry( 100, 100 );
@@ -272,8 +253,6 @@ class ProgressiveLightMap {
 
 	/**
 	 * Creates the Blurring Plane.
-	 *
-	 * @private
 	 */
 	_initializeBlurPlane() {
 
@@ -288,14 +267,14 @@ class ProgressiveLightMap {
 		const pixelOffset = float( 0.5 ).div( float( this.resolution ) ).toVar();
 
 		const color = add(
-			this._previousShadowMap.sample( uvNode.add( vec2( pixelOffset, 0 ) ) ),
-			this._previousShadowMap.sample( uvNode.add( vec2( 0, pixelOffset ) ) ),
-			this._previousShadowMap.sample( uvNode.add( vec2( 0, pixelOffset.negate() ) ) ),
-			this._previousShadowMap.sample( uvNode.add( vec2( pixelOffset.negate(), 0 ) ) ),
-			this._previousShadowMap.sample( uvNode.add( vec2( pixelOffset, pixelOffset ) ) ),
-			this._previousShadowMap.sample( uvNode.add( vec2( pixelOffset.negate(), pixelOffset ) ) ),
-			this._previousShadowMap.sample( uvNode.add( vec2( pixelOffset, pixelOffset.negate() ) ) ),
-			this._previousShadowMap.sample( uvNode.add( vec2( pixelOffset.negate(), pixelOffset.negate() ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( pixelOffset, 0 ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( 0, pixelOffset ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( 0, pixelOffset.negate() ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( pixelOffset.negate(), 0 ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( pixelOffset, pixelOffset ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( pixelOffset.negate(), pixelOffset ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( pixelOffset, pixelOffset.negate() ) ) ),
+			this._previousShadowMap.uv( uvNode.add( vec2( pixelOffset.negate(), pixelOffset.negate() ) ) ),
 		).div( 8 );
 
 		blurMaterial.fragmentNode = color;

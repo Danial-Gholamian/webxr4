@@ -1,9 +1,9 @@
-import { DataTexture, FloatType, RGBAFormat, Vector2, Vector3, LightsNode, NodeUpdateType } from 'three/webgpu';
-
 import {
-	attributeArray, nodeProxy, int, float, vec2, ivec2, ivec4, uniform, Break, Loop, positionView,
+	storageObject, nodeProxy, int, float, vec2, ivec2, ivec4, uniform, Break, Loop,
 	Fn, If, Return, textureLoad, instanceIndex, screenCoordinate, directPointLight
 } from 'three/tsl';
+
+import { DataTexture, FloatType, LightsNode, NodeUpdateType, RGBAFormat, StorageBufferAttribute, Vector2, Vector3 } from 'three';
 
 export const circleIntersectsAABB = /*@__PURE__*/ Fn( ( [ circleCenter, radius, minBounds, maxBounds ] ) => {
 
@@ -34,13 +34,6 @@ export const circleIntersectsAABB = /*@__PURE__*/ Fn( ( [ circleCenter, radius, 
 const _vector3 = /*@__PURE__*/ new Vector3();
 const _size = /*@__PURE__*/ new Vector2();
 
-/**
- * A custom version of `LightsNode` implementing tiled lighting. This node is used in
- * {@link TiledLighting} to overwrite the renderer's default lighting with
- * a custom implementation.
- *
- * @augments LightsNode
- */
 class TiledLightsNode extends LightsNode {
 
 	static get type() {
@@ -49,12 +42,6 @@ class TiledLightsNode extends LightsNode {
 
 	}
 
-	/**
-	 * Constructs a new tiled lights node.
-	 *
-	 * @param {number} [maxLights=1024] - The maximum number of lights.
-	 * @param {number} [tileSize=32] - The tile size.
-	 */
 	constructor( maxLights = 1024, tileSize = 32 ) {
 
 		super();
@@ -62,52 +49,33 @@ class TiledLightsNode extends LightsNode {
 		this.materialLights = [];
 		this.tiledLights = [];
 
-		/**
-		 * The maximum number of lights.
-		 *
-		 * @type {number}
-		 * @default 1024
-		 */
 		this.maxLights = maxLights;
-
-		/**
-		 * The tile size.
-		 *
-		 * @type {number}
-		 * @default 32
-		 */
 		this.tileSize = tileSize;
 
-		this._bufferSize = null;
-		this._lightIndexes = null;
-		this._screenTileIndex = null;
-		this._compute = null;
-		this._lightsTexture = null;
+		this.bufferSize = null;
+		this.lightIndexes = null;
+		this.screenTileIndex = null;
+		this.compute = null;
+		this.lightsTexture = null;
 
-		this._lightsCount = uniform( 0, 'int' );
-		this._tileLightCount = 8;
-		this._screenSize = uniform( new Vector2() );
-		this._cameraProjectionMatrix = uniform( 'mat4' );
-		this._cameraViewMatrix = uniform( 'mat4' );
+		this.lightsCount = uniform( 0, 'int' );
+		this.tileLightCount = 8;
+		this.screenSize = uniform( new Vector2() );
+		this.cameraProjectionMatrix = uniform( 'mat4' );
+		this.cameraViewMatrix = uniform( 'mat4' );
 
 		this.updateBeforeType = NodeUpdateType.RENDER;
 
 	}
 
-	customCacheKey() {
-
-		return this._compute.getCacheKey() + super.customCacheKey();
-
-	}
-
 	updateLightsTexture() {
 
-		const { _lightsTexture: lightsTexture, tiledLights } = this;
+		const { lightsTexture, tiledLights } = this;
 
 		const data = lightsTexture.image.data;
 		const lineSize = lightsTexture.image.width * 4;
 
-		this._lightsCount.value = tiledLights.length;
+		this.lightsCount.value = tiledLights.length;
 
 		for ( let i = 0; i < tiledLights.length; i ++ ) {
 
@@ -145,13 +113,13 @@ class TiledLightsNode extends LightsNode {
 
 		this.updateLightsTexture( camera );
 
-		this._cameraProjectionMatrix.value = camera.projectionMatrix;
-		this._cameraViewMatrix.value = camera.matrixWorldInverse;
+		this.cameraProjectionMatrix.value = camera.projectionMatrix;
+		this.cameraViewMatrix.value = camera.matrixWorldInverse;
 
 		renderer.getDrawingBufferSize( _size );
-		this._screenSize.value.copy( _size );
+		this.screenSize.value.copy( _size );
 
-		renderer.compute( this._compute );
+		renderer.compute( this.compute );
 
 	}
 
@@ -185,7 +153,7 @@ class TiledLightsNode extends LightsNode {
 
 	getBlock( block = 0 ) {
 
-		return this._lightIndexes.element( this._screenTileIndex.mul( int( 2 ).add( int( block ) ) ) );
+		return this.lightIndexes.element( this.screenTileIndex.mul( int( 2 ).add( int( block ) ) ) );
 
 	}
 
@@ -195,9 +163,9 @@ class TiledLightsNode extends LightsNode {
 
 		const stride = int( 4 );
 		const tileOffset = element.div( stride );
-		const tileIndex = this._screenTileIndex.mul( int( 2 ) ).add( tileOffset );
+		const tileIndex = this.screenTileIndex.mul( int( 2 ) ).add( tileOffset );
 
-		return this._lightIndexes.element( tileIndex ).element( element.mod( stride ) );
+		return this.lightIndexes.element( tileIndex ).element( element.modInt( stride ) );
 
 	}
 
@@ -205,11 +173,11 @@ class TiledLightsNode extends LightsNode {
 
 		index = int( index );
 
-		const dataA = textureLoad( this._lightsTexture, ivec2( index, 0 ) );
-		const dataB = textureLoad( this._lightsTexture, ivec2( index, 1 ) );
+		const dataA = textureLoad( this.lightsTexture, ivec2( index, 0 ) );
+		const dataB = textureLoad( this.lightsTexture, ivec2( index, 1 ) );
 
 		const position = dataA.xyz;
-		const viewPosition = this._cameraViewMatrix.mul( position );
+		const viewPosition = this.cameraViewMatrix.mul( position );
 		const distance = dataA.w;
 		const color = dataB.rgb;
 		const decay = dataB.w;
@@ -236,11 +204,9 @@ class TiledLightsNode extends LightsNode {
 		lightingModel.directDiffuse.append();
 		lightingModel.directSpecular.append();
 
-		super.setupLights( builder, lightNodes );
-
 		Fn( () => {
 
-			Loop( this._tileLightCount, ( { i } ) => {
+			Loop( this.tileLightCount, ( { i } ) => {
 
 				const lightIndex = this.getTile( i );
 
@@ -252,16 +218,20 @@ class TiledLightsNode extends LightsNode {
 
 				const { color, decay, viewPosition, distance } = this.getLightData( lightIndex.sub( 1 ) );
 
-				builder.lightsNode.setupDirectLight( builder, this, directPointLight( {
+				directPointLight( {
 					color,
-					lightVector: viewPosition.sub( positionView ),
+					lightViewPosition: viewPosition,
 					cutoffDistance: distance,
 					decayExponent: decay
-				} ) );
+				} ).append();
 
 			} );
 
 		} )().append();
+
+		// others lights
+
+		super.setupLights( builder, lightNodes );
 
 	}
 
@@ -278,7 +248,7 @@ class TiledLightsNode extends LightsNode {
 		width = this.getBufferFitSize( width );
 		height = this.getBufferFitSize( height );
 
-		if ( ! this._bufferSize || this._bufferSize.width !== width || this._bufferSize.height !== height ) {
+		if ( ! this.bufferSize || this.bufferSize.width !== width || this.bufferSize.height !== height ) {
 
 			this.create( width, height );
 
@@ -295,11 +265,11 @@ class TiledLightsNode extends LightsNode {
 		const width = this.getBufferFitSize( _size.width );
 		const height = this.getBufferFitSize( _size.height );
 
-		if ( this._bufferSize === null ) {
+		if ( this.bufferSize === null ) {
 
 			this.create( width, height );
 
-		} else if ( this._bufferSize.width !== width || this._bufferSize.height !== height ) {
+		} else if ( this.bufferSize.width !== width || this.bufferSize.height !== height ) {
 
 			this.create( width, height );
 
@@ -321,7 +291,8 @@ class TiledLightsNode extends LightsNode {
 		const lightsTexture = new DataTexture( lightsData, lightsData.length / 8, 2, RGBAFormat, FloatType );
 
 		const lightIndexesArray = new Int32Array( count * 4 * 2 );
-		const lightIndexes = attributeArray( lightIndexesArray, 'ivec4' ).label( 'lightIndexes' );
+		const lightIndexesAttribute = new StorageBufferAttribute( lightIndexesArray, 4 );
+		const lightIndexes = storageObject( lightIndexesAttribute, 'ivec4', lightIndexesAttribute.count ).label( 'lightIndexes' );
 
 		// compute
 
@@ -341,18 +312,18 @@ class TiledLightsNode extends LightsNode {
 			const tileOffset = elementIndex.div( stride );
 			const tileIndex = instanceIndex.mul( int( 2 ) ).add( tileOffset );
 
-			return lightIndexes.element( tileIndex ).element( elementIndex.mod( stride ) );
+			return lightIndexes.element( tileIndex ).element( elementIndex.modInt( stride ) );
 
 		};
 
 		const compute = Fn( () => {
 
-			const { _cameraProjectionMatrix: cameraProjectionMatrix, _bufferSize: bufferSize, _screenSize: screenSize } = this;
+			const { cameraProjectionMatrix, bufferSize, screenSize } = this;
 
 			const tiledBufferSize = bufferSize.clone().divideScalar( tileSize ).floor();
 
 			const tileScreen = vec2(
-				instanceIndex.mod( tiledBufferSize.width ),
+				instanceIndex.modInt( tiledBufferSize.width ),
 				instanceIndex.div( tiledBufferSize.width )
 			).mul( tileSize ).div( screenSize );
 
@@ -367,7 +338,7 @@ class TiledLightsNode extends LightsNode {
 
 			Loop( this.maxLights, ( { i } ) => {
 
-				If( index.greaterThanEqual( this._tileLightCount ).or( int( i ).greaterThanEqual( int( this._lightsCount ) ) ), () => {
+				If( index.greaterThanEqual( this.tileLightCount ).or( int( i ).greaterThanEqual( int( this.lightsCount ) ) ), () => {
 
 					Return();
 
@@ -400,11 +371,11 @@ class TiledLightsNode extends LightsNode {
 
 		// assigns
 
-		this._bufferSize = bufferSize;
-		this._lightIndexes = lightIndexes;
-		this._screenTileIndex = screenTileIndex;
-		this._compute = compute;
-		this._lightsTexture = lightsTexture;
+		this.bufferSize = bufferSize;
+		this.lightIndexes = lightIndexes;
+		this.screenTileIndex = screenTileIndex;
+		this.compute = compute;
+		this.lightsTexture = lightsTexture;
 
 	}
 

@@ -15,48 +15,20 @@ import {
 	NeverStencilFunc, AlwaysStencilFunc, LessStencilFunc, LessEqualStencilFunc, EqualStencilFunc, GreaterEqualStencilFunc, GreaterStencilFunc, NotEqualStencilFunc
 } from '../../../constants.js';
 
-/**
- * A WebGPU backend utility module for managing pipelines.
- *
- * @private
- */
 class WebGPUPipelineUtils {
 
-	/**
-	 * Constructs a new utility object.
-	 *
-	 * @param {WebGPUBackend} backend - The WebGPU backend.
-	 */
 	constructor( backend ) {
 
-		/**
-		 * A reference to the WebGPU backend.
-		 *
-		 * @type {WebGPUBackend}
-		 */
 		this.backend = backend;
 
 	}
 
-	/**
-	 * Returns the sample count derived from the given render context.
-	 *
-	 * @private
-	 * @param {RenderContext} renderContext - The render context.
-	 * @return {number} The sample count.
-	 */
-	_getSampleCount( renderContext ) {
+	_getSampleCount( renderObjectContext ) {
 
-		return this.backend.utils.getSampleCountRenderContext( renderContext );
+		return this.backend.utils.getSampleCountRenderContext( renderObjectContext );
 
 	}
 
-	/**
-	 * Creates a render pipeline for the given render object.
-	 *
-	 * @param {RenderObject} renderObject - The render object.
-	 * @param {Array<Promise>} promises - An array of compilation promises which are used in `compileAsync()`.
-	 */
 	createRenderPipeline( renderObject, promises ) {
 
 		const { object, material, geometry, pipeline } = renderObject;
@@ -188,14 +160,6 @@ class WebGPUPipelineUtils {
 
 			}
 
-			if ( material.polygonOffset === true ) {
-
-				depthStencil.depthBias = material.polygonOffsetUnits;
-				depthStencil.depthBiasSlopeScale = material.polygonOffsetFactor;
-				depthStencil.depthBiasClamp = 0; // three.js does not provide an API to configure this value
-
-			}
-
 			pipelineDescriptor.depthStencil = depthStencil;
 
 		}
@@ -224,12 +188,6 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Creates GPU render bundle encoder for the given render context.
-	 *
-	 * @param {RenderContext} renderContext - The render context.
-	 * @return {GPURenderBundleEncoder} The GPU render bundle encoder.
-	 */
 	createBundleEncoder( renderContext ) {
 
 		const backend = this.backend;
@@ -250,12 +208,6 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Creates a compute pipeline for the given compute node.
-	 *
-	 * @param {ComputePipeline} pipeline - The compute pipeline.
-	 * @param {Array<BindGroup>} bindings - The bindings.
-	 */
 	createComputePipeline( pipeline, bindings ) {
 
 		const backend = this.backend;
@@ -286,14 +238,6 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Returns the blending state as a descriptor object required
-	 * for the pipeline creation.
-	 *
-	 * @private
-	 * @param {Material} material - The material.
-	 * @return {Object} The blending state.
-	 */
 	_getBlending( material ) {
 
 		let color, alpha;
@@ -401,13 +345,7 @@ class WebGPUPipelineUtils {
 		}
 
 	}
-	/**
-	 * Returns the GPU blend factor which is required for the pipeline creation.
-	 *
-	 * @private
-	 * @param {number} blend - The blend factor as a three.js constant.
-	 * @return {string} The GPU blend factor.
-	 */
+
 	_getBlendFactor( blend ) {
 
 		let blendFactor;
@@ -475,13 +413,6 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Returns the GPU stencil compare function which is required for the pipeline creation.
-	 *
-	 * @private
-	 * @param {Material} material - The material.
-	 * @return {string} The GPU stencil compare function.
-	 */
 	_getStencilCompare( material ) {
 
 		let stencilCompare;
@@ -531,13 +462,6 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Returns the GPU stencil operation which is required for the pipeline creation.
-	 *
-	 * @private
-	 * @param {number} op - A three.js constant defining the stencil operation.
-	 * @return {string} The GPU stencil operation.
-	 */
 	_getStencilOperation( op ) {
 
 		let stencilOperation;
@@ -585,13 +509,6 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Returns the GPU blend operation which is required for the pipeline creation.
-	 *
-	 * @private
-	 * @param {number} blendEquation - A three.js constant defining the blend equation.
-	 * @return {string} The GPU blend operation.
-	 */
 	_getBlendOperation( blendEquation ) {
 
 		let blendOperation;
@@ -627,16 +544,6 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Returns the primitive state as a descriptor object required
-	 * for the pipeline creation.
-	 *
-	 * @private
-	 * @param {Object3D} object - The 3D object.
-	 * @param {BufferGeometry} geometry - The geometry.
-	 * @param {Material} material - The material.
-	 * @return {Object} The primitive state.
-	 */
 	_getPrimitiveState( object, geometry, material ) {
 
 		const descriptor = {};
@@ -677,26 +584,12 @@ class WebGPUPipelineUtils {
 
 	}
 
-	/**
-	 * Returns the GPU color write mask which is required for the pipeline creation.
-	 *
-	 * @private
-	 * @param {Material} material - The material.
-	 * @return {string} The GPU color write mask.
-	 */
 	_getColorWriteMask( material ) {
 
 		return ( material.colorWrite === true ) ? GPUColorWriteFlags.All : GPUColorWriteFlags.None;
 
 	}
 
-	/**
-	 * Returns the GPU depth compare function which is required for the pipeline creation.
-	 *
-	 * @private
-	 * @param {Material} material - The material.
-	 * @return {string} The GPU depth compare function.
-	 */
 	_getDepthCompare( material ) {
 
 		let depthCompare;

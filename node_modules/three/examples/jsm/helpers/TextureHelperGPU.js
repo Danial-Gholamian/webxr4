@@ -1,58 +1,29 @@
 import {
-	NodeMaterial,
 	BoxGeometry,
 	BufferAttribute,
 	Mesh,
 	PlaneGeometry,
-	DoubleSide,
 	Vector3,
 } from 'three';
-import { texture as textureNode, cubeTexture, texture3D, float, vec4, attribute } from 'three/tsl';
+import { NodeMaterial, texture as textureNode, cubeTexture, texture3D, float, vec4 } from 'three/tsl';
 import { mergeGeometries } from '../utils/BufferGeometryUtils.js';
 
-/**
- * A helper that can be used to display any type of texture for
- * debugging purposes. Depending on the type of texture (2D, 3D, Array),
- * the helper becomes a plane or box mesh.
- *
- * This helper can only be used with {@link WebGPURenderer}.
- * When using {@link WebGLRenderer}, import from `TextureHelper.js`.
- *
- * @private
- * @augments Mesh
- */
 class TextureHelper extends Mesh {
 
-	/**
-	 * Constructs a new texture helper.
-	 *
-	 * @param {Texture} texture - The texture to visualize.
-	 * @param {number} [width=1] - The helper's width.
-	 * @param {number} [height=1] - The helper's height.
-	 * @param {number} [depth=1] - The helper's depth.
-	 */
 	constructor( texture, width = 1, height = 1, depth = 1 ) {
 
 		const material = new NodeMaterial();
-		material.side = DoubleSide;
-		material.transparent = true;
 		material.name = 'TextureHelper';
 
 		let colorNode;
 
-		const uvw = attribute( 'uvw' );
-
 		if ( texture.isCubeTexture ) {
 
-			colorNode = cubeTexture( texture ).sample( uvw );
+			colorNode = cubeTexture( texture );
 
 		} else if ( texture.isData3DTexture || texture.isCompressed3DTexture ) {
 
-			colorNode = texture3D( texture ).sample( uvw );
-
-		} else if ( texture.isDataArrayTexture || texture.isCompressedArrayTexture ) {
-
-			colorNode = textureNode( texture ).sample( uvw.xy ).depth( uvw.z );
+			colorNode = texture3D( texture );
 
 		} else {
 
@@ -70,20 +41,11 @@ class TextureHelper extends Mesh {
 
 		super( geometry, material );
 
-		/**
-		 * The texture to visualize.
-		 *
-		 * @type {Texture}
-		 */
 		this.texture = texture;
 		this.type = 'TextureHelper';
 
 	}
 
-	/**
-	 * Frees the GPU-related resources allocated by this instance. Call this
-	 * method whenever this instance is no longer used in your app.
-	 */
 	dispose() {
 
 		this.geometry.dispose();
@@ -160,7 +122,7 @@ function createCubeGeometry( width, height, depth ) {
 	}
 
 	geometry.deleteAttribute( 'uv' );
-	geometry.setAttribute( 'uvw', uvw );
+	geometry.setAttribute( 'uv', uvw );
 
 	return geometry;
 
@@ -200,7 +162,7 @@ function createSliceGeometry( texture, width, height, depth ) {
 		}
 
 		geometry.deleteAttribute( 'uv' );
-		geometry.setAttribute( 'uvw', uvw );
+		geometry.setAttribute( 'uv', uvw );
 
 		geometries.push( geometry );
 

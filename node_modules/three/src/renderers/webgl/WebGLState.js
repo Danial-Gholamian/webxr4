@@ -78,17 +78,17 @@ function WebGLState( gl, extensions ) {
 	function DepthBuffer() {
 
 		let locked = false;
+		let reversed = false;
 
-		let currentReversed = false;
 		let currentDepthMask = null;
 		let currentDepthFunc = null;
 		let currentDepthClear = null;
 
 		return {
 
-			setReversed: function ( reversed ) {
+			setReversed: function ( value ) {
 
-				if ( currentReversed !== reversed ) {
+				if ( reversed !== value ) {
 
 					const ext = extensions.get( 'EXT_clip_control' );
 
@@ -102,19 +102,19 @@ function WebGLState( gl, extensions ) {
 
 					}
 
-					currentReversed = reversed;
-
 					const oldDepth = currentDepthClear;
 					currentDepthClear = null;
 					this.setClear( oldDepth );
 
 				}
 
+				reversed = value;
+
 			},
 
 			getReversed: function () {
 
-				return currentReversed;
+				return reversed;
 
 			},
 
@@ -145,7 +145,7 @@ function WebGLState( gl, extensions ) {
 
 			setFunc: function ( depthFunc ) {
 
-				if ( currentReversed ) depthFunc = reversedFuncs[ depthFunc ];
+				if ( reversed ) depthFunc = reversedFuncs[ depthFunc ];
 
 				if ( currentDepthFunc !== depthFunc ) {
 
@@ -213,7 +213,7 @@ function WebGLState( gl, extensions ) {
 
 				if ( currentDepthClear !== depth ) {
 
-					if ( currentReversed ) {
+					if ( reversed ) {
 
 						depth = 1 - depth;
 
@@ -233,7 +233,7 @@ function WebGLState( gl, extensions ) {
 				currentDepthMask = null;
 				currentDepthFunc = null;
 				currentDepthClear = null;
-				currentReversed = false;
+				reversed = false;
 
 			}
 
@@ -980,7 +980,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.compressedTexImage2D( ...arguments );
+			gl.compressedTexImage2D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -994,7 +994,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.compressedTexImage3D( ...arguments );
+			gl.compressedTexImage3D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1008,7 +1008,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.texSubImage2D( ...arguments );
+			gl.texSubImage2D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1022,7 +1022,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.texSubImage3D( ...arguments );
+			gl.texSubImage3D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1036,7 +1036,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.compressedTexSubImage2D( ...arguments );
+			gl.compressedTexSubImage2D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1050,7 +1050,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.compressedTexSubImage3D( ...arguments );
+			gl.compressedTexSubImage3D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1064,7 +1064,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.texStorage2D( ...arguments );
+			gl.texStorage2D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1078,7 +1078,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.texStorage3D( ...arguments );
+			gl.texStorage3D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1092,7 +1092,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.texImage2D( ...arguments );
+			gl.texImage2D.apply( gl, arguments );
 
 		} catch ( error ) {
 
@@ -1106,7 +1106,7 @@ function WebGLState( gl, extensions ) {
 
 		try {
 
-			gl.texImage3D( ...arguments );
+			gl.texImage3D.apply( gl, arguments );
 
 		} catch ( error ) {
 
