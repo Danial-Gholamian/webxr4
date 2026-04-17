@@ -739,30 +739,50 @@ window.histogramRef = histogram
 // ========================
 
 const guideVRBtn = createCapsuleLabel("Guide", {
+  selectedColor: "#C41E3A",
   fontSize: 40,
   color: 0x1f3a5f,
   hoverColor: 0x2f5f9f,
   onClick: () => {
-    console.log("Guide button clicked");
+    const isOpen = userGuidePanel.visible;
+    const mode = userGuidePanel.userData.mode;
 
-    userGuidePanel.visible = true;
-    userGuidePanel.userData.mode = "GUIDE";
+    if (isOpen && mode === "GUIDE") {
+      userGuidePanel.visible = false;
+    } else {
+      userGuidePanel.visible = true;
+      userGuidePanel.userData.mode = "GUIDE";
 
-    userGuidePanel.userData.questionPanel.group.visible = false;
+      userGuidePanel.userData.questionPanel.group.visible = false;
+      userGuidePanel.userData.textPlane.visible = true;
+      userGuidePanel.userData.videoMesh.visible = false;
+    }
+
+    updateVRButtonStates();
   }
 });
 
 const questionVRBtn = createCapsuleLabel("Questions", {
+  selectedColor: "#C41E3A",
   fontSize: 40,
   color: 0x1f3a5f,
   hoverColor: 0x2f5f9f,
   onClick: () => {
-    console.log("Questions button clicked");
+    const isOpen = userGuidePanel.visible;
+    const mode = userGuidePanel.userData.mode;
 
-    userGuidePanel.visible = true;
-    userGuidePanel.userData.mode = "QUESTIONS";
+    if (isOpen && mode === "QUESTIONS") {
+      userGuidePanel.visible = false;
+    } else {
+      userGuidePanel.visible = true;
+      userGuidePanel.userData.mode = "QUESTIONS";
 
-    userGuidePanel.userData.questionPanel.group.visible = true;
+      userGuidePanel.userData.questionPanel.group.visible = true;
+      userGuidePanel.userData.textPlane.visible = false;
+      userGuidePanel.userData.videoMesh.visible = false;
+    }
+
+    updateVRButtonStates();
   }
 });
 
@@ -785,6 +805,43 @@ cameraGroup.add(questionVRBtn);
   btn.scale.set(2, 2, 2);
   btn.rotation.y = -Math.PI / 2.95;
 });
+
+
+// STATE OF THE GUIDE AND QUESTION BUTTON
+guideVRBtn.userData.isSelected = false;
+questionVRBtn.userData.isSelected = false;
+
+function updateVRButtonStates() {
+  const isVisible = userGuidePanel.visible;
+  const mode = userGuidePanel.userData.mode;
+
+  const guideMesh = guideVRBtn.children[0];
+  const questionMesh = questionVRBtn.children[0];
+
+  // GUIDE BUTTON
+  const guideSelected = isVisible && mode === "GUIDE";
+  guideMesh.userData.isSelected = guideSelected;
+
+  guideMesh.userData.redraw(
+    guideSelected
+      ? guideMesh.userData.selectedColor
+      : guideMesh.userData.defaultColor
+  );
+
+  // QUESTION BUTTON
+  const questionSelected = isVisible && mode === "QUESTIONS";
+  questionMesh.userData.isSelected = questionSelected;
+
+  questionMesh.userData.redraw(
+    questionSelected
+      ? questionMesh.userData.selectedColor
+      : questionMesh.userData.defaultColor
+  );
+}
+
+
+// INTIALIZE THE QUESTIONS AND GUIDE BUTTON
+updateVRButtonStates();
 
 // Subscribe to controller temporal updates
 graphController.subscribeToTimeChanges(
@@ -1552,13 +1609,14 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     });
 
     handleBButtonInput(xrFrame, () => {
-      // Show the user guide panel
-      userGuidePanel.visible = !userGuidePanel.visible;
+      // // Show the user guide panel
+      // userGuidePanel.visible = !userGuidePanel.visible;
+      // updateVRButtonStates();
 
-      // This part ensures the video plays/pauses
-      if (userGuidePanel.onToggle) {
-        userGuidePanel.onToggle(userGuidePanel.visible);
-      }
+      // // This part ensures the video plays/pauses
+      // if (userGuidePanel.onToggle) {
+      //   userGuidePanel.onToggle(userGuidePanel.visible);
+      // }
     });
 
     handleYButtonInput(xrFrame, () => {

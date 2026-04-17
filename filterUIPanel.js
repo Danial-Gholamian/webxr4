@@ -306,6 +306,7 @@ console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeStrin
 const DEBUG = true;
 
 export function createCapsuleLabel(text, {
+  selectedColor = "#3366ff",
   fontSize = 72,
   color = "#222244",
   hoverColor = "#444488",
@@ -418,7 +419,7 @@ export function createCapsuleLabel(text, {
 
   mesh.userData.defaultColor = color;
   mesh.userData.hoverColor = hoverColor;
-  mesh.userData.selectedColor = "#3366ff";
+  mesh.userData.selectedColor = selectedColor;
   mesh.userData.isSelected = false;
   mesh.userData.redraw = drawCapsule;
 

@@ -37,6 +37,56 @@ export function createUserGuidePanel() {
     const canvasWidth = 1024;
     const canvasHeight = 1024;
 
+    // --- Video Setup ---
+    const video = document.createElement('video');
+    video.src = 'sample-15s.mp4';
+    video.loop = true;
+    video.muted = false;
+    video.playsInline = true;
+    video.crossOrigin = "anonymous";
+    video.load();
+
+    const videoTexture = new THREE.VideoTexture(video);
+    videoTexture.colorSpace = THREE.SRGBColorSpace;
+
+    const videoWindowHeight = 0.45;
+    const videoWindowWidth = videoWindowHeight * (16 / 9);
+    const videoGeo = new THREE.PlaneGeometry(videoWindowWidth, videoWindowHeight);
+    const videoMat = new THREE.MeshBasicMaterial({
+        map: videoTexture,
+        depthTest: false,
+        transparent: true
+    });
+    const videoMesh = new THREE.Mesh(videoGeo, videoMat);
+
+    videoMesh.renderOrder = 100;
+    videoMesh.position.set(0, 0.28, 0.02);
+    videoMesh.visible = false; // Start hidden
+    group.add(videoMesh);
+
+    // --- Text/Canvas Setup ---
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext('2d');
+
+    const textTexture = new THREE.CanvasTexture(canvas);
+    textTexture.colorSpace = THREE.SRGBColorSpace
+    const textPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(panelHeight * (canvasWidth / canvasHeight), panelHeight),
+        new THREE.MeshBasicMaterial({
+            map: textTexture,
+            transparent: true,
+            depthTest: false,
+            toneMapped: false
+        })
+    );
+
+    textPlane.renderOrder = 99;
+    group.add(textPlane);
+    group.userData.textPlane = textPlane;
+
+
     // QUESTION SETUP
     const questionPanel = new QuestionPanel();
     questionPanel.group.visible = false;
@@ -96,54 +146,6 @@ export function createUserGuidePanel() {
             }
         });
     });
-
-    // --- Video Setup ---
-    const video = document.createElement('video');
-    video.src = 'sample-15s.mp4';
-    video.loop = true;
-    video.muted = false;
-    video.playsInline = true;
-    video.crossOrigin = "anonymous";
-    video.load();
-
-    const videoTexture = new THREE.VideoTexture(video);
-    videoTexture.colorSpace = THREE.SRGBColorSpace;
-
-    const videoWindowHeight = 0.45;
-    const videoWindowWidth = videoWindowHeight * (16 / 9);
-    const videoGeo = new THREE.PlaneGeometry(videoWindowWidth, videoWindowHeight);
-    const videoMat = new THREE.MeshBasicMaterial({
-        map: videoTexture,
-        depthTest: false,
-        transparent: true
-    });
-    const videoMesh = new THREE.Mesh(videoGeo, videoMat);
-
-    videoMesh.renderOrder = 100;
-    videoMesh.position.set(0, 0.28, 0.02);
-    videoMesh.visible = false; // Start hidden
-    group.add(videoMesh);
-
-    // --- Text/Canvas Setup ---
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-    const ctx = canvas.getContext('2d');
-
-    const textTexture = new THREE.CanvasTexture(canvas);
-    textTexture.colorSpace = THREE.SRGBColorSpace
-    const textPlane = new THREE.Mesh(
-        new THREE.PlaneGeometry(panelHeight * (canvasWidth / canvasHeight), panelHeight),
-        new THREE.MeshBasicMaterial({
-            map: textTexture,
-            transparent: true,
-            depthTest: false,
-            toneMapped: false
-        })
-    );
-
-    textPlane.renderOrder = 99;
-    group.add(textPlane);
 
     // --- Storage & Callbacks ---
     group.userData.video = video;
