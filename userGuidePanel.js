@@ -97,47 +97,41 @@ export function createUserGuidePanel() {
     group.userData.mode = 'GUIDE';
     questionPanel.group.userData.parentPanel = group;
 
-    // QUESTION BUTTON
-    const questionBtn = createCapsuleLabel("Questions", {
-        fontSize: 35,
+    // PREVIOUS PAGE BUTTON
+    const prevBtn = createCapsuleLabel("◀", {
+        fontSize: 40,
         color: BUTTON_COLOR,
         hoverColor: BUTTON_HOVER,
         onClick: () => {
-            console.log("Switch to Questions");
-
-            group.userData.mode = "QUESTIONS";
-            group.userData.questionPanel.group.visible = true;
-
-            // hide guide content
-            textPlane.visible = false;
-            videoMesh.visible = false;
-            group.userData.texture.needsUpdate = false;
-            questionPanel.group.visible = true;
+            if (group.userData.mode === "GUIDE") {
+                prevGuidePage(group);
+            } else {
+                group.userData.questionPanel.prevQuestion();
+            }
         }
     });
 
-    questionBtn.position.set(0.4, -0.5, 0.02);
-    group.add(questionBtn);
+    prevBtn.position.set(-0.4, -0.5, 0.025);
+    group.add(prevBtn);
 
-    // BACK TO GUIDE BUTTON
-    const backBtn = createCapsuleLabel("Guide", {
-        fontSize: 35,
+    // NEXT PAGE BUTTON
+    const nextBtn = createCapsuleLabel("▶", {
+        fontSize: 40,
         color: BUTTON_COLOR,
         hoverColor: BUTTON_HOVER,
         onClick: () => {
-            group.userData.mode = "GUIDE";
-
-            group.userData.questionPanel.group.visible = false;
-
-            textPlane.visible = true;
-            videoMesh.visible = false;
+            if (group.userData.mode === "GUIDE") {
+                nextGuidePage(group);
+            } else {
+                group.userData.questionPanel.nextQuestion();
+            }
         }
     });
 
-    backBtn.position.set(-0.4, -0.5, 0.02);
-    group.add(backBtn);
+    nextBtn.position.set(0.4, -0.5, 0.025);
+    group.add(nextBtn);
 
-    [backBtn, questionBtn].forEach(btn => {
+    [nextBtn, prevBtn].forEach(btn => {
         btn.traverse(obj => {
             if (obj.isMesh && obj.material) {
                 obj.material.depthTest = false;
@@ -146,6 +140,56 @@ export function createUserGuidePanel() {
             }
         });
     });
+
+    // // QUESTION BUTTON
+    // const questionBtn = createCapsuleLabel("Questions", {
+    //     fontSize: 35,
+    //     color: BUTTON_COLOR,
+    //     hoverColor: BUTTON_HOVER,
+    //     onClick: () => {
+    //         console.log("Switch to Questions");
+
+    //         group.userData.mode = "QUESTIONS";
+    //         group.userData.questionPanel.group.visible = true;
+
+    //         // hide guide content
+    //         textPlane.visible = false;
+    //         videoMesh.visible = false;
+    //         group.userData.texture.needsUpdate = false;
+    //         questionPanel.group.visible = true;
+    //     }
+    // });
+
+    // questionBtn.position.set(0.4, -0.5, 0.02);
+    // group.add(questionBtn);
+
+    // // BACK TO GUIDE BUTTON
+    // const backBtn = createCapsuleLabel("Guide", {
+    //     fontSize: 35,
+    //     color: BUTTON_COLOR,
+    //     hoverColor: BUTTON_HOVER,
+    //     onClick: () => {
+    //         group.userData.mode = "GUIDE";
+
+    //         group.userData.questionPanel.group.visible = false;
+
+    //         textPlane.visible = true;
+    //         videoMesh.visible = false;
+    //     }
+    // });
+
+    // backBtn.position.set(-0.4, -0.5, 0.02);
+    // group.add(backBtn);
+
+    // [backBtn, questionBtn].forEach(btn => {
+    //     btn.traverse(obj => {
+    //         if (obj.isMesh && obj.material) {
+    //             obj.material.depthTest = false;
+    //             obj.material.depthWrite = false;
+    //             obj.renderOrder = 999;
+    //         }
+    //     });
+    // });
 
     // --- Storage & Callbacks ---
     group.userData.video = video;

@@ -1189,8 +1189,8 @@ renderer.xr.addEventListener('sessionstart', () => {
   Graph.enablePointerInteraction(false);
   inVR = true;
 
-  // Show guide panel when starting the tool
-  userGuidePanel.visible = true
+  // // Show guide panel when starting the tool
+  // userGuidePanel.visible = true
 
   cameraGroup.position.set(0, 3.6, 230);  // Initial spawn position
   cameraGroup.position.y += 22.2;
@@ -1639,23 +1639,23 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     })
 
     handleLeftStickButton(xrFrame, () => {
-      if (!userGuidePanel.visible) return;
+      // if (!userGuidePanel.visible) return;
 
-      if (userGuidePanel.userData.mode === "GUIDE") {
-        prevGuidePage(userGuidePanel);
-      } else {
-        userGuidePanel.userData.questionPanel.prevQuestion();
-      }
+      // if (userGuidePanel.userData.mode === "GUIDE") {
+      //   prevGuidePage(userGuidePanel);
+      // } else {
+      //   userGuidePanel.userData.questionPanel.prevQuestion();
+      // }
     });
 
     handleRightStickButton(xrFrame, () => {
-      if (!userGuidePanel.visible) return;
+      // if (!userGuidePanel.visible) return;
 
-      if (userGuidePanel.userData.mode === "GUIDE") {
-        nextGuidePage(userGuidePanel);
-      } else {
-        userGuidePanel.userData.questionPanel.nextQuestion();
-      }
+      // if (userGuidePanel.userData.mode === "GUIDE") {
+      //   nextGuidePage(userGuidePanel);
+      // } else {
+      //   userGuidePanel.userData.questionPanel.nextQuestion();
+      // }
     });
 
     if (!periodStack?.group?.visible) {
