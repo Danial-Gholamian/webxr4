@@ -743,15 +743,12 @@ const guideVRBtn = createCapsuleLabel("Guide", {
   color: 0x1f3a5f,
   hoverColor: 0x2f5f9f,
   onClick: () => {
+    console.log("Guide button clicked");
+
     userGuidePanel.visible = true;
     userGuidePanel.userData.mode = "GUIDE";
 
     userGuidePanel.userData.questionPanel.group.visible = false;
-
-    // restore guide content
-    userGuidePanel.children.forEach(child => {
-      if (child.name !== "QuestionPanel") child.visible = true;
-    });
   }
 });
 
@@ -760,24 +757,34 @@ const questionVRBtn = createCapsuleLabel("Questions", {
   color: 0x1f3a5f,
   hoverColor: 0x2f5f9f,
   onClick: () => {
+    console.log("Questions button clicked");
+
     userGuidePanel.visible = true;
     userGuidePanel.userData.mode = "QUESTIONS";
 
     userGuidePanel.userData.questionPanel.group.visible = true;
-
-    // hide guide content
-    userGuidePanel.children.forEach(child => {
-      if (child.name !== "QuestionPanel") child.visible = false;
-    });
   }
 });
 
 
-guideVRBtn.position.set(-0.2, -0.25, -0.6);
-questionVRBtn.position.set(0.2, -0.25, -0.6);
+guideVRBtn.position.set(2.8, 0.3, -3.3);
+questionVRBtn.position.set(2.8, -0.1, -3.3);
 
 cameraGroup.add(guideVRBtn);
 cameraGroup.add(questionVRBtn);
+
+[guideVRBtn, questionVRBtn].forEach(btn => {
+  btn.traverse(obj => {
+    if (obj.isMesh && obj.material) {
+      obj.material.depthTest = false;
+      obj.material.depthWrite = false;
+      obj.renderOrder = 999;
+    }
+  });
+
+  btn.scale.set(2, 2, 2);
+  btn.rotation.y = -Math.PI / 2.95;
+});
 
 // Subscribe to controller temporal updates
 graphController.subscribeToTimeChanges(

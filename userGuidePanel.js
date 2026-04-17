@@ -87,6 +87,16 @@ export function createUserGuidePanel() {
     backBtn.position.set(-0.4, -0.5, 0.02);
     group.add(backBtn);
 
+    [backBtn, questionBtn].forEach(btn => {
+        btn.traverse(obj => {
+            if (obj.isMesh && obj.material) {
+                obj.material.depthTest = false;
+                obj.material.depthWrite = false;
+                obj.renderOrder = 999;
+            }
+        });
+    });
+
     // --- Video Setup ---
     const video = document.createElement('video');
     video.src = 'sample-15s.mp4';
