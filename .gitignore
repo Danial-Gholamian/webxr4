@@ -1,3 +1,4 @@
 node_modules/
 localhost-key.pem
-localhost.pem
+localhost.pemnode_modules/
+.vite/
