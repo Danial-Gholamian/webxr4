@@ -22,21 +22,34 @@ export function calculateInsights(nodes, links, currentSelection = { type: 'NONE
 
   const sortedGlobalNodes = [...globalDegreeMap.entries()].sort((a, b) => b[1] - a[1]);
   
+
+
   // 2. Count degrees (interactions) in the CURRENT link set
   links.forEach(l => {
-      const s = l.source.id || l.source;
-      const t = l.target.id || l.target;
-      
-      // Node degrees
-      degreeMap.set(s, (degreeMap.get(s) || 0) + 1);
-      degreeMap.set(t, (degreeMap.get(t) || 0) + 1);
+    const s = l.source.id || l.source;
+    const t = l.target.id || l.target;
+    
+    // Individual Node degrees ALWAYS count both (since they are unique nodes)
+    degreeMap.set(s, (degreeMap.get(s) || 0) + 1);
+    degreeMap.set(t, (degreeMap.get(t) || 0) + 1);
 
-      // Group Activity (Count both sides of the link)
-      const sGroup = nodeLookup.get(s)?.group;
-      const tGroup = nodeLookup.get(t)?.group;
+    const sGroup = nodeLookup.get(s)?.group;
+    const tGroup = nodeLookup.get(t)?.group;
 
-      if (sGroup) groupActivity.set(sGroup, (groupActivity.get(sGroup) || 0) + 1);
-      if (tGroup) groupActivity.set(tGroup, (groupActivity.get(tGroup) || 0) + 1);
+    if (sGroup && tGroup) {
+      if (sGroup === tGroup) {
+        // INTRA: Both nodes in same group. Count the interaction ONCE.
+        groupActivity.set(sGroup, (groupActivity.get(sGroup) || 0) + 1);
+      } else {
+        // INTER: Nodes in different groups. Count once for EACH group.
+        groupActivity.set(sGroup, (groupActivity.get(sGroup) || 0) + 1);
+        groupActivity.set(tGroup, (groupActivity.get(tGroup) || 0) + 1);
+      }
+    } else if (sGroup || tGroup) {
+      // Fallback: if only one node has a valid group
+      const validGroup = sGroup || tGroup;
+      groupActivity.set(validGroup, (groupActivity.get(validGroup) || 0) + 1);
+    }
   });
 
   const sortedNodes = [...degreeMap.entries()].sort((a, b) => b[1] - a[1]);
