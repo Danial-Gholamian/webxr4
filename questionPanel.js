@@ -194,6 +194,16 @@ export class QuestionPanel {
             canvas.width / 2,
             canvas.height - 60
         );
+
+        // -------------------------
+        // NAV ARROWS
+        // -------------------------
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 70px Arial';
+        ctx.textAlign = 'center';
+
+        ctx.fillText("◀", 120, canvas.height - 120);
+        ctx.fillText("▶", canvas.width - 120, canvas.height - 120);
     }
 
     _onBack() {

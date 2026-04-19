@@ -29,6 +29,13 @@ export class InsightPanel {
         );
         this.group.add(bg);
 
+        bg.name = "uiPanelBackground";
+        bg.userData = {
+            absorbsOnly: true,
+            isUIPanel: true,
+            noHaptics: true
+        };
+
         // 2. White Border for definition
         const edges = new THREE.EdgesGeometry(bg.geometry);
         const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true }));
@@ -72,6 +79,8 @@ export class InsightPanel {
             if (obj.material) {
                 obj.material.depthTest = false;
                 obj.material.depthWrite = false;
+                obj.userData.absorbsOnly = true; 
+                obj.userData.noHaptics = true;
             }
         });
 
@@ -90,7 +99,7 @@ export class InsightPanel {
 
         // 1. Clear existing dots
         // this.rowGroup.clear();
-        this.rightTextGroup.position.x = 0.1; 
+        this.rightTextGroup.position.x = 0.1;
         this.leftTextGroup.visible = true; // Make sure left is visible
 
         // 2. Generate Node Text (Left)
@@ -112,7 +121,7 @@ export class InsightPanel {
         });
 
         // --- SPACE BETWEEN SECTIONS ---
-        y -= SECTION_GAP; 
+        y -= SECTION_GAP;
 
         // --- LOW DEGREE SECTION ---
         const quietHeader = this._createText("LOW DEGREE NODES", SUB_HEADING_FONT_SIZE, y, 0xffffff);

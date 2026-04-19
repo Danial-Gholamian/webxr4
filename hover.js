@@ -169,13 +169,14 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     });
     cacheNeedsUpdate = false;
   }
-  interactables.push(...nodeMeshesCache);
+  const graphNodes = [...nodeMeshesCache];
 
   const panelsToCheck = [
     graphScene.getObjectByName('FilterUIPanel'),
     cameraGroup.getObjectByName('FilterUIPanel'),
     cameraGroup.getObjectByName('TemporalDrillPanel'),
     cameraGroup.getObjectByName('UserGuidePanel'),
+    cameraGroup.getObjectByName('InsightLegendPanel'),
   ];
 
   panelsToCheck.forEach(panel => {
@@ -190,9 +191,23 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     }
   });
 
+  const guidePanel = cameraGroup.getObjectByName('UserGuidePanel');
+
+  const panelOpen = guidePanel && guidePanel.visible;
+
+  // ONLY allow graph interaction if panel is NOT open
+  if (!panelOpen) {
+    interactables.push(...graphNodes);
+  }
+
   const intersections = raycaster.intersectObjects(interactables, false);
 
-  const triggerHaptic = () => {
+  const triggerHaptic = (hit) => {
+  const currentHit = intersections[0]?.object;
+
+  // Block haptics for insight panel
+  if (currentHit?.userData?.noHaptics) return;
+
     const gp = controller.userData.inputSource?.gamepad;
     if (gp?.hapticActuators?.[0]?.pulse) gp.hapticActuators[0].pulse(0.8, 40);
   };
@@ -229,6 +244,8 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
     // CASE B: UI BACKGROUND (Swallow ray but don't highlight)
     if (hit.name === "uiPanelBackground" || hit.userData.absorbsOnly) {
+      if (line) line.scale.z = dist;
+
       // Clear any previously hovered button/node but keep laser shortened
       if (controller.userData.lastHoveredButton) {
         const btn = controller.userData.lastHoveredButton;

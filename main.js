@@ -1262,7 +1262,7 @@ export function applyRemotePeriodStackToggle(visible, context = {}) {
 // ========================
 // Animation Loop
 // ========================
-const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate);
+const pollGraphSwitchButtons = setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate, cameraGroup);
 setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUpdate, scene, cameraGroup, histogram);
 // precomputePeriodData();
 export const AVATAR_UPDATE_INTERVAL = 16;

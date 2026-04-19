@@ -35,8 +35,9 @@ function setupController(controller, index, renderer, cameraGroup) {
   const laser = new THREE.Line(laserGeometry, laserMaterial);
   laser.name = 'laser';
   laser.scale.z = laserDistance;
-  console.log(`Laser lenght ${laserDistance}`)
+  console.log(`Laser length ${laserDistance}`)
   laser.userData.isLaser = true;
+  laser.renderOrder = 2000; // higher than panel
   // comment
   controller.add(laser);
   controller.userData.laser = laser;
@@ -201,6 +202,14 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
 
       return; // STOP HERE. Don't click through the UI to the graph behind it.
     }
+
+    // BLOCK GRAPH SELECTION WHEN PANEL IS OPEN
+    const guidePanel = cameraGroup.getObjectByName('UserGuidePanel');
+
+    if (guidePanel && guidePanel.visible) {
+      return;
+    }
+
     // ============================================================
     // 3. GRAPH SELECTION (Fallback)
     // ============================================================
@@ -237,7 +246,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
 
 
 
-function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate) {
+function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGraphUpdate, cameraGroup) {
   function checkButtonPress(controller, handedness) {
     const inputSource = controller.userData.inputSource;
 
@@ -249,7 +258,11 @@ function setupGraphSwitchButtons(controller1, controller2, GraphRef, requestGrap
     if (!gamepad.buttons || gamepad.buttons.length === 0) {
       return;
     }
+    const guidePanel = cameraGroup.getObjectByName('UserGuidePanel');
 
+    if (guidePanel && guidePanel.visible) {
+      return; // ALWAYS block graph here if guide visible
+    }
     const buttonIndex = 0; // A (right) or X (left)
     const button = gamepad.buttons[buttonIndex];
 

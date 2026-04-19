@@ -30,10 +30,20 @@ export const QUESTIONS = [
     {
         question: "Reset the graph and set the interaction filter to inter-group. Reduce the temporal window to a single timestamp and explore the timeline. During which interval does interaction between teachers and students drop significantly (indicating lunch break)?",
         answers: [
-            "Interval 600 - 900", // Correct Answer
-            "Interval 4000 - 4300", // Correct Answer
-            "Both intervals",
+            "Interval 600 - 900",
+            "Interval 5000 - 5300",
+            "Both intervals", // Correct Answer
             "No clear interval"
+        ]
+    },
+
+    {
+        question: "Compare the following two time intervals: Interval A (600–900) and Interval B (5000–5300). Which interval shows higher interaction activity?",
+        answers: [
+            "Interval A",
+            "Interval B",
+            "Both intervals show similar activity",
+            "Cannot determine"
         ]
     }
 ];

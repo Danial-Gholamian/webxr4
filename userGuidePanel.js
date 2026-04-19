@@ -97,49 +97,71 @@ export function createUserGuidePanel() {
     group.userData.mode = 'GUIDE';
     questionPanel.group.userData.parentPanel = group;
 
-    // PREVIOUS PAGE BUTTON
-    const prevBtn = createCapsuleLabel("◀", {
-        fontSize: 40,
-        color: BUTTON_COLOR,
-        hoverColor: BUTTON_HOVER,
-        onClick: () => {
-            if (group.userData.mode === "GUIDE") {
-                prevGuidePage(group);
-            } else {
-                group.userData.questionPanel.prevQuestion();
-            }
+
+    const prevHitbox = createArrowHitbox(-0.4, -0.5, 0.25, 0.25, () => {
+        if (group.userData.mode === "GUIDE") {
+            prevGuidePage(group);
+        } else {
+            group.userData.questionPanel.prevQuestion();
         }
     });
 
-    prevBtn.position.set(-0.4, -0.5, 0.025);
-    group.add(prevBtn);
-
-    // NEXT PAGE BUTTON
-    const nextBtn = createCapsuleLabel("▶", {
-        fontSize: 40,
-        color: BUTTON_COLOR,
-        hoverColor: BUTTON_HOVER,
-        onClick: () => {
-            if (group.userData.mode === "GUIDE") {
-                nextGuidePage(group);
-            } else {
-                group.userData.questionPanel.nextQuestion();
-            }
+    const nextHitbox = createArrowHitbox(0.4, -0.5, 0.25, 0.25, () => {
+        if (group.userData.mode === "GUIDE") {
+            nextGuidePage(group);
+        } else {
+            group.userData.questionPanel.nextQuestion();
         }
     });
 
-    nextBtn.position.set(0.4, -0.5, 0.025);
-    group.add(nextBtn);
+    group.add(prevHitbox);
+    group.add(nextHitbox);
 
-    [nextBtn, prevBtn].forEach(btn => {
-        btn.traverse(obj => {
-            if (obj.isMesh && obj.material) {
-                obj.material.depthTest = false;
-                obj.material.depthWrite = false;
-                obj.renderOrder = 999;
-            }
-        });
-    });
+
+
+    // // PREVIOUS PAGE BUTTON
+    // const prevBtn = createCapsuleLabel("◀", {
+    //     fontSize: 40,
+    //     color: BUTTON_COLOR,
+    //     hoverColor: BUTTON_HOVER,
+    //     onClick: () => {
+    //         if (group.userData.mode === "GUIDE") {
+    //             prevGuidePage(group);
+    //         } else {
+    //             group.userData.questionPanel.prevQuestion();
+    //         }
+    //     }
+    // });
+
+    // prevBtn.position.set(-0.4, -0.5, 0.025);
+    // group.add(prevBtn);
+
+    // // NEXT PAGE BUTTON
+    // const nextBtn = createCapsuleLabel("▶", {
+    //     fontSize: 40,
+    //     color: BUTTON_COLOR,
+    //     hoverColor: BUTTON_HOVER,
+    //     onClick: () => {
+    //         if (group.userData.mode === "GUIDE") {
+    //             nextGuidePage(group);
+    //         } else {
+    //             group.userData.questionPanel.nextQuestion();
+    //         }
+    //     }
+    // });
+
+    // nextBtn.position.set(0.4, -0.5, 0.025);
+    // group.add(nextBtn);
+
+    // [nextBtn, prevBtn].forEach(btn => {
+    //     btn.traverse(obj => {
+    //         if (obj.isMesh && obj.material) {
+    //             obj.material.depthTest = false;
+    //             obj.material.depthWrite = false;
+    //             obj.renderOrder = 999;
+    //         }
+    //     });
+    // });
 
     // // QUESTION BUTTON
     // const questionBtn = createCapsuleLabel("Questions", {
@@ -287,10 +309,24 @@ function drawGuidePage(ctx, canvas, page) {
     ctx.font = '28px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(
-        `Page ${page + 1} / ${totalPages}  —  Use Stick Click to flip`,
+        `Page ${page + 1} / ${totalPages}`,
         canvas.width / 2,
         canvas.height - 60
     );
+
+
+    // -------------------------
+    // NAV ARROWS
+    // -------------------------
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 70px Arial';
+    ctx.textAlign = 'center';
+
+    // LEFT arrow
+    ctx.fillText("◀", 120, canvas.height - 120);
+
+    // RIGHT arrow
+    ctx.fillText("▶", canvas.width - 120, canvas.height - 120);
 }
 
 export function nextGuidePage(panel) {
@@ -318,4 +354,25 @@ function switchToQuestions() {
 function switchToGuide() {
     guideMode = "GUIDE";
     questPanel.group.visible = false;
+}
+
+function createArrowHitbox(x, y, width = 0.2, height = 0.2, onClick) {
+    const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, height),
+        new THREE.MeshBasicMaterial({
+            transparent: true,
+            opacity: 0 // 🔥 invisible
+        })
+    );
+
+    mesh.position.set(x, y, 0.05); // slightly in front
+    mesh.name = "capsuleHitbox";
+
+    mesh.userData = {
+        interactive: true,
+        onClick,
+        target: mesh // required by your hover system
+    };
+
+    return mesh;
 }

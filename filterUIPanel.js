@@ -516,18 +516,18 @@ function layoutVertical(container, startY, spacing) {
 }
 
 export function createSelectionRing() {
-    const geometry = new THREE.RingGeometry(1.2, 1.6, 32);
+  const geometry = new THREE.RingGeometry(1.2, 1.6, 32);
 
-    const material = new THREE.MeshBasicMaterial({
-        color: 0x00ffff,  
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.9
-    });
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x00ffff,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.9
+  });
 
-    const ring = new THREE.Mesh(geometry, material);
-    ring.userData.isRemoteRing = true;
+  const ring = new THREE.Mesh(geometry, material);
+  ring.userData.isRemoteRing = true;
 
-    ring.scale.set(3, 3, 3)
-    return ring;
+  ring.scale.set(3, 3, 3)
+  return ring;
 }
