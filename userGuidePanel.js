@@ -2,28 +2,66 @@ import * as THREE from 'three';
 import { QuestionPanel } from './questionPanel';
 import { createCapsuleLabel } from './filterUIPanel';
 
+// Load all the images
+const loader = new THREE.TextureLoader();
+const guideImages = {
+    "edge-mode.jpeg": loader.load(' /webxr4/guide-images/edge-mode.jpeg'),
+    "group-filter-a.jpeg": loader.load(' /webxr4/guide-images/group-filter-a.jpeg'),
+    "movement.jpeg": loader.load(' /webxr4/guide-images/movement.jpeg'),
+    "move-window.jpeg": loader.load(' /webxr4/guide-images/move-window.jpeg'),
+    "reset-filter.jpeg": loader.load(' /webxr4/guide-images/reset-filter.jpeg'),
+    "rotate.jpeg": loader.load(' /webxr4/guide-images/rotate.jpeg'),
+    "trigger.jpeg": loader.load(' /webxr4/guide-images/trigger.jpeg'),
+    "trigger-select.jpeg": loader.load(' /webxr4/guide-images/trigger-select.jpeg')
+};
+
+
 const ITEMS_PER_PAGE = 4;
 const GUIDE_ITEMS = [
-    { text: "Right Stick → Move" },
-    { text: "Left Stick → Rotate View" },
-    { text: "Grip (Squeeze) → Rotate Graph" },
-    { text: "Trigger → Select nodes, groups, hierarchy, or time" },
-    { text: "Right Stick Press → Next Time Snapshot" },
-    { text: "Left Stick Press → Previous Time Snapshot" },
-    { text: "A → Toggle Filter Panel (select groups)" },
-    { text: "Y → Toggle Drill-Down Panel (zoom in / out of dataset)" },
-    { text: "X → Reset Graph to Default View (full aggregation)" },
-    { text: "B → Toggle User Guide Panel" }
+    {
+        type: "image",
+        title: "Switch edge mode",
+        image: "edge-mode.jpeg"
+    },
+    {
+        type: "image",
+        title: "Filter groups",
+        image: "group-filter-a.jpeg"
+    },
+    {
+        type: "image",
+        title: "Move & Rotate",
+        image: "movement.jpeg"
+    },
+    {
+        type: "image",
+        title: "Resize time window",
+        image: "move-window.jpeg"
+    },
+    {
+        type: "image",
+        title: "Reset view",
+        image: "reset-filter.jpeg"
+    },
+    {
+        type: "image",
+        title: "Rotate graph",
+        image: "rotate.jpeg"
+    },
+    {
+        type: "image",
+        title: "Trigger interaction",
+        image: "trigger.jpeg"
+    },
+    {
+        type: "image",
+        title: "Select with beam",
+        image: "trigger-select.jpeg"
+    }
 ];
 
-
-const BUTTON_COLOR = 0x1f3a5f;
-const BUTTON_HOVER = 0x2f5f9f;
-
-
-
 let currentPage = 0;
-let totalPages = Math.ceil(GUIDE_ITEMS.length / ITEMS_PER_PAGE);
+let totalPages = GUIDE_ITEMS.length;
 
 export function createUserGuidePanel() {
     const group = new THREE.Group();
@@ -118,101 +156,6 @@ export function createUserGuidePanel() {
     group.add(nextHitbox);
 
 
-
-    // // PREVIOUS PAGE BUTTON
-    // const prevBtn = createCapsuleLabel("◀", {
-    //     fontSize: 40,
-    //     color: BUTTON_COLOR,
-    //     hoverColor: BUTTON_HOVER,
-    //     onClick: () => {
-    //         if (group.userData.mode === "GUIDE") {
-    //             prevGuidePage(group);
-    //         } else {
-    //             group.userData.questionPanel.prevQuestion();
-    //         }
-    //     }
-    // });
-
-    // prevBtn.position.set(-0.4, -0.5, 0.025);
-    // group.add(prevBtn);
-
-    // // NEXT PAGE BUTTON
-    // const nextBtn = createCapsuleLabel("▶", {
-    //     fontSize: 40,
-    //     color: BUTTON_COLOR,
-    //     hoverColor: BUTTON_HOVER,
-    //     onClick: () => {
-    //         if (group.userData.mode === "GUIDE") {
-    //             nextGuidePage(group);
-    //         } else {
-    //             group.userData.questionPanel.nextQuestion();
-    //         }
-    //     }
-    // });
-
-    // nextBtn.position.set(0.4, -0.5, 0.025);
-    // group.add(nextBtn);
-
-    // [nextBtn, prevBtn].forEach(btn => {
-    //     btn.traverse(obj => {
-    //         if (obj.isMesh && obj.material) {
-    //             obj.material.depthTest = false;
-    //             obj.material.depthWrite = false;
-    //             obj.renderOrder = 999;
-    //         }
-    //     });
-    // });
-
-    // // QUESTION BUTTON
-    // const questionBtn = createCapsuleLabel("Questions", {
-    //     fontSize: 35,
-    //     color: BUTTON_COLOR,
-    //     hoverColor: BUTTON_HOVER,
-    //     onClick: () => {
-    //         console.log("Switch to Questions");
-
-    //         group.userData.mode = "QUESTIONS";
-    //         group.userData.questionPanel.group.visible = true;
-
-    //         // hide guide content
-    //         textPlane.visible = false;
-    //         videoMesh.visible = false;
-    //         group.userData.texture.needsUpdate = false;
-    //         questionPanel.group.visible = true;
-    //     }
-    // });
-
-    // questionBtn.position.set(0.4, -0.5, 0.02);
-    // group.add(questionBtn);
-
-    // // BACK TO GUIDE BUTTON
-    // const backBtn = createCapsuleLabel("Guide", {
-    //     fontSize: 35,
-    //     color: BUTTON_COLOR,
-    //     hoverColor: BUTTON_HOVER,
-    //     onClick: () => {
-    //         group.userData.mode = "GUIDE";
-
-    //         group.userData.questionPanel.group.visible = false;
-
-    //         textPlane.visible = true;
-    //         videoMesh.visible = false;
-    //     }
-    // });
-
-    // backBtn.position.set(-0.4, -0.5, 0.02);
-    // group.add(backBtn);
-
-    // [backBtn, questionBtn].forEach(btn => {
-    //     btn.traverse(obj => {
-    //         if (obj.isMesh && obj.material) {
-    //             obj.material.depthTest = false;
-    //             obj.material.depthWrite = false;
-    //             obj.renderOrder = 999;
-    //         }
-    //     });
-    // });
-
     // --- Storage & Callbacks ---
     group.userData.video = video;
     group.userData.videoMesh = videoMesh; // Store mesh reference
@@ -281,60 +224,122 @@ function drawGuidePage(ctx, canvas, page) {
     ctx.fillStyle = '#111111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Only draw the video border on Page 3
-    if (page === 2) {
-        ctx.strokeStyle = '#ffff00'; // Yellow border for Page 3
-        ctx.lineWidth = 5;
-        ctx.strokeRect(80, 50, canvas.width - 160, 420);
-    }
+    const item = GUIDE_ITEMS[page];
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 45px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('VR Controls Guide', canvas.width / 2, 520);
 
-    ctx.font = '38px Arial';
-    ctx.textAlign = 'left';
+    if (item.type === "image") {
 
-    const start = page * ITEMS_PER_PAGE;
-    const end = Math.min(start + ITEMS_PER_PAGE, GUIDE_ITEMS.length);
+        // --- DRAW IMAGE ---
+        const img = guideImages[item.image]?.image;
 
-    let y = 600;
-    for (let i = start; i < end; i++) {
-        ctx.fillText("• " + GUIDE_ITEMS[i].text, 100, y);
-        y += 85;
+        if (img) {
+            ctx.drawImage(img, 100, 50, canvas.width - 200, 500);
+        }
+
+        // --- TITLE ---
+        ctx.font = 'bold 45px Arial';
+        ctx.fillText(item.title, canvas.width / 2, 620);
+
+    } else if (item.type === "text") {
+
+        ctx.font = 'bold 45px Arial';
+        ctx.fillText('VR Controls Guide', canvas.width / 2, 150);
+
+        ctx.textAlign = 'left';
+        ctx.font = '38px Arial';
+
+        let y = 300;
+        item.items.forEach(text => {
+            ctx.fillText("• " + text, 120, y);
+            y += 80;
+        });
     }
 
+    // --- PAGE NUMBER ---
     ctx.fillStyle = '#aaaaaa';
     ctx.font = '28px Arial';
     ctx.textAlign = 'center';
+
     ctx.fillText(
-        `Page ${page + 1} / ${totalPages}`,
+        `Page ${page + 1} / ${GUIDE_ITEMS.length}`,
         canvas.width / 2,
         canvas.height - 60
     );
 
-
-    // -------------------------
-    // NAV ARROWS
-    // -------------------------
-    ctx.fillStyle = '#ffffff';
+    // --- ARROWS ---
     ctx.font = 'bold 70px Arial';
-    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
 
-    // LEFT arrow
     ctx.fillText("◀", 120, canvas.height - 120);
-
-    // RIGHT arrow
     ctx.fillText("▶", canvas.width - 120, canvas.height - 120);
+
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '26px Arial';
+    ctx.fillText("Use arrows to navigate", canvas.width / 2, canvas.height - 100);
 }
+
+// function drawGuidePage(ctx, canvas, page) {
+//     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+//     ctx.fillStyle = '#111111';
+//     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+//     // Only draw the video border on Page 3
+//     if (page === 2) {
+//         ctx.strokeStyle = '#ffff00'; // Yellow border for Page 3
+//         ctx.lineWidth = 5;
+//         ctx.strokeRect(80, 50, canvas.width - 160, 420);
+//     }
+
+//     ctx.fillStyle = '#ffffff';
+//     ctx.font = 'bold 45px Arial';
+//     ctx.textAlign = 'center';
+//     ctx.fillText('VR Controls Guide', canvas.width / 2, 520);
+
+//     ctx.font = '38px Arial';
+//     ctx.textAlign = 'left';
+
+//     const start = page * ITEMS_PER_PAGE;
+//     const end = Math.min(start + ITEMS_PER_PAGE, GUIDE_ITEMS.length);
+
+//     let y = 600;
+//     for (let i = start; i < end; i++) {
+//         ctx.fillText("• " + GUIDE_ITEMS[i].text, 100, y);
+//         y += 85;
+//     }
+
+//     ctx.fillStyle = '#aaaaaa';
+//     ctx.font = '28px Arial';
+//     ctx.textAlign = 'center';
+//     ctx.fillText(
+//         `Page ${page + 1} / ${totalPages}`,
+//         canvas.width / 2,
+//         canvas.height - 60
+//     );
+
+
+//     // -------------------------
+//     // NAV ARROWS
+//     // -------------------------
+//     ctx.fillStyle = '#ffffff';
+//     ctx.font = 'bold 70px Arial';
+//     ctx.textAlign = 'center';
+
+//     // LEFT arrow
+//     ctx.fillText("◀", 120, canvas.height - 120);
+
+//     // RIGHT arrow
+//     ctx.fillText("▶", canvas.width - 120, canvas.height - 120);
+// }
 
 export function nextGuidePage(panel) {
     currentPage = (currentPage + 1) % totalPages;
     const { canvas, ctx, texture } = panel.userData;
     drawGuidePage(ctx, canvas, currentPage);
     texture.needsUpdate = true;
-    updateVideoState(panel); // Sync video visibility
+    // updateVideoState(panel); // Sync video visibility
 }
 
 export function prevGuidePage(panel) {
@@ -342,7 +347,7 @@ export function prevGuidePage(panel) {
     const { canvas, ctx, texture } = panel.userData;
     drawGuidePage(ctx, canvas, currentPage);
     texture.needsUpdate = true;
-    updateVideoState(panel); // Sync video visibility
+    // updateVideoState(panel); // Sync video visibility
 }
 
 
