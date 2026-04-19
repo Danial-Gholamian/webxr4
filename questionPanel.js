@@ -26,7 +26,7 @@ export class QuestionPanel {
         const bgMat = new THREE.MeshBasicMaterial({
             color: 0x111111,
             transparent: true,
-            opacity: 0.9,
+            opacity: 0.2,
             depthTest: false,
             depthWrite: false
         });
@@ -121,7 +121,7 @@ export class QuestionPanel {
         // -------------------------
         // Background
         // -------------------------
-        ctx.fillStyle = 'rgba(17,17,17,0.95)';
+        ctx.fillStyle = 'rgba(17,17,17,0.45)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 

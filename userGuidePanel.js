@@ -166,7 +166,8 @@ export function createUserGuidePanel() {
     const bgGeo = new THREE.PlaneGeometry(panelHeight * (canvasWidth / canvasHeight), panelHeight);
     const bgMat = new THREE.MeshBasicMaterial({
         transparent: true,
-        opacity: 0.0,
+        opacity: 0.2,
+        color: 0x111111,
         depthTest: false
     });
 
@@ -221,7 +222,7 @@ function updateVideoState(panel) {
 function drawGuidePage(ctx, canvas, page) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = '#111111';
+    ctx.fillStyle = 'rgba(17,17,17,0.45)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const item = GUIDE_ITEMS[page];
