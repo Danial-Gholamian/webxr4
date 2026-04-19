@@ -57,7 +57,7 @@ setUsername(username)
 export const myUsername = username
 
 let stickHoldTimer = 0;
-const HOLD_THRESHOLD = 0.2; // Seconds before a click turns into a slide
+const HOLD_THRESHOLD = 1.0; // Seconds before a click turns into a slide
 const SLIDE_SPEED_BASE = 8;     // Very slow start for precision
 const SLIDE_SPEED_TIER_2 = 250;
 const SLIDE_SPEED_TIER_3 = 800;
@@ -1446,63 +1446,63 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-    // 2. Process the input
-    // Add these to your global variables at the top of main.js
-    let wasLeftSqueezePressed = false;
-    let wasRightSqueezePressed = false;
+    // ============================================================
+// HIGH-SENSITIVITY: One Click = One Step + Hold to Slide
+// ============================================================
+let isLeftSqueezing = false;
+let isRightSqueezing = false;
 
-    // ... inside renderer.setAnimationLoop, within if(inVR && xrFrame) block
+  // Direct Gamepad Polling (More sensitive than Event Listeners)
+  for (const source of xrFrame.session.inputSources) {
+    if (source.gamepad && source.handedness) {
+      // Button 1 is usually Squeeze on Quest/Index
+      const squeezeValue = source.gamepad.buttons[1]?.value || 0;
+      const pressed = squeezeValue > 0.1; // Trigger at 10% pressure
 
-    // 2. Process Squeeze Input
-    let shifted = false;
-    let direction = 0;
-    let slideAmount = 0;
+      if (source.handedness === 'left') isLeftSqueezing = pressed;
+      if (source.handedness === 'right') isRightSqueezing = pressed;
+    }
+  }
 
-    const isLeftSqueezing = controller1.userData.isSqueezing;
-    const isRightSqueezing = controller2.userData.isSqueezing;
+  let direction = 0;
+  if (isLeftSqueezing) direction = -1;
+  if (isRightSqueezing) direction = 1;
 
-    if (isLeftSqueezing || isRightSqueezing) {
-      direction = isLeftSqueezing ? -1 : 1;
+  if (isLeftSqueezing || isRightSqueezing) {
+    // Detect "Rising Edge" (New Press)
+    const isNewPress = (isLeftSqueezing && !wasLeftSqueezePressed) || 
+                      (isRightSqueezing && !wasRightSqueezePressed);
 
-      // --- CLICK DETECTION (Single Step) ---
-      // If this is the very first frame the button is down
-      if ((isLeftSqueezing && !wasLeftSqueezePressed) || (isRightSqueezing && !wasRightSqueezePressed)) {
-        slideAmount = 1; // Exactly 1 unit step
-        shifted = true;
-      }
-
-      stickHoldTimer += deltaTime;
-
-      // --- HOLD ACCELERATION ---
-      if (stickHoldTimer > HOLD_THRESHOLD) {
-        let currentSpeed = SLIDE_SPEED_BASE;
-
-        if (stickHoldTimer >= TIER_3_THRESHOLD) {
-          currentSpeed = SLIDE_SPEED_TIER_3;
-        } else if (stickHoldTimer >= TIER_2_THRESHOLD) {
-          currentSpeed = SLIDE_SPEED_TIER_2;
-        }
-
-        slideAmount = currentSpeed * deltaTime;
-        shifted = true;
-      }
-    } else {
-      // Released
-      if (stickHoldTimer > 0) {
-        Graph.d3ReheatSimulation?.();
-      }
-      stickHoldTimer = 0;
+    if (isNewPress) {
+      // THE INSTANT SHIFT
+      timelineManager.shift(direction, 1); 
+      updateTimeWindow();
+      
+      // Haptic Feedback to confirm the click
+      const activeController = isLeftSqueezing ? controller1 : controller2;
+      const gp = activeController.userData.inputSource?.gamepad;
+      gp?.hapticActuators?.[0]?.pulse(0.4, 50);
     }
 
-    // Save state for next frame's edge detection
-    wasLeftSqueezePressed = isLeftSqueezing;
-    wasRightSqueezePressed = isRightSqueezing;
+    // Handle Acceleration
+    stickHoldTimer += deltaTime;
+    if (stickHoldTimer > HOLD_THRESHOLD) {
+      let currentSpeed = SLIDE_SPEED_BASE;
+      if (stickHoldTimer >= TIER_3_THRESHOLD) currentSpeed = SLIDE_SPEED_TIER_3;
+      else if (stickHoldTimer >= TIER_2_THRESHOLD) currentSpeed = SLIDE_SPEED_TIER_2;
 
-    // 3. Apply the shift
-    if (shifted) {
-      timelineManager.shift(direction, slideAmount);
+      timelineManager.shift(direction, currentSpeed * deltaTime);
       updateTimeWindow();
     }
+  } else {
+    if (stickHoldTimer > 0) Graph.d3ReheatSimulation?.();
+    stickHoldTimer = 0;
+  }
+
+  // Update state trackers for next frame
+  wasLeftSqueezePressed = isLeftSqueezing;
+  wasRightSqueezePressed = isRightSqueezing;
+
 
 
     // Handle increase in window size
