@@ -734,23 +734,6 @@ cameraGroup.userData.histogram = histogram;
 window.histogramRef = histogram
 
 
-// COMBINE THE HISTOGRAM AND LIVE INSIGHT PANEL TOGETHERE
-const analyticsPanel = new THREE.Group();
-cameraGroup.add(analyticsPanel);
-
-
-analyticsPanel.position.set(0, -0.2, -1.5);
-
-function updateAnalyticsPanel() {
-  analyticsPanel.quaternion.copy(camera.quaternion);
-}
-
-analyticsPanel.add(insightPanel.getObject3D());
-
-const histogramObj = histogram.getObject3D();
-histogramObj.position.set(0, -0.2, 0); // BELOW insights
-analyticsPanel.add(histogramObj);
-
 // ========================
 // VR GUIDE / QUESTION BUTTONS
 // ========================
@@ -1299,6 +1282,9 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
   // rotation of the histogram towardst the user
   if (histogram) {
     histogram.updateFacing(camera);
+  }
+  if (histogram?.tooltip) {
+    histogram.tooltip.quaternion.copy(camera.quaternion);
   }
 
   sky.position.copy(camera.position);

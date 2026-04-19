@@ -39,6 +39,8 @@ export class HistogramGauge {
     this.group = new THREE.Group();
     this.binMeshes = [];
 
+    this.tooltip = null;
+
     this._buildHistogram(bins);
     this._buildBackground()
     this._buildHighlightWindow();
@@ -50,7 +52,7 @@ export class HistogramGauge {
     this.group.scale.set(1.3, 1.3, 1.3);
 
     // Position relative to cameraGroup (shoulder-docked)
-    this.group.position.set(2.8, 1, -3.3);
+    this.group.position.set(0, -0.15, -1.5);
 
     // Tilt the histogram toward the user
     // this.group.rotation.y = -Math.PI / 2.95;
@@ -107,19 +109,24 @@ export class HistogramGauge {
       const barMat = new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
       });
 
       const barGeom = new THREE.BoxGeometry(
-        binWidth * 0.8,
+        binWidth * 1,
         h,
         binDepth
       );
 
       const barMesh = new THREE.Mesh(barGeom, barMat);
 
-      // Store bin index for interaction mapping
-      barMesh.userData.binIndex = i;
+      // Store bin index for interaction mapping including tool tip
+      barMesh.userData = {
+        type: "histogramBar",
+        binIndex: i,
+        count: count,
+        parent: this
+      };
 
       // Position bars along X
       barMesh.position.x =
@@ -137,12 +144,49 @@ export class HistogramGauge {
       //   }
       // };
 
+      const edges = new THREE.EdgesGeometry(barGeom);
+
+      const outline = new THREE.LineSegments(
+        edges,
+        new THREE.LineBasicMaterial({
+          color: 0x000000, 
+          transparent: true,
+          opacity: 0.35
+        })
+      );
+
+      barMesh.add(outline);
+
       barsGroup.add(barMesh);
       this.binMeshes.push(barMesh);
     });
 
     this.group.add(barsGroup);
   }
+
+  createTooltip(text) {
+    const label = createCapsuleLabel(text, {
+      fontSize: 40,
+      color: 0x000000,
+      textColor: "#ffffff",
+      opacity: 0.85
+    });
+
+    label.renderOrder = 9999;
+
+    return label;
+  }
+
+
+  getBinRange(binIndex) {
+    const binSize = this.globalDuration / this.numBins;
+
+    const start = Math.floor(this.globalStart + binIndex * binSize);
+    const end = Math.floor(start + binSize);
+
+    return { start, end };
+  }
+
 
   /**
    * Build translucent highlight window.
@@ -401,7 +445,6 @@ export class HistogramGauge {
   updateFacing(camera) {
     this.group.quaternion.copy(camera.quaternion);
   }
-
 }
 
 // --- Histogram Helper ---

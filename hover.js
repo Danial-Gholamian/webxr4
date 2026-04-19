@@ -191,6 +191,19 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     }
   });
 
+  // ============================
+  // ADD HISTOGRAM TO RAYCAST
+  // ============================
+  const histogram = cameraGroup.userData.histogram;
+
+  if (histogram) {
+    histogram.group.traverse(obj => {
+      if (obj.userData?.type === "histogramBar") {
+        interactables.push(obj);
+      }
+    });
+  }
+
   const guidePanel = cameraGroup.getObjectByName('UserGuidePanel');
 
   const panelOpen = guidePanel && guidePanel.visible;
@@ -203,10 +216,10 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   const intersections = raycaster.intersectObjects(interactables, false);
 
   const triggerHaptic = (hit) => {
-  const currentHit = intersections[0]?.object;
+    const currentHit = intersections[0]?.object;
 
-  // Block haptics for insight panel
-  if (currentHit?.userData?.noHaptics) return;
+    // Block haptics for insight panel
+    if (currentHit?.userData?.noHaptics) return;
 
     const gp = controller.userData.inputSource?.gamepad;
     if (gp?.hapticActuators?.[0]?.pulse) gp.hapticActuators[0].pulse(0.8, 40);
@@ -214,7 +227,8 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
   // --- 4. INTERSECTION LOGIC ---
   if (intersections.length > 0) {
-    const hit = intersections[0].object;
+    const intersection = intersections[0];
+    const hit = intersection.object;
     const dist = intersections[0].distance;
 
     // Correctly shorten laser to the hit point
@@ -309,9 +323,48 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       controller.userData.lastHoveredObject = hit;
       controller.userData.lastHoveredNodeId = nodeId;
     }
+
+    // CASE D HISTOGRAM BAR HIT
+    // ============================
+    if (hit.userData?.type === "histogramBar") {
+
+      const histogram = hit.userData.parent;
+      const binIndex = hit.userData.binIndex;
+      const count = hit.userData.count;
+
+      const { start, end } = histogram.getBinRange(binIndex);
+
+      const text = `${start} - ${end}\nInteractions: ${count}`;
+      console.log("YOOOOO", text)
+
+      // Remove old tooltip
+      if (histogram.tooltip) {
+        histogram.group.remove(histogram.tooltip);
+      }
+
+      const tooltip = histogram.createTooltip(text);
+
+      // Position above bar
+      tooltip.position.copy(intersection.point);
+      histogram.group.worldToLocal(tooltip.position);
+      tooltip.position.y += 0.08;
+      tooltip.position.z += 0.05;
+
+      histogram.group.add(tooltip);
+      histogram.tooltip = tooltip;
+
+      return; // stop further processing
+    }
   } else {
-    // --- CASE D: NO HIT (Reset Everything) ---
+    // --- CASE E: NO HIT (Reset Everything) ---
     if (line) line.scale.z = LASER_DEFAULT_LENGTH;
     resetAllHoverStates(controller, cameraGroup);
+
+    // Remove histogram tooltip if exists
+    const histogram = cameraGroup.userData.histogram;
+    if (histogram?.tooltip) {
+      histogram.group.remove(histogram.tooltip);
+      histogram.tooltip = null;
+    }
   }
 }

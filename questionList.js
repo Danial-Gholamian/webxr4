@@ -2,9 +2,9 @@ export const QUESTIONS = [
     {
         question: "Adjust the temporal window to approximately match the width of a histogram bar (≈100 units). Which interval shows the highest interaction activity, and which three groups are the most active?",
         answers: [
-            "Interval A — Groups 1B, 3B, 5B",
+            "Interval A — Groups 1B, 3B, 4B", // Correct Answer
             "Interval B — Groups 4B, Teachers, 5A",
-            "Interval C — Groups 1B, 2B, 3A", // Correct Answer
+            "Interval C — Groups 1B, 2B, 3A", 
             "Interval D - Groups 5B, 2A, 1B"
 
         ]
