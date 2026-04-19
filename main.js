@@ -57,10 +57,10 @@ setUsername(username)
 export const myUsername = username
 
 let stickHoldTimer = 0;
-const HOLD_THRESHOLD = 1.0; // Seconds before a click turns into a slide
-const SLIDE_SPEED_BASE = 8;     // Very slow start for precision
-const SLIDE_SPEED_TIER_2 = 250;
-const SLIDE_SPEED_TIER_3 = 800;
+let stepAccumulator = 0;   // NEW: Tracks the "unit-by-unit" pulses
+let activeHand = null;      // NEW: Ensures one hand "owns" the current hold
+
+const STEP_INTERVAL = 0.2; // Every 0.2s = 5 units per second during the first 3s
 let wasLeftSqueezePressed = false;
 let wasRightSqueezePressed = false;
 
@@ -734,6 +734,23 @@ cameraGroup.userData.histogram = histogram;
 window.histogramRef = histogram
 
 
+// COMBINE THE HISTOGRAM AND LIVE INSIGHT PANEL TOGETHERE
+const analyticsPanel = new THREE.Group();
+cameraGroup.add(analyticsPanel);
+
+
+analyticsPanel.position.set(0, -0.2, -1.5);
+
+function updateAnalyticsPanel() {
+  analyticsPanel.quaternion.copy(camera.quaternion);
+}
+
+analyticsPanel.add(insightPanel.getObject3D());
+
+const histogramObj = histogram.getObject3D();
+histogramObj.position.set(0, -0.2, 0); // BELOW insights
+analyticsPanel.add(histogramObj);
+
 // ========================
 // VR GUIDE / QUESTION BUTTONS
 // ========================
@@ -1279,6 +1296,11 @@ const _snapPos = new THREE.Vector3();
 
 renderer.setAnimationLoop((timestamp, xrFrame) => {
 
+  // rotation of the histogram towardst the user
+  if (histogram) {
+    histogram.updateFacing(camera);
+  }
+
   sky.position.copy(camera.position);
 
   // SKYBOX RENDERING 
@@ -1446,62 +1468,74 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-    // ============================================================
-// HIGH-SENSITIVITY: One Click = One Step + Hold to Slide
+
+  // ============================================================
 // ============================================================
-let isLeftSqueezing = false;
-let isRightSqueezing = false;
+// FINAL FIX: Quantized Stepping (No Batching)
+// ============================================================
+const isLeftSqueezing = controller1.userData.isSqueezing;
+const isRightSqueezing = controller2.userData.isSqueezing;
 
-  // Direct Gamepad Polling (More sensitive than Event Listeners)
-  for (const source of xrFrame.session.inputSources) {
-    if (source.gamepad && source.handedness) {
-      // Button 1 is usually Squeeze on Quest/Index
-      const squeezeValue = source.gamepad.buttons[1]?.value || 0;
-      const pressed = squeezeValue > 0.1; // Trigger at 10% pressure
+const isNewPress = (isLeftSqueezing && !wasLeftSqueezePressed) || 
+                   (isRightSqueezing && !wasRightSqueezePressed);
 
-      if (source.handedness === 'left') isLeftSqueezing = pressed;
-      if (source.handedness === 'right') isRightSqueezing = pressed;
-    }
-  }
+if (isNewPress) {
+  activeHand = isLeftSqueezing ? 'left' : 'right';
+  stickHoldTimer = 0;
+  stepAccumulator = 0;
 
-  let direction = 0;
-  if (isLeftSqueezing) direction = -1;
-  if (isRightSqueezing) direction = 1;
+  // Immediate first step
+  const direction = (activeHand === 'left') ? -1 : 1;
+  timelineManager.shift(direction, 1);
+  
+  // BYPASS THROTTLE: Update everything immediately for the first frame
+  const bucket = timelineManager.getCurrentBucket();
+  graphController.updateEdgeUniforms(bucket.start, bucket.end);
+  graphController.highlightBucket(bucket); 
+  histogram.onTimeChange(bucket);
 
-  if (isLeftSqueezing || isRightSqueezing) {
-    // Detect "Rising Edge" (New Press)
-    const isNewPress = (isLeftSqueezing && !wasLeftSqueezePressed) || 
-                      (isRightSqueezing && !wasRightSqueezePressed);
+  const gp = (isLeftSqueezing ? controller1 : controller2).userData.inputSource?.gamepad;
+  gp?.hapticActuators?.[0]?.pulse(0.6, 50);
+}
 
-    if (isNewPress) {
-      // THE INSTANT SHIFT
-      timelineManager.shift(direction, 1); 
-      updateTimeWindow();
-      
-      // Haptic Feedback to confirm the click
-      const activeController = isLeftSqueezing ? controller1 : controller2;
-      const gp = activeController.userData.inputSource?.gamepad;
-      gp?.hapticActuators?.[0]?.pulse(0.4, 50);
-    }
+const isStillHolding = (activeHand === 'left' && isLeftSqueezing) || 
+                       (activeHand === 'right' && isRightSqueezing);
 
-    // Handle Acceleration
-    stickHoldTimer += deltaTime;
-    if (stickHoldTimer > HOLD_THRESHOLD) {
-      let currentSpeed = SLIDE_SPEED_BASE;
-      if (stickHoldTimer >= TIER_3_THRESHOLD) currentSpeed = SLIDE_SPEED_TIER_3;
-      else if (stickHoldTimer >= TIER_2_THRESHOLD) currentSpeed = SLIDE_SPEED_TIER_2;
+if (isStillHolding) {
+  stickHoldTimer += deltaTime;
+  const direction = (activeHand === 'left') ? -1 : 1;
 
-      timelineManager.shift(direction, currentSpeed * deltaTime);
-      updateTimeWindow();
+  if (stickHoldTimer < 3.0) {
+    // --- PHASE 1: 0-3s (Unit-by-Unit Display Sync) ---
+    stepAccumulator += deltaTime;
+
+    if (stepAccumulator >= STEP_INTERVAL) {
+      stepAccumulator = 0; // Hard reset to prevent "catch-up" bursts
+      timelineManager.shift(direction, 1);
+
+      // FORCE RENDER: Bypass frameSkip % 5 so we see every digit change
+      const bucket = timelineManager.getCurrentBucket();
+      graphController.updateEdgeUniforms(bucket.start, bucket.end);
+      graphController.highlightBucket(bucket); 
+      histogram.onTimeChange(bucket);
     }
   } else {
-    if (stickHoldTimer > 0) Graph.d3ReheatSimulation?.();
-    stickHoldTimer = 0;
+    // --- PHASE 2 & 3: Fast Sliding ---
+    // Here we use the standard updateTimeWindow() which allows throttling 
+    // because at high speeds, you don't need to see every single digit.
+    let currentSpeed = (stickHoldTimer >= 6.0) ? SPEED_TIER_3 : SPEED_TIER_2;
+    timelineManager.shift(direction, currentSpeed * deltaTime);
+    updateTimeWindow(); 
   }
+} else {
+  // Reset on release
+  activeHand = null;
+  stickHoldTimer = 0;
+  stepAccumulator = 0;
+}
 
-  // Update state trackers for next frame
-  wasLeftSqueezePressed = isLeftSqueezing;
-  wasRightSqueezePressed = isRightSqueezing;
+wasLeftSqueezePressed = isLeftSqueezing;
+wasRightSqueezePressed = isRightSqueezing;
 
 
 
