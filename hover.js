@@ -335,7 +335,6 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       const { start, end } = histogram.getBinRange(binIndex);
 
       const text = `${start} - ${end}\nInteractions: ${count}`;
-      console.log("YOOOOO", text)
 
       // Remove old tooltip
       if (histogram.tooltip) {

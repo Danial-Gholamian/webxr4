@@ -725,7 +725,7 @@ const histogram = new HistogramGauge({
     graphController.bucketActiveNodes.clear();
     graphController.highlightBucket(newBucket);
     histogram.onTimeChange(newBucket);
-  }
+  },
 });
 
 // Add it to the VR camera space
@@ -1142,27 +1142,26 @@ export function resetGraph() {
 
 export function completeResetGraph() {
 
-  // 1. Set timeline to full range
-  timelineManager.reset()
-  timelineManager.setWindowSize(globalDuration);
+  // 1. Reset timeline (this sets windowSize = 500)
+  timelineManager.reset();
 
-  // 2. Get the FULL bucket
+  // 2. Get the FULL bucket? ❌ NO — we don’t want full window anymore
   const bucket = timelineManager.getCurrentBucket();
 
-  // 3. Sync GPU edges (VERY IMPORTANT)
+  // 3. Sync GPU edges
   graphController.updateEdgeUniforms(bucket.start, bucket.end);
 
   // 4. Sync graph logic
   graphController.bucketActiveNodes.clear();
   graphController.highlightBucket(bucket);
 
-  // 5. Reset selection ONLY (not full reset)
+  // 5. Reset selection
   graphController.clearAllSelection();
 
-  // 6. Sync histogram UI
-  histogram.reset()
+  // 6. Sync histogram
+  histogram.reset(timelineManager.windowSize);
 
-  console.log("Reset to ALL TIME (stable)");
+  console.log("Reset (consistent behavior)");
 }
 
 
