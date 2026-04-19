@@ -149,7 +149,7 @@ export class HistogramGauge {
       const outline = new THREE.LineSegments(
         edges,
         new THREE.LineBasicMaterial({
-          color: 0x000000, 
+          color: 0x000000,
           transparent: true,
           opacity: 0.35
         })
@@ -313,33 +313,38 @@ export class HistogramGauge {
    * Reset histogram to full-range default state.
    * Highlight spans entire histogram.
    */
-  reset() {
-    // Cover full histogram width
-    this.highlightWindow.scale.x = 1;
-    this.highlightWindow.position.x = 0;
+  reset(windowSize = this.currentWindowSize) {
+
+    const widthRatio = windowSize / this.globalDuration;
+
+    this.highlightWindow.scale.x = widthRatio;
+
+    const startRatio = 0; // reset to beginning
+
+    const actualWidth = this.width * widthRatio;
+
+    this.highlightWindow.position.x =
+      (-this.width / 2) +
+      (this.width * startRatio) +
+      (actualWidth / 2);
 
     // Reset label
     this.group.remove(this.label);
 
-    this.label = createCapsuleLabel('All Time', {
-      fontSize: 48,
-      color: 0x00ff00,
-      textColor: "#00ff00",
-      opacity: 0.0
-    });
+    this.label = createCapsuleLabel(
+      `${this.globalStart} - ${this.globalStart + windowSize}`,
+      {
+        fontSize: 48,
+        color: 0x00ff00,
+        textColor: "#00ff00",
+        opacity: 0.0
+      }
+    );
 
     this.label.position.set(0, -0.12, 0.01);
-    this.label.traverse((child) => {
-      if (child.isMesh && child.material) {
-        child.renderOrder = 999;
-        child.material.depthTest = false;
-        child.material.depthWrite = false;
-      }
-    });
 
     this.group.add(this.label);
   }
-
   resetHistogram() {
     this.reset()
     // re initialize the variables
