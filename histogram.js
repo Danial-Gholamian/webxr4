@@ -40,6 +40,7 @@ export class HistogramGauge {
     this.binMeshes = [];
 
     this._buildHistogram(bins);
+    this._buildBackground()
     this._buildHighlightWindow();
     this._buildLabel();
     this._resetWindow()
@@ -52,7 +53,7 @@ export class HistogramGauge {
     this.group.position.set(2.8, 1, -3.3);
 
     // Tilt the histogram toward the user
-    this.group.rotation.y = -Math.PI / 2.95;
+    // this.group.rotation.y = -Math.PI / 2.95;
   }
 
   /**
@@ -60,6 +61,23 @@ export class HistogramGauge {
    */
   getObject3D() {
     return this.group;
+  }
+
+  _buildBackground() {
+    const bg = new THREE.Mesh(
+      new THREE.PlaneGeometry(this.width + 0.1, this.maxHeight + 0.25),
+      new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false
+      })
+    );
+
+    bg.position.set(0, this.maxHeight / 2, -0.02);
+    bg.renderOrder = -1;
+
+    this.group.add(bg);
   }
 
   /**
@@ -377,6 +395,11 @@ export class HistogramGauge {
 
       console.log(`Cleaned up remote window for user: ${id}`);
     }
+  }
+
+  // Rotates the histogram to always face the user
+  updateFacing(camera) {
+    this.group.quaternion.copy(camera.quaternion);
   }
 
 }
