@@ -24,15 +24,19 @@ export function calculateInsights(nodes, links, currentSelection = { type: 'NONE
   
   // 2. Count degrees (interactions) in the CURRENT link set
   links.forEach(l => {
-    const s = l.source.id || l.source;
-    const t = l.target.id || l.target;
-    
-    degreeMap.set(s, (degreeMap.get(s) || 0) + 1);
-    degreeMap.set(t, (degreeMap.get(t) || 0) + 1);
+      const s = l.source.id || l.source;
+      const t = l.target.id || l.target;
+      
+      // Node degrees
+      degreeMap.set(s, (degreeMap.get(s) || 0) + 1);
+      degreeMap.set(t, (degreeMap.get(t) || 0) + 1);
 
-    // Group Heat logic
-    const sGroup = nodeLookup.get(s)?.group;
-    if (sGroup) groupActivity.set(sGroup, (groupActivity.get(sGroup) || 0) + 1);
+      // Group Activity (Count both sides of the link)
+      const sGroup = nodeLookup.get(s)?.group;
+      const tGroup = nodeLookup.get(t)?.group;
+
+      if (sGroup) groupActivity.set(sGroup, (groupActivity.get(sGroup) || 0) + 1);
+      if (tGroup) groupActivity.set(tGroup, (groupActivity.get(tGroup) || 0) + 1);
   });
 
   const sortedNodes = [...degreeMap.entries()].sort((a, b) => b[1] - a[1]);
@@ -65,7 +69,7 @@ export function calculateInsights(nodes, links, currentSelection = { type: 'NONE
       };
     }),
 
-    topGroups: sortedGroups.slice(0, 3).map(g => ({ name: g[0], count: g[1] })),
+    topGroups: sortedGroups.map(g => ({ name: g[0], count: g[1] })),
     avgDensity: (rankingSource.length / totalActiveNodes).toFixed(2) 
   };
 
