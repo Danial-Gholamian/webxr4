@@ -421,8 +421,17 @@ export class GraphVisualController {
     _isNodeVisible(nodeId, ctx) {
         // 1. SELECTION LOGIC: If selection is active, only show the node or active neighbors
         if (ctx.selection.active) {
-            return nodeId === ctx.selection.selectedNodeId || ctx.selection.neighbors.has(nodeId);
-        }
+                const isSelected = nodeId === ctx.selection.selectedNodeId;
+                const isConnectedNeighbor = ctx.selection.neighbors.has(nodeId);
+                
+                // Even if it's a neighbor, if we are in a bucket, 
+                // it MUST be active in this specific time window
+                if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
+                    return false; 
+                }
+
+                return isSelected || isConnectedNeighbor;
+            }
 
         // 2. GROUP LOGIC
         if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
@@ -639,7 +648,15 @@ export class GraphVisualController {
 
 
     _edgeInBucket(link, bucket) {
-        if (!bucket || !link._bitmask) return true;
+        if (!bucket) return true;
+
+        // Use raw timestamps for selection precision if available
+        if (link.times && link.times.length > 0) {
+            return link.times.some(t => t >= bucket.start && t <= bucket.end);
+        }
+
+        // Fallback to bitmask for general visibility
+        if (!link._bitmask) return true;
 
         // Convert bucket start/end to slot indices (0 to 199)
         const startRatio = (bucket.start - this.globalStart) / this.globalDuration;
