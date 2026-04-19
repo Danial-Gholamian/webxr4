@@ -787,8 +787,8 @@ const questionVRBtn = createCapsuleLabel("Questions", {
 });
 
 
-guideVRBtn.position.set(2.8, 0.3, -3.3);
-questionVRBtn.position.set(2.8, -0.1, -3.3);
+guideVRBtn.position.set(2.4, 0.3, -2.3);
+questionVRBtn.position.set(2.4, -0.1, -2.3);
 
 cameraGroup.add(guideVRBtn);
 cameraGroup.add(questionVRBtn);

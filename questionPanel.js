@@ -129,7 +129,7 @@ export class QuestionPanel {
         // HEADER (Question number)
         // -------------------------
         ctx.fillStyle = '#00ffcc';
-        ctx.font = 'bold 42px Arial';
+        ctx.font = 'bold 40px Arial';
         ctx.textAlign = 'left';
 
         ctx.fillText(
@@ -142,7 +142,7 @@ export class QuestionPanel {
         // QUESTION
         // -------------------------
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 35px Arial';
+        ctx.font = 'bold 33px Arial';
         ctx.textAlign = 'left';
 
         let y = 170;
@@ -163,7 +163,7 @@ export class QuestionPanel {
 
         const letters = ['A', 'B', 'C', 'D'];
 
-        y += 40;
+        y += 25;
 
         current.answers.forEach((ans, i) => {
             const text = `${letters[i]}. ${ans}`;
