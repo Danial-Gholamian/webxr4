@@ -57,10 +57,10 @@ setUsername(username)
 export const myUsername = username
 
 let stickHoldTimer = 0;
-const HOLD_THRESHOLD = 0.2; // Seconds before a click turns into a slide
-const SLIDE_SPEED_BASE = 8;     // Very slow start for precision
-const SLIDE_SPEED_TIER_2 = 250;
-const SLIDE_SPEED_TIER_3 = 800;
+let stepAccumulator = 0;   // NEW: Tracks the "unit-by-unit" pulses
+let activeHand = null;      // NEW: Ensures one hand "owns" the current hold
+
+const STEP_INTERVAL = 0.2; // Every 0.2s = 5 units per second during the first 3s
 let wasLeftSqueezePressed = false;
 let wasRightSqueezePressed = false;
 
@@ -1454,63 +1454,75 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-    // 2. Process the input
-    // Add these to your global variables at the top of main.js
-    let wasLeftSqueezePressed = false;
-    let wasRightSqueezePressed = false;
 
-    // ... inside renderer.setAnimationLoop, within if(inVR && xrFrame) block
+  // ============================================================
+// ============================================================
+// FINAL FIX: Quantized Stepping (No Batching)
+// ============================================================
+const isLeftSqueezing = controller1.userData.isSqueezing;
+const isRightSqueezing = controller2.userData.isSqueezing;
 
-    // 2. Process Squeeze Input
-    let shifted = false;
-    let direction = 0;
-    let slideAmount = 0;
+const isNewPress = (isLeftSqueezing && !wasLeftSqueezePressed) || 
+                   (isRightSqueezing && !wasRightSqueezePressed);
 
-    const isLeftSqueezing = controller1.userData.isSqueezing;
-    const isRightSqueezing = controller2.userData.isSqueezing;
+if (isNewPress) {
+  activeHand = isLeftSqueezing ? 'left' : 'right';
+  stickHoldTimer = 0;
+  stepAccumulator = 0;
 
-    if (isLeftSqueezing || isRightSqueezing) {
-      direction = isLeftSqueezing ? -1 : 1;
+  // Immediate first step
+  const direction = (activeHand === 'left') ? -1 : 1;
+  timelineManager.shift(direction, 1);
+  
+  // BYPASS THROTTLE: Update everything immediately for the first frame
+  const bucket = timelineManager.getCurrentBucket();
+  graphController.updateEdgeUniforms(bucket.start, bucket.end);
+  graphController.highlightBucket(bucket); 
+  histogram.onTimeChange(bucket);
 
-      // --- CLICK DETECTION (Single Step) ---
-      // If this is the very first frame the button is down
-      if ((isLeftSqueezing && !wasLeftSqueezePressed) || (isRightSqueezing && !wasRightSqueezePressed)) {
-        slideAmount = 1; // Exactly 1 unit step
-        shifted = true;
-      }
+  const gp = (isLeftSqueezing ? controller1 : controller2).userData.inputSource?.gamepad;
+  gp?.hapticActuators?.[0]?.pulse(0.6, 50);
+}
 
-      stickHoldTimer += deltaTime;
+const isStillHolding = (activeHand === 'left' && isLeftSqueezing) || 
+                       (activeHand === 'right' && isRightSqueezing);
 
-      // --- HOLD ACCELERATION ---
-      if (stickHoldTimer > HOLD_THRESHOLD) {
-        let currentSpeed = SLIDE_SPEED_BASE;
+if (isStillHolding) {
+  stickHoldTimer += deltaTime;
+  const direction = (activeHand === 'left') ? -1 : 1;
 
-        if (stickHoldTimer >= TIER_3_THRESHOLD) {
-          currentSpeed = SLIDE_SPEED_TIER_3;
-        } else if (stickHoldTimer >= TIER_2_THRESHOLD) {
-          currentSpeed = SLIDE_SPEED_TIER_2;
-        }
+  if (stickHoldTimer < 3.0) {
+    // --- PHASE 1: 0-3s (Unit-by-Unit Display Sync) ---
+    stepAccumulator += deltaTime;
 
-        slideAmount = currentSpeed * deltaTime;
-        shifted = true;
-      }
-    } else {
-      // Released
-      if (stickHoldTimer > 0) {
-        Graph.d3ReheatSimulation?.();
-      }
-      stickHoldTimer = 0;
+    if (stepAccumulator >= STEP_INTERVAL) {
+      stepAccumulator = 0; // Hard reset to prevent "catch-up" bursts
+      timelineManager.shift(direction, 1);
+
+      // FORCE RENDER: Bypass frameSkip % 5 so we see every digit change
+      const bucket = timelineManager.getCurrentBucket();
+      graphController.updateEdgeUniforms(bucket.start, bucket.end);
+      graphController.highlightBucket(bucket); 
+      histogram.onTimeChange(bucket);
     }
+  } else {
+    // --- PHASE 2 & 3: Fast Sliding ---
+    // Here we use the standard updateTimeWindow() which allows throttling 
+    // because at high speeds, you don't need to see every single digit.
+    let currentSpeed = (stickHoldTimer >= 6.0) ? SPEED_TIER_3 : SPEED_TIER_2;
+    timelineManager.shift(direction, currentSpeed * deltaTime);
+    updateTimeWindow(); 
+  }
+} else {
+  // Reset on release
+  activeHand = null;
+  stickHoldTimer = 0;
+  stepAccumulator = 0;
+}
 
-    // Save state for next frame's edge detection
-    wasLeftSqueezePressed = isLeftSqueezing;
-    wasRightSqueezePressed = isRightSqueezing;
+wasLeftSqueezePressed = isLeftSqueezing;
+wasRightSqueezePressed = isRightSqueezing;
 
-    // 3. Apply the shift
-    if (shifted) {
-      timelineManager.shift(direction, slideAmount);
-      updateTimeWindow();
-    }
 
 
     // Handle increase in window size
