@@ -35,24 +35,19 @@ function setupController(controller, index, renderer, cameraGroup) {
   const laser = new THREE.Line(laserGeometry, laserMaterial);
   laser.name = 'laser';
   laser.scale.z = laserDistance;
-  console.log(`Laser length ${laserDistance}`)
   laser.userData.isLaser = true;
-  laser.renderOrder = 2000; // higher than panel
-  // comment
+  laser.renderOrder = 2000; 
+
   controller.add(laser);
   controller.userData.laser = laser;
   cameraGroup.add(controller);
 
   controller.addEventListener('squeezestart', () => {
-    if (index === 0) {
-      // Left controller → go back
-      // cyclePeriod(-1);
-      // squeezeLefttPrevPeriod();
-    } else if (index === 1) {
-      // Right controller → go forward
-      // cyclePeriod(1);
-      // squeezeRightNextPeriod();
-    }
+    controller.userData.isSqueezing = true;
+  });
+
+  controller.addEventListener('squeezeend', () => {
+    controller.userData.isSqueezing = false;
   });
 }
 
@@ -131,6 +126,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
   // Check histogram bars
   // Check graph nodes
   function onVRSelect(event) {
+    if (window.isDraggingTimeline) return;
     const controller = event.target;
     const controllerSide = controller === controller1 ? 'left' : 'right';
     // console.log(`[VR] Select from ${controllerSide}`);

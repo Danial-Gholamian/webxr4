@@ -1,3 +1,4 @@
+// histogram.js
 import * as THREE from 'three';
 import { createCapsuleLabel } from './filterUIPanel';
 import { completeResetGraph } from './main';
@@ -65,7 +66,7 @@ export class HistogramGauge {
     return this.group;
   }
 
-  _buildBackground() {
+_buildBackground() {
     const bg = new THREE.Mesh(
       new THREE.PlaneGeometry(this.width + 0.1, this.maxHeight + 0.25),
       new THREE.MeshBasicMaterial({
@@ -80,12 +81,24 @@ export class HistogramGauge {
     bg.renderOrder = -1;
 
     this.group.add(bg);
+
+    // --- ADD THIS BLOCK ---
+    // Create an invisible "Rail" for stable 1D dragging
+    this.dragSurface = new THREE.Mesh(
+      new THREE.PlaneGeometry(this.width * 2, this.maxHeight * 2),
+      new THREE.MeshBasicMaterial({ visible: false }) 
+    );
+    this.dragSurface.name = "dragRail";
+    // Position it slightly forward so it's easy to hit
+    this.dragSurface.position.set(0, this.maxHeight / 2, 0.05); 
+    this.group.add(this.dragSurface);
+    // ----------------------
   }
 
   /**
    * Build histogram bars from bins.
    */
-  _buildHistogram(bins) {
+_buildHistogram(bins) {
     const maxBinCount = Math.max(...bins) || 1;
     this.numBins = bins.length;
     const binWidth = this.width / this.numBins;
@@ -96,15 +109,8 @@ export class HistogramGauge {
     bins.forEach((count, i) => {
       if (count === 0) return;
 
-      // Normalize height relative to max bin
       const h = (count / maxBinCount) * this.maxHeight;
-
-      // Color gradient (green → red)
-      const color = new THREE.Color().setHSL(
-        0.3 - (0.3 * (count / maxBinCount)),
-        1.0,
-        0.5
-      );
+      const color = new THREE.Color().setHSL(0.3 - (0.3 * (count / maxBinCount)), 1.0, 0.5);
 
       const barMat = new THREE.MeshBasicMaterial({
         color,
@@ -112,51 +118,28 @@ export class HistogramGauge {
         opacity: 0.8,
       });
 
-      const barGeom = new THREE.BoxGeometry(
-        binWidth * 1,
-        h,
-        binDepth
-      );
-
+      const barGeom = new THREE.BoxGeometry(binWidth * 1, h, binDepth);
       const barMesh = new THREE.Mesh(barGeom, barMat);
 
-      // Store bin index for interaction mapping including tool tip
       barMesh.userData = {
         type: "histogramBar",
         binIndex: i,
         count: count,
-        parent: this
+        parent: this,
+        // ADD THIS: ensures the raycaster treats these as secondary to the slider window
+        isInteractable: true 
       };
 
-      // Position bars along X
-      barMesh.position.x =
-        (-this.width / 2) + (i * binWidth) + (binWidth / 2);
-
-      // Center vertically so base rests at y = 0
+      barMesh.position.x = (-this.width / 2) + (i * binWidth) + (binWidth / 2);
       barMesh.position.y = h / 2;
 
-      // This makes the bars clickable and interactive
-      // barMesh.userData = {
-      //   isInteractable: true,
-      //   isHistogramBar: true,
-      //   onClick: () => {
-      //     this._handleBarClick(i, numBins);
-      //   }
-      // };
-
       const edges = new THREE.EdgesGeometry(barGeom);
-
       const outline = new THREE.LineSegments(
         edges,
-        new THREE.LineBasicMaterial({
-          color: 0x000000,
-          transparent: true,
-          opacity: 0.35
-        })
+        new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 })
       );
 
       barMesh.add(outline);
-
       barsGroup.add(barMesh);
       this.binMeshes.push(barMesh);
     });
@@ -186,6 +169,7 @@ export class HistogramGauge {
 
     return { start, end };
   }
+  
 
 
   /**
@@ -207,6 +191,11 @@ export class HistogramGauge {
     });
 
     this.highlightWindow = new THREE.Mesh(windowGeom, windowMat);
+    this.highlightWindow.name = "temporalHighlightWindow";
+    this.highlightWindow.userData = {
+      type: "temporalSlider",
+      parent: this
+    };
 
     // Start with zero width
     this.highlightWindow.scale.x = 1;
@@ -217,7 +206,7 @@ export class HistogramGauge {
 
     this.group.add(this.highlightWindow);
   }
-
+  
   /**
    * Build the text label displayed below the histogram.
    */
