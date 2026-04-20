@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import { highlightPeriod, getActivePeriods } from './main.js';
-import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
+// import { squeezeLefttPrevPeriod, squeezeRightNextPeriod } from './network.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // --- Constants ---
@@ -144,37 +144,42 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(matrix);
     raycaster.far = laserDistance; // 2000
 
+// ============================================================
+    // 2. UI INTERACTION (Panel Buttons & Dashboard Blocking)
     // ============================================================
-    // 2. UI INTERACTION (Panel Buttons)
-    // ============================================================
-    // We check everything in cameraGroup (includes FilterPanel, TemporalPanel AND histogram as well)
     const intersects = raycaster.intersectObject(cameraGroup, true);
-
-    // Filter hits to find the first actual "Button" (Object with onClick)
-    // We use a loop to "bubble up" from the hit point (e.g. text) to the button container
     let uiHit = null;
 
     for (const hit of intersects) {
-      // Check if visible
       if (!hit.object.visible) continue;
 
       let target = hit.object;
 
-      // Traverse up to find the clickable element
+      // TRAVERSAL LOOP
       while (target) {
+        // 1. ABSORB: If we hit a panel background, stop the ray so it doesn't hit the graph.
+        if (target.name === 'uiPanelBackground' || target.userData.absorbsOnly) {
+           uiHit = target; 
+           break; 
+        }
+
+        // 2. CLICK: If we hit a button with an onClick handler.
         if (target.userData && target.userData.onClick) {
           uiHit = target;
           break;
         }
-        // Stop if we hit the cameraGroup root
         if (target === cameraGroup) break;
         target = target.parent;
       }
 
-      if (uiHit) break; // Found a button, stop looking
+      if (uiHit) break; 
     }
 
     if (uiHit) {
+      // If we hit a background/absorber that DOESN'T have an onClick, just block and return.
+      // This prevents "clicking through" the Insight Panel into the graph nodes.
+      if (!uiHit.userData.onClick) return; 
+
       controller.userData.activeButton = uiHit;
       console.log(`[VR] Clicked Button: ${uiHit.userData.label || 'Unnamed'}`);
 
@@ -183,15 +188,14 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
 
       // B. Haptic Feedback (Pulse)
       const gamepad = controller.userData.inputSource?.gamepad;
-      if (gamepad && gamepad.hapticActuators && gamepad.hapticActuators[0]) {
-        gamepad.hapticActuators[0].pulse(0.8, 20); // Strength 0.8, 20ms
+      if (gamepad?.hapticActuators?.[0]) {
+        gamepad.hapticActuators[0].pulse(0.8, 20); 
       }
 
-      // C. Legacy Highlighting (Only for FilterUIPanel capsules that need manual color change)
-      // If the button handles its own re-render (like TemporalPanel), this part is ignored.
+      // C. Highlighting (Keeps Guide/Question panels working!)
+      // This checks if the button has a specific color state to update.
       if (uiHit.material && uiHit.userData.selectedColor) {
         if (lastSelectedCapsule && lastSelectedCapsule !== uiHit) {
-          // Reset previous
           if (lastSelectedCapsule.userData.defaultColor) {
             lastSelectedCapsule.material.color.copy(lastSelectedCapsule.userData.defaultColor);
           }
@@ -200,12 +204,11 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
         lastSelectedCapsule = uiHit;
       }
 
-      return; // STOP HERE. Don't click through the UI to the graph behind it.
+      return; // STOP HERE.
     }
 
     // BLOCK GRAPH SELECTION WHEN PANEL IS OPEN
     const guidePanel = cameraGroup.getObjectByName('UserGuidePanel');
-
     if (guidePanel && guidePanel.visible) {
       return;
     }

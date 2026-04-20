@@ -1,9 +1,9 @@
 // filterUIPanel.js
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
-import { broadcastDatasetChange } from './network.js';
+// import { broadcastDatasetChange } from './network.js';
 import { buildGroupColorList, highlightGroup, switchDataset } from './main.js'
-import { broadcastGroupSelection } from './network.js';
+// import { broadcastGroupSelection } from './network.js';
 import { getGraphController } from './main.js';
 
 

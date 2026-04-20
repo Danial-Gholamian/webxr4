@@ -20,10 +20,7 @@ export const knownUsers = {}; // { socketId: name }
 export let myAvatar = null;
 
 
-let _uiPanel = null;
-export function setUIPanel(panel) {
-  _uiPanel = panel;
-}
+
 
 export const socket = io('https://webxr4-server.fly.dev', {
   transports: ['websocket']  // Force WebSocket, skip long-polling (prevents 400 errors)
@@ -170,9 +167,9 @@ let lastPositions = {
   right: new THREE.Vector3()
 };
 
-export function broadcastAvatar(camera, controller1, controller2, timelineManager) {
+export function broadcastAvatar(camera, controller1, controller2, timelineManager, force = false) {
   const now = Date.now();
-  if (now - lastAvatarUpdate < AVATAR_UPDATE_INTERVAL) return;
+  if (!force && now - lastAvatarUpdate < AVATAR_UPDATE_INTERVAL) return;
 
   const currentBucket = timelineManager ? timelineManager.getCurrentBucket() : { start: 0, end: 0 };
   const compressRot = q => [
@@ -317,8 +314,8 @@ export function setCurrentPeriodIndex(index, broadcast = true) {
 }
 
 
-export let squeezeRightNextPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() + 1, true);
-export let squeezeLefttPrevPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() - 1, true);
+// export let squeezeRightNextPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() + 1, true);
+// export let squeezeLefttPrevPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() - 1, true);
 
 socket.on('period-change', (period) => {
   console.log("Received period change:", period);
@@ -390,9 +387,6 @@ socket.on('user-list', async (userArray) => {
     }
   });
 
-  if (_uiPanel?.userData?.refreshUsers) {
-    _uiPanel.userData.refreshUsers(socket.id);
-  }
   handleUserList(userArray);
 });
 

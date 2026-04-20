@@ -29,8 +29,9 @@ import {
 } from './vrSetup.js';
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
-import { createFilterPanel, updatePeroidLabel, updatePanelPosition, updateGroupList, createCapsuleLabel } from './filterUIPanel.js';
-import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUIPanel, setUsername, broadcastNodeSelection } from './network.js';
+// We only keep the label and period helpers
+import { updatePeroidLabel, createCapsuleLabel } from './filterUIPanel.js';
+import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUsername, broadcastNodeSelection, socket } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
@@ -106,8 +107,8 @@ export function getDatasets() {
 //  Static Panel variables
 // ========================
 
-let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
-const PANEL_HIDDEN_POS = new THREE.Vector3(0, -2, -0.8);
+// let panelState = 'hiding'; // 'shown', 'hiding', 'hidden', 'showing'
+// const PANEL_HIDDEN_POS = new THREE.Vector3(0, -2, -0.8);
 
 let currentPeriodIndex = 0;
 let targetScale = 0.1;      // starting size
@@ -609,7 +610,7 @@ export async function switchDataset(datasetKey) {
 
   // Update the rest of the visuals as well
   // Update Filter Panel using the created uiPanel at initialization
-  updateGroupList(uiPanel, buildGroupColorList(Graph.graphData()))
+  // updateGroupList(uiPanel, buildGroupColorList(Graph.graphData()))
 
   console.log(`Dataset switched to: ${currentDatasetKey}`);
 }
@@ -1009,10 +1010,11 @@ vrButton.textContent = 'Enter VR';
 document.body.appendChild(vrButton);
 
 
-const groups = [...new Set(Graph.graphData().nodes.map(n => n.group))].map(group => ({
-  name: String(group),
-  color: colorScale(group)
-}));
+// The InsightPanel is already created at the top of your file. 
+// Just ensure we have a way to reset it if needed.
+export function clearDashboardSelection() {
+  insightPanel.clearSelection?.();
+}
 
 export function buildGroupColorList(dataset) {
   const map = new Map();
@@ -1024,9 +1026,9 @@ export function buildGroupColorList(dataset) {
   return [...map.entries()].map(([name, color]) => ({ name, color }));
 }
 
-export const uiPanel = await createFilterPanel({ groupColors: groups, camera, datasets: Object.values(DATASETS) });
-cameraGroup.add(uiPanel); // ui panel buttom center
-uiPanel.position.copy(PANEL_HIDDEN_POS);
+// export const uiPanel = await createFilterPanel({ groupColors: groups, camera, datasets: Object.values(DATASETS) });
+// cameraGroup.add(uiPanel); // ui panel buttom center
+// uiPanel.position.copy(PANEL_HIDDEN_POS);
 // initLabels(cameraGroup, camera); // info label for hover
 //panel for insight 
 
@@ -1070,21 +1072,35 @@ function requestGraphUpdate(mode, nodeId) {
   graphUpdateNeeded = true;
 }
 
-graphController.setSelectionListener((nodeId) => {
-  uiPanel.userData.updateSelectedNodeLabel?.(nodeId);
-});
+// graphController.setSelectionListener((nodeId) => {
+//   uiPanel.userData.updateSelectedNodeLabel?.(nodeId);
+// });
 
 
 let frameSkip = 0;
 
-function updateTimeWindow() {
+// Add these two trackers outside the function if they aren't already global
+let lastSentStart = -1;
+let lastSentEnd = -1;
+
+function updateTimeWindow(force = false) {
   const newBucket = timelineManager.getCurrentBucket();
 
-  // 1. ALWAYS update the GPU Edges (This is instant)
+  // 1. ALWAYS update the GPU Edges (Immediate visual feedback)
   graphController.updateEdgeUniforms(newBucket.start, newBucket.end);
 
-  // 2. THROTTLE the CPU Node/Selection logic
-  // Only run this every 5 frames to keep VR at 90FPS
+  // 2. NETWORK SYNC: Use the 'force' flag to bypass the "same value" check
+  if (force || newBucket.start !== lastSentStart || newBucket.end !== lastSentEnd) {
+      socket.emit('window-update', { 
+        id: socket.id,
+        start: newBucket.start, 
+        end: newBucket.end 
+      });
+      lastSentStart = newBucket.start;
+      lastSentEnd = newBucket.end;
+  }
+
+  // 3. THROTTLE the CPU Node/Selection logic (Keep VR at 90FPS)
   frameSkip++;
   if (frameSkip % 5 === 0) {
     graphController.highlightBucket(newBucket);
@@ -1094,7 +1110,6 @@ function updateTimeWindow() {
 }
 
 
-setUIPanel(uiPanel);
 
 export function highlightSubgraph(nodeId) {
   graphController.highlightNode(nodeId)
@@ -1356,32 +1371,12 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
 
 
 
-  panelState = updatePanelPosition({
-    uiPanel,
-    panelState,
-    camera,
-    cameraGroup,
-    controller: controller1,
-    scene,
-    inVR
-  });
-  uiPanel?.userData?.update?.();
 
   // <--- NEW: FIX FOR "GOING BEHIND" (Snap Logic)
   // ============================================================
   temporalPanel.update();
   // ============================================================
 
-
-  if (uiPanel?.userData?.bgPlane) {
-    const bg = uiPanel.userData.bgPlane;
-
-    // Only update color if panel is interactive
-    if (bg.userData.isUIPanel) {
-      const targetColor = bg.userData.isHovered ? 0x4444aa : 0x000000;
-      bg.material.color.lerp(new THREE.Color(targetColor), 0.1);
-    }
-  }
 
 
 
@@ -1513,6 +1508,10 @@ if (isStillHolding) {
     updateTimeWindow(); 
   }
 } else {
+  if (activeHand !== null) {
+      updateTimeWindow(true); // Force one final packet out
+      broadcastAvatar(camera, controller1, controller2, timelineManager, true); // Force avatar sync
+  }
   // Reset on release
   activeHand = null;
   stickHoldTimer = 0;
@@ -1615,15 +1614,13 @@ wasRightSqueezePressed = isRightSqueezing;
     });
 
     handleAButtonInput(xrFrame, () => {
-      togglePanel();
+      // Repurposed: Reset both graph and dashboard selection
+      resetGraph();
+      insightPanel.clearSelection?.();
+      
       [controller1, controller2].forEach(c => {
         const gp = c.userData.inputSource?.gamepad;
-        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
-        if (h?.pulse) {
-          h.pulse(0.8, 100);
-        } else if (navigator.vibrate) {
-          navigator.vibrate(100);
-        }
+        gp?.hapticActuators?.[0]?.pulse(0.8, 100);
       });
     });
 

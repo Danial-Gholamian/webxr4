@@ -171,13 +171,15 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
   }
   const graphNodes = [...nodeMeshesCache];
 
+
   const panelsToCheck = [
-    graphScene.getObjectByName('FilterUIPanel'),
-    cameraGroup.getObjectByName('FilterUIPanel'),
-    cameraGroup.getObjectByName('TemporalDrillPanel'),
-    cameraGroup.getObjectByName('UserGuidePanel'),
-    cameraGroup.getObjectByName('InsightLegendPanel'),
-  ];
+      graphScene.getObjectByName('FilterUIPanel'),
+      cameraGroup.getObjectByName('FilterUIPanel'),
+      cameraGroup.getObjectByName('TemporalDrillPanel'),
+      cameraGroup.getObjectByName('UserGuidePanel'),
+      cameraGroup.getObjectByName('InsightCanvasPanel'), // <--- CHANGED THIS
+    ];
+
 
   panelsToCheck.forEach(panel => {
     if (panel && panel.visible) {
@@ -256,11 +258,11 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       return;
     }
 
-    // CASE B: UI BACKGROUND (Swallow ray but don't highlight)
+    // CASE B: UI BACKGROUND (Shortens laser, clears button hover)
     if (hit.name === "uiPanelBackground" || hit.userData.absorbsOnly) {
       if (line) line.scale.z = dist;
 
-      // Clear any previously hovered button/node but keep laser shortened
+      // If we move from a button to the background, reset the button color
       if (controller.userData.lastHoveredButton) {
         const btn = controller.userData.lastHoveredButton;
         const col = btn.userData.isSelected ? btn.userData.selectedColor : btn.userData.defaultColor;
