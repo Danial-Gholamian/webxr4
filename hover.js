@@ -8,6 +8,8 @@ export let hoverLabel = null;
 let nodeMeshesCache = [];
 let cacheNeedsUpdate = true;
 
+let activeTooltipController = null;
+
 const FONT_SIZE = 0.05;        // 5cm in VR units
 const LASER_DEFAULT_LENGTH = 50; // Default length when hitting nothing (adjust as needed)
 
@@ -342,11 +344,21 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     if (hit.userData?.type === "histogramBar") {
 
       const histogram = hit.userData.parent;
+
+      // 🧠 CLAIM OWNERSHIP
+      if (!activeTooltipController) {
+        activeTooltipController = controller;
+      }
+
+      // ❌ If another controller owns it → ignore
+      if (activeTooltipController !== controller) {
+        return;
+      }
+
       const binIndex = hit.userData.binIndex;
       const count = hit.userData.count;
 
       const { start, end } = histogram.getBinRange(binIndex);
-
       const text = `${start} - ${end}\nInteractions: ${count}`;
 
       // Remove old tooltip
@@ -356,25 +368,17 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
       const tooltip = histogram.createTooltip(text);
 
-      // Position above bar
-      // Convert hit point to local (for X only)
       const local = intersection.point.clone();
       histogram.group.worldToLocal(local);
 
-      // FIXED HEIGHT (above all bars)
       const FIXED_HEIGHT = histogram.maxHeight + 0.09;
 
-      // Apply position
-      tooltip.position.set(
-        local.x,           // keep correct horizontal position
-        FIXED_HEIGHT,      // constant height 
-        0.05               // slight forward offset
-      );
+      tooltip.position.set(local.x, FIXED_HEIGHT, 0.05);
 
       histogram.group.add(tooltip);
       histogram.tooltip = tooltip;
 
-      return; // stop further processing
+      return;
     }
     // CASE F: HISTOGRAM HIGHLIGHT WINDOW HIT
     // ============================
@@ -401,9 +405,10 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
     // Remove histogram tooltip if exists
     const histogram = cameraGroup.userData.histogram;
-    if (histogram?.tooltip) {
+    if (histogram?.tooltip && activeTooltipController === controller) {
       histogram.group.remove(histogram.tooltip);
       histogram.tooltip = null;
+      activeTooltipController = null; // release lock
     }
   }
 }

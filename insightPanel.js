@@ -121,7 +121,7 @@ export class InsightPanel {
         const modes = [
             { label: 'ALL', x: this.MODE_X_ALL, color: 0x00ff00 },
             { label: 'INTRA', x: this.MODE_X_INTRA, color: 0x4444ff },
-            { label: 'INTER', x: this.MODE_X_INTER, color: 0xffffff }
+            { label: 'INTER', x: this.MODE_X_INTER, color: 0xaa00ff  }
         ];
 
         modes.forEach(m => {
