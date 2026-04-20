@@ -421,17 +421,17 @@ export class GraphVisualController {
     _isNodeVisible(nodeId, ctx) {
         // 1. SELECTION LOGIC: If selection is active, only show the node or active neighbors
         if (ctx.selection.active) {
-                const isSelected = nodeId === ctx.selection.selectedNodeId;
-                const isConnectedNeighbor = ctx.selection.neighbors.has(nodeId);
-                
-                // Even if it's a neighbor, if we are in a bucket, 
-                // it MUST be active in this specific time window
-                if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
-                    return false; 
-                }
+            const isSelected = nodeId === ctx.selection.selectedNodeId;
+            const isConnectedNeighbor = ctx.selection.neighbors.has(nodeId);
 
-                return isSelected || isConnectedNeighbor;
+            // Even if it's a neighbor, if we are in a bucket, 
+            // it MUST be active in this specific time window
+            if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
+                return false;
             }
+
+            return isSelected || isConnectedNeighbor;
+        }
 
         // 2. GROUP LOGIC
         if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
@@ -777,6 +777,9 @@ export class GraphVisualController {
         this.clearNodeSelection()
         this._clearNodeSelectionState();
         this.clearGroupFilter();
+
+        // Reset edge mode back to default
+        this.state.edgeMode = 'ALL';
 
         // Ensure the next update() call treats this as a "Full Redraw"
         this._modeChanged = true;
