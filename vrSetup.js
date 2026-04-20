@@ -43,17 +43,7 @@ function setupController(controller, index, renderer, cameraGroup) {
   controller.userData.laser = laser;
   cameraGroup.add(controller);
 
-  controller.addEventListener('squeezestart', () => {
-    if (index === 0) {
-      // Left controller → go back
-      // cyclePeriod(-1);
-      // squeezeLefttPrevPeriod();
-    } else if (index === 1) {
-      // Right controller → go forward
-      // cyclePeriod(1);
-      // squeezeRightNextPeriod();
-    }
-  });
+
 }
 
 // // --- 1.2 Changing time slices ---
@@ -131,6 +121,7 @@ function setupVRNodeSelection(controller1, controller2, GraphRef, requestGraphUp
   // Check histogram bars
   // Check graph nodes
   function onVRSelect(event) {
+    if (window.isDraggingTimeline) return;
     const controller = event.target;
     const controllerSide = controller === controller1 ? 'left' : 'right';
     // console.log(`[VR] Select from ${controllerSide}`);

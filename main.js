@@ -50,6 +50,7 @@ import { InsightPanel } from './insightPanel.js';
 import { initStartMenu } from './startMenu.js';
 import { SlidingTimelineManager } from './SlidingTimelineManager.js';
 
+
 // INTIALIZE THE START MENU AND GLOBAL VARIABLES
 const { datasetKey, deltaMin, username } = await initStartMenu();
 export let userDeltaMin = deltaMin;
@@ -75,6 +76,12 @@ export let timelineManager = null;
 let globalStart = 0;
 let globalDuration = 1;
 let insightPanel = null;
+let isDraggingTimeline = false;
+let timelineDragOffset = 0; 
+let draggingController = null;
+
+// This allows hover.js to check the state globally
+window.isDraggingTimeline = false;
 
 
 // Graph data variables
@@ -272,23 +279,8 @@ const controller2 = renderer.xr.getController(1);
 setupController(controller1, 0, renderer, cameraGroup);
 setupController(controller2, 1, renderer, cameraGroup);
 
-// Controller listeners for moving the temporal window
-controller1.userData.isSqueezing = false;
-controller2.userData.isSqueezing = false;
 
-controller1.addEventListener('squeezestart', () => {
-  controller1.userData.isSqueezing = true;
-});
-controller1.addEventListener('squeezeend', () => {
-  controller1.userData.isSqueezing = false;
-});
 
-controller2.addEventListener('squeezestart', () => {
-  controller2.userData.isSqueezing = true;
-});
-controller2.addEventListener('squeezeend', () => {
-  controller2.userData.isSqueezing = false;
-});
 
 
 
@@ -954,27 +946,86 @@ registerNetworkHandlers({
   },
 });
 
+function handleTimelineDragging(xrFrame) {
+  if (!inVR || !timelineManager || !histogram) return;
 
+  for (const source of xrFrame.session.inputSources) {
+    const controller = source.handedness === 'left' ? controller1 : controller2;
+    const gamepad = source.gamepad;
+    if (!gamepad) continue;
 
-function rebuildPeriodStack() {
-  if (periodStack) {
-    scene.remove(periodStack.group);
-    periodStack = null;
+    // Authority check: Only the hand that started the drag can update it
+    if (isDraggingTimeline && draggingController !== controller) continue;
+
+    const trigger = gamepad.buttons[0]; 
+    const raycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+    
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+    // Build the Plane mathematical object based on the histogram's current rotation
+    const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(histogram.group.quaternion);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+      planeNormal,
+      histogram.group.getWorldPosition(new THREE.Vector3())
+    );
+
+    // 1. START DRAGGING (Hover + Click)
+    if (trigger.pressed && !isDraggingTimeline) {
+      const intersections = raycaster.intersectObject(histogram.highlightWindow);
+      
+      if (intersections.length > 0) {
+        isDraggingTimeline = true;
+        window.isDraggingTimeline = true; // Global flag to block resize
+        draggingController = controller;
+        
+        const hitPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, hitPoint);
+        const localHit = histogram.group.worldToLocal(hitPoint.clone());
+        
+        // Record where we grabbed relative to the window center
+        timelineDragOffset = localHit.x - histogram.highlightWindow.position.x;
+        gamepad.hapticActuators?.[0]?.pulse(0.6, 30);
+      }
+    }
+
+    // 2. WHILE DRAGGING (1D Projection)
+    if (isDraggingTimeline && draggingController === controller) {
+      if (trigger.pressed) {
+        const hitPoint = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(plane, hitPoint)) {
+          const localPoint = histogram.group.worldToLocal(hitPoint.clone());
+          
+          // Apply offset to get the target window center
+          const targetX = localPoint.x - timelineDragOffset;
+
+          // Convert local X to 0.0 - 1.0 ratio
+          const halfWidth = histogram.width / 2;
+          const normalizedX = (targetX + halfWidth) / histogram.width;
+          
+          // Map to time and center the window
+          const newStart = (normalizedX * globalDuration) - (timelineManager.windowSize / 2);
+          
+          timelineManager.currentStart = THREE.MathUtils.clamp(
+            newStart, 
+            0, 
+            globalDuration - timelineManager.windowSize
+          );
+
+          updateTimeWindow(true); 
+        }
+      } else {
+        // 3. RELEASE
+        isDraggingTimeline = false;
+        window.isDraggingTimeline = false;
+        draggingController = null;
+      }
+    }
   }
-
-  const freshData = JSON.parse(JSON.stringify(dataset)); // deep clone
-  periodStack = createPeriodStack({
-    Graph,
-    graphData: freshData,
-    periods: periods,
-    colorScale,
-    spacing: 50,
-    nodeSize: 1.2,
-    controller: graphController
-  });
-
-  scene.add(periodStack.group);
 }
+
 
 // ========================
 // UI Setup (VR Button + Panel)
@@ -1109,6 +1160,70 @@ function updateTimeWindow(force = false) {
   }
 }
 
+// function handleTimelineDragging(xrFrame) {
+//   if (!inVR || !timelineManager || !histogram) return;
+
+//   for (const source of xrFrame.session.inputSources) {
+//     const controller = source.handedness === 'left' ? controller1 : controller2;
+//     const gamepad = source.gamepad;
+//     if (!gamepad) continue;
+
+//     // Use Trigger (button 0) for the grab
+//     const trigger = gamepad.buttons[0]; 
+
+//     // 1. START DRAGGING
+//     if (trigger.pressed && !isDraggingTimeline) {
+//       const raycaster = new THREE.Raycaster();
+//       const tempMatrix = new THREE.Matrix4();
+//       tempMatrix.identity().extractRotation(controller.matrixWorld);
+//       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+//       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+//       const intersections = raycaster.intersectObject(histogram.highlightWindow);
+      
+//       if (intersections.length > 0) {
+//         isDraggingTimeline = true;
+//         window.isDraggingTimeline = true;
+//         draggingController = controller;
+        
+//         // The "Secret Sauce": Store the offset so it doesn't jump to center
+//         const localHit = histogram.group.worldToLocal(intersections[0].point.clone());
+//         timelineDragOffset = localHit.x - histogram.highlightWindow.position.x;
+        
+//         gamepad.hapticActuators?.[0]?.pulse(0.6, 30);
+//       }
+//     }
+
+//     // 2. WHILE DRAGGING
+//     if (isDraggingTimeline && draggingController === controller) {
+//       if (trigger.pressed) {
+//         // Project hand position into histogram local space
+//         const controllerPos = histogram.group.worldToLocal(controller.position.clone());
+//         let targetX = controllerPos.x - timelineDragOffset;
+
+//         // Map local X to time
+//         const halfWidth = histogram.width / 2;
+//         const normalizedX = (targetX + halfWidth) / histogram.width;
+        
+//         const newStart = (normalizedX * globalDuration) - (timelineManager.windowSize / 2);
+        
+//         timelineManager.currentStart = THREE.MathUtils.clamp(
+//           newStart, 
+//           0, 
+//           globalDuration - timelineManager.windowSize
+//         );
+
+//         // Force immediate update for that "silky smooth" feel
+//         updateTimeWindow(true); 
+//       } else {
+//         // 3. STOP DRAGGING
+//         isDraggingTimeline = false;
+//         window.isDraggingTimeline = false;
+//         draggingController = null;
+//       }
+//     }
+//   }
+// }
 
 
 export function highlightSubgraph(nodeId) {
@@ -1247,29 +1362,6 @@ function togglePanel() {
   }
 }
 
-export function applyRemotePeriodStackToggle(visible, context = {}) {
-  if (!periodStack) rebuildPeriodStack();
-
-  // Apply context BEFORE showing
-  if (context.groupName) {
-    graphController.highlightGroup(context.groupName)
-    // highlightGroup(context.groupName);
-  }
-  if (context.period) {
-    graphController.highlightPeriod(context.period)
-    // highlightPeriod(context.period);
-  }
-  if (context.selectedNodeId) {
-    graphController.highlightNode(context.selectedNodeId)
-    // highlightSubgraph(context.selectedNodeId);
-  }
-
-  if (visible) {
-    periodStack.show();
-  } else {
-    periodStack.hide();
-  }
-}
 
 
 
@@ -1386,32 +1478,21 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     hoverPanel.userData.update?.();
   }
 
-  if (inVR && xrFrame) {
+if (inVR && xrFrame) {
+    // 1. Basic Movement & Hands
     handleJoystickInput(xrFrame, camera, cameraGroup);
-
-    // // Calculate deltaTime for smooth sliding and timers
-    // const deltaTime = (timestamp - lastTime) / 1000;
-    // lastTime = timestamp;
     clampCameraToRoom();
     animatePuppetHands(xrFrame, renderer);
 
-    // ============================================================
-    // NEW: "Click-to-Step, Hold-to-Slide" Logic
-    // ============================================================
+    // 2. Timeline Dragging (The new "Hover + Grab" logic)
+    // This is now the primary way to move through time.
+    handleTimelineDragging(xrFrame);
+
+    // 3. Input Polling for Triggers and Sticks
     let isLeftStickPressed = false;
     let isRightStickPressed = false;
     let isLeftTriggerPressed = false;
     let isRightTriggerPressed = false;
-
-
-
-
-
-    // Reset states at the start of the frame check
-    // isLeftTriggerPressed = false;
-    // isRightTriggerPressed = false;
-    // isLeftStickPressed = false;
-    // isRightStickPressed = false;
 
     for (const source of xrFrame.session.inputSources) {
       if (source.gamepad) {
@@ -1430,113 +1511,25 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
       }
     }
 
+// 4. Trigger Hold Timer (Used for Resizing)
     const isTriggerActive = isLeftTriggerPressed || isRightTriggerPressed;
 
-    if (isTriggerActive) {
-      triggerHoldTime += deltaTime; // Timer starts counting up
+    // MODIFIED: Only accumulate hold time if we aren't currently dragging/sliding the bar
+    if (isTriggerActive && !isDraggingTimeline) {
+      triggerHoldTime += deltaTime;
     } else {
-      // Trigger released
-      if (wasTriggerPressed && triggerHoldTime < TRIGGER_HOLD_THRESHOLD) {
-        // This was a quick tap! 
-        // Note: Selection is already handled by 'selectstart' in vrSetup.js
-        console.log("Trigger Tap Detected");
-      }
-      triggerHoldTime = 0; // Reset timer for the next press
+      triggerHoldTime = 0; 
     }
     wasTriggerPressed = isTriggerActive;
 
-
-
-
-
-  // ============================================================
-// ============================================================
-// FINAL FIX: Quantized Stepping (No Batching)
-// ============================================================
-const isLeftSqueezing = controller1.userData.isSqueezing;
-const isRightSqueezing = controller2.userData.isSqueezing;
-
-const isNewPress = (isLeftSqueezing && !wasLeftSqueezePressed) || 
-                   (isRightSqueezing && !wasRightSqueezePressed);
-
-if (isNewPress) {
-  activeHand = isLeftSqueezing ? 'left' : 'right';
-  stickHoldTimer = 0;
-  stepAccumulator = 0;
-
-  // Immediate first step
-  const direction = (activeHand === 'left') ? -1 : 1;
-  timelineManager.shift(direction, 1);
-  
-  // BYPASS THROTTLE: Update everything immediately for the first frame
-  const bucket = timelineManager.getCurrentBucket();
-  graphController.updateEdgeUniforms(bucket.start, bucket.end);
-  graphController.highlightBucket(bucket); 
-  histogram.onTimeChange(bucket);
-
-  const gp = (isLeftSqueezing ? controller1 : controller2).userData.inputSource?.gamepad;
-  gp?.hapticActuators?.[0]?.pulse(0.6, 50);
-}
-
-const isStillHolding = (activeHand === 'left' && isLeftSqueezing) || 
-                       (activeHand === 'right' && isRightSqueezing);
-
-if (isStillHolding) {
-  stickHoldTimer += deltaTime;
-  const direction = (activeHand === 'left') ? -1 : 1;
-
-  if (stickHoldTimer < 3.0) {
-    // --- PHASE 1: 0-3s (Unit-by-Unit Display Sync) ---
-    stepAccumulator += deltaTime;
-
-    if (stepAccumulator >= STEP_INTERVAL) {
-      stepAccumulator = 0; // Hard reset to prevent "catch-up" bursts
-      timelineManager.shift(direction, 1);
-
-      // FORCE RENDER: Bypass frameSkip % 5 so we see every digit change
-      const bucket = timelineManager.getCurrentBucket();
-      graphController.updateEdgeUniforms(bucket.start, bucket.end);
-      graphController.highlightBucket(bucket); 
-      histogram.onTimeChange(bucket);
-    }
-  } else {
-    // --- PHASE 2 & 3: Fast Sliding ---
-    // Here we use the standard updateTimeWindow() which allows throttling 
-    // because at high speeds, you don't need to see every single digit.
-    let currentSpeed = (stickHoldTimer >= 6.0) ? SPEED_TIER_3 : SPEED_TIER_2;
-    timelineManager.shift(direction, currentSpeed * deltaTime);
-    updateTimeWindow(); 
-  }
-} else {
-  if (activeHand !== null) {
-      updateTimeWindow(true); // Force one final packet out
-      broadcastAvatar(camera, controller1, controller2, timelineManager, true); // Force avatar sync
-  }
-  // Reset on release
-  activeHand = null;
-  stickHoldTimer = 0;
-  stepAccumulator = 0;
-}
-
-wasLeftSqueezePressed = isLeftSqueezing;
-wasRightSqueezePressed = isRightSqueezing;
-
-
-
-    // Handle increase in window size
-    const RESIZE_SPEED = 200; // tweak this
-
-
-    // Handle increase in window size
+    // 5. Window Resize Logic (Guard: Only if NOT dragging the window)
     let resized = false;
 
-    if (!cameraGroup.userData.temporalPanel?.visible) {
+    // MODIFIED: Added !isDraggingTimeline check here as well to be safe
+    if (!isDraggingTimeline && !cameraGroup.userData.temporalPanel?.visible) {
       if (triggerHoldTime > TRIGGER_HOLD_THRESHOLD) {
-
-        // 1. Calculate Dynamic Speed based on how long trigger has been held
+        // Calculate Dynamic Speed based on hold duration
         let currentResizeSpeed = RESIZE_SPEED_BASE;
-
-        // Use triggerHoldTime 
         if (triggerHoldTime >= TIER_THRESHOLD * 2) {
           currentResizeSpeed = RESIZE_SPEED_TIER_3;
         } else if (triggerHoldTime >= TIER_THRESHOLD) {
@@ -1545,142 +1538,68 @@ wasRightSqueezePressed = isRightSqueezing;
 
         const deltaResize = currentResizeSpeed * deltaTime;
 
-        // 2. Apply the resize
         if (isLeftTriggerPressed) {
-          // Shrink window
           timelineManager.setWindowSize(timelineManager.windowSize - deltaResize);
           resized = true;
         }
-
         if (isRightTriggerPressed) {
-          // Expand window
           timelineManager.setWindowSize(timelineManager.windowSize + deltaResize);
           resized = true;
         }
       }
     }
 
-
-    // HANDLE THE JOYSTICK PRESS FOR ROTATING THE GRAPH
+    // 6. Graph Rotation (Via Stick Press)
     if (isLeftStickPressed && !isRotatingGraph) {
       isRotatingGraph = true;
       grabbedController = controller1;
-
       startControllerQuat.copy(controller1.quaternion);
       startGraphQuat.copy(graphRoot.quaternion);
     }
-
     if (isRightStickPressed && !isRotatingGraph) {
       isRotatingGraph = true;
       grabbedController = controller2;
-
       startControllerQuat.copy(controller2.quaternion);
       startGraphQuat.copy(graphRoot.quaternion);
     }
 
-    // STOP rotation when released
+    // Stop rotation on release
     if (!isLeftStickPressed && grabbedController === controller1) {
       isRotatingGraph = false;
       grabbedController = null;
     }
-
     if (!isRightStickPressed && grabbedController === controller2) {
       isRotatingGraph = false;
       grabbedController = null;
     }
 
-    if (resized) {
-      updateTimeWindow();
-    }
-    // ============================================================
-
-
-    // Smoothly interpolate scale
+    // 7. Graph Scale Interpolation
     const currentScale = graphRoot.scale.x;
     const newScale = THREE.MathUtils.lerp(currentScale, targetScale, scaleLerpSpeed);
     graphRoot.scale.set(newScale, newScale, newScale);
 
+    // 8. Remaining Button Handlers (X and Y)
     handleXButtonInput(xrFrame, () => {
       resetBtn.click();
-      [controller1, controller2].forEach(c => {
-        const gp = c.userData.inputSource?.gamepad;
-        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
-        if (h?.pulse) {
-          h.pulse(0.8, 100);
-        } else if (navigator.vibrate) {
-          navigator.vibrate(100);
-        }
-      });
-    });
-
-    handleAButtonInput(xrFrame, () => {
-      // Repurposed: Reset both graph and dashboard selection
-      resetGraph();
-      insightPanel.clearSelection?.();
-      
-      [controller1, controller2].forEach(c => {
-        const gp = c.userData.inputSource?.gamepad;
-        gp?.hapticActuators?.[0]?.pulse(0.8, 100);
-      });
-    });
-
-    handleBButtonInput(xrFrame, () => {
-      // // Show the user guide panel
-      // userGuidePanel.visible = !userGuidePanel.visible;
-      // updateVRButtonStates();
-
-      // // This part ensures the video plays/pauses
-      // if (userGuidePanel.onToggle) {
-      //   userGuidePanel.onToggle(userGuidePanel.visible);
-      // }
+      const gp = controller1.userData.inputSource?.gamepad;
+      gp?.hapticActuators?.[0]?.pulse(0.8, 100);
     });
 
     handleYButtonInput(xrFrame, () => {
-      // temporalPanel.toggle();
       const modes = ['ALL', 'INTRA_ONLY', 'INTER_ONLY'];
       const currentIndex = modes.indexOf(graphController.state.edgeMode);
       const nextMode = modes[(currentIndex + 1) % modes.length];
-
       graphController.setEdgeMode(nextMode);
-      [controller1, controller2].forEach(c => {
-        const gp = c.userData.inputSource?.gamepad;
-        const h = gp?.hapticActuators?.[0] || gp?.hapticActuator;
-        if (h?.pulse) {
-          h.pulse(0.8, 100);
-        } else if (navigator.vibrate) {
-          navigator.vibrate(100);
-        }
-        console.log(`Switched Edge Mode to: ${nextMode}`);
-      });
-    })
-
-    handleLeftStickButton(xrFrame, () => {
-      // if (!userGuidePanel.visible) return;
-
-      // if (userGuidePanel.userData.mode === "GUIDE") {
-      //   prevGuidePage(userGuidePanel);
-      // } else {
-      //   userGuidePanel.userData.questionPanel.prevQuestion();
-      // }
+      
+      const gp = controller1.userData.inputSource?.gamepad;
+      gp?.hapticActuators?.[0]?.pulse(0.8, 100);
     });
 
-    handleRightStickButton(xrFrame, () => {
-      // if (!userGuidePanel.visible) return;
-
-      // if (userGuidePanel.userData.mode === "GUIDE") {
-      //   nextGuidePage(userGuidePanel);
-      // } else {
-      //   userGuidePanel.userData.questionPanel.nextQuestion();
-      // }
-    });
-
+    // 9. Hover Detection and Labels
     if (!periodStack?.group?.visible) {
-      // 1. Run detection for both controller
       detectHover(controller1, GraphRef.current.scene(), camera, cameraGroup);
       detectHover(controller2, GraphRef.current.scene(), camera, cameraGroup);
 
-      // 2. Update the label position ONLY once per frame
-      // This ensures the label follows the camera regardless of which hand triggered it
       const label = cameraGroup.getObjectByName('NodeIDBillboard');
       if (label && typeof label.userData.update === 'function') {
         label.userData.update();
@@ -1689,9 +1608,9 @@ wasRightSqueezePressed = isRightSqueezing;
 
     pollGraphSwitchButtons();
   } else {
+    // Desktop / Orbit mode
     controls.update();
   }
-
   // ========================
   // Graph Rotation Update
   // ========================

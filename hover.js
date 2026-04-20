@@ -138,6 +138,11 @@ export function markHoverCacheDirty() {
 }
 
 export function detectHover(controller, graphScene, camera, cameraGroup) {
+  if (window.isDraggingTimeline) {
+     resetAllHoverStates(controller, cameraGroup);
+     if (controller.userData.laser) controller.userData.laser.scale.z = LASER_DEFAULT_LENGTH;
+     return;
+  }
   if (!controller || !graphScene) return;
 
   const interactables = [];
@@ -193,18 +198,24 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     }
   });
 
-  // ============================
-  // ADD HISTOGRAM TO RAYCAST
-  // ============================
-  const histogram = cameraGroup.userData.histogram;
+    // ============================
+    // ADD HISTOGRAM TO RAYCAST
+    // ============================
+    const histogram = cameraGroup.userData.histogram;
 
-  if (histogram) {
-    histogram.group.traverse(obj => {
-      if (obj.userData?.type === "histogramBar") {
-        interactables.push(obj);
+    if (histogram) {
+      // 1. Add the bars (for tooltips)
+      histogram.group.traverse(obj => {
+        if (obj.userData?.type === "histogramBar") {
+          interactables.push(obj);
+        }
+      });
+
+      // 2. Add the actual highlight window (for dragging)
+      if (histogram.highlightWindow) {
+        interactables.push(histogram.highlightWindow);
       }
-    });
-  }
+    }
 
   const guidePanel = cameraGroup.getObjectByName('UserGuidePanel');
 
@@ -355,6 +366,24 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       histogram.tooltip = tooltip;
 
       return; // stop further processing
+    }
+    // CASE F: HISTOGRAM HIGHLIGHT WINDOW HIT
+    // ============================
+    if (hit.userData?.type === "temporalSlider") {
+      // Clear tooltips so they don't block the view while dragging
+      const histogram = hit.userData.parent;
+      if (histogram.tooltip) {
+        histogram.group.remove(histogram.tooltip);
+        histogram.tooltip = null;
+      }
+      
+      // Visual feedback: brighten the window slightly on hover
+      hit.material.opacity = 0.5; 
+      return; 
+    } else {
+      // Reset opacity if not hovering window
+      const histogram = cameraGroup.userData.histogram;
+      if (histogram?.highlightWindow) histogram.highlightWindow.material.opacity = 0.3;
     }
   } else {
     // --- CASE E: NO HIT (Reset Everything) ---
