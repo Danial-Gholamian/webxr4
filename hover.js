@@ -139,9 +139,9 @@ export function markHoverCacheDirty() {
 
 export function detectHover(controller, graphScene, camera, cameraGroup) {
   if (window.isDraggingTimeline) {
-     resetAllHoverStates(controller, cameraGroup);
-     if (controller.userData.laser) controller.userData.laser.scale.z = LASER_DEFAULT_LENGTH;
-     return;
+    resetAllHoverStates(controller, cameraGroup);
+    if (controller.userData.laser) controller.userData.laser.scale.z = LASER_DEFAULT_LENGTH;
+    return;
   }
   if (!controller || !graphScene) return;
 
@@ -178,12 +178,12 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
 
   const panelsToCheck = [
-      graphScene.getObjectByName('FilterUIPanel'),
-      cameraGroup.getObjectByName('FilterUIPanel'),
-      cameraGroup.getObjectByName('TemporalDrillPanel'),
-      cameraGroup.getObjectByName('UserGuidePanel'),
-      cameraGroup.getObjectByName('InsightCanvasPanel'), // <--- CHANGED THIS
-    ];
+    graphScene.getObjectByName('FilterUIPanel'),
+    cameraGroup.getObjectByName('FilterUIPanel'),
+    cameraGroup.getObjectByName('TemporalDrillPanel'),
+    cameraGroup.getObjectByName('UserGuidePanel'),
+    cameraGroup.getObjectByName('InsightCanvasPanel'), // <--- CHANGED THIS
+  ];
 
 
   panelsToCheck.forEach(panel => {
@@ -198,24 +198,24 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
     }
   });
 
-    // ============================
-    // ADD HISTOGRAM TO RAYCAST
-    // ============================
-    const histogram = cameraGroup.userData.histogram;
+  // ============================
+  // ADD HISTOGRAM TO RAYCAST
+  // ============================
+  const histogram = cameraGroup.userData.histogram;
 
-    if (histogram) {
-      // 1. Add the bars (for tooltips)
-      histogram.group.traverse(obj => {
-        if (obj.userData?.type === "histogramBar") {
-          interactables.push(obj);
-        }
-      });
-
-      // 2. Add the actual highlight window (for dragging)
-      if (histogram.highlightWindow) {
-        interactables.push(histogram.highlightWindow);
+  if (histogram) {
+    // 1. Add the bars (for tooltips)
+    histogram.group.traverse(obj => {
+      if (obj.userData?.type === "histogramBar") {
+        interactables.push(obj);
       }
+    });
+
+    // 2. Add the actual highlight window (for dragging)
+    if (histogram.highlightWindow) {
+      interactables.push(histogram.highlightWindow);
     }
+  }
 
   const guidePanel = cameraGroup.getObjectByName('UserGuidePanel');
 
@@ -357,10 +357,19 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       const tooltip = histogram.createTooltip(text);
 
       // Position above bar
-      tooltip.position.copy(intersection.point);
-      histogram.group.worldToLocal(tooltip.position);
-      tooltip.position.y += 0.08;
-      tooltip.position.z += 0.05;
+      // Convert hit point to local (for X only)
+      const local = intersection.point.clone();
+      histogram.group.worldToLocal(local);
+
+      // FIXED HEIGHT (above all bars)
+      const FIXED_HEIGHT = histogram.maxHeight + 0.09;
+
+      // Apply position
+      tooltip.position.set(
+        local.x,           // keep correct horizontal position
+        FIXED_HEIGHT,      // constant height 
+        0.05               // slight forward offset
+      );
 
       histogram.group.add(tooltip);
       histogram.tooltip = tooltip;
@@ -376,10 +385,10 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
         histogram.group.remove(histogram.tooltip);
         histogram.tooltip = null;
       }
-      
+
       // Visual feedback: brighten the window slightly on hover
-      hit.material.opacity = 0.5; 
-      return; 
+      hit.material.opacity = 0.5;
+      return;
     } else {
       // Reset opacity if not hovering window
       const histogram = cameraGroup.userData.histogram;

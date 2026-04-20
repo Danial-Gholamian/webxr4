@@ -5,8 +5,6 @@ import { createCapsuleLabel } from './filterUIPanel';
 // Load all the images
 const loader = new THREE.TextureLoader();
 const guideImages = {
-    "edge-mode.jpeg": loader.load(' /webxr4/guide-images/edge-mode.jpeg'),
-    "group-filter-a.jpeg": loader.load(' /webxr4/guide-images/group-filter-a.jpeg'),
     "movement.jpeg": loader.load(' /webxr4/guide-images/movement.jpeg'),
     "move-window.jpeg": loader.load(' /webxr4/guide-images/move-window.jpeg'),
     "reset-filter.jpeg": loader.load(' /webxr4/guide-images/reset-filter.jpeg'),
@@ -20,22 +18,12 @@ const ITEMS_PER_PAGE = 4;
 const GUIDE_ITEMS = [
     {
         type: "image",
-        title: "Switch edge mode",
-        image: "edge-mode.jpeg"
-    },
-    {
-        type: "image",
-        title: "Filter groups",
-        image: "group-filter-a.jpeg"
-    },
-    {
-        type: "image",
         title: "Move & Rotate",
         image: "movement.jpeg"
     },
     {
         type: "image",
-        title: "Resize time window",
+        title: "Left to move backward, Right to move forward.",
         image: "move-window.jpeg"
     },
     {

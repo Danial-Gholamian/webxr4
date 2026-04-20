@@ -53,7 +53,7 @@ export class HistogramGauge {
     this.group.scale.set(1.3, 1.3, 1.3);
 
     // Position relative to cameraGroup (shoulder-docked)
-    this.group.position.set(0, -0.15, -1.5);
+    this.group.position.set(0, -0.15, -2.5);
 
     // Tilt the histogram toward the user
     // this.group.rotation.y = -Math.PI / 2.95;
@@ -149,7 +149,7 @@ _buildHistogram(bins) {
 
   createTooltip(text) {
     const label = createCapsuleLabel(text, {
-      fontSize: 40,
+      fontSize: 35,
       color: 0x000000,
       textColor: "#ffffff",
       opacity: 0.85
@@ -230,7 +230,7 @@ _buildHistogram(bins) {
   }
 
   _resetWindow() {
-    this.resetButton = createCapsuleLabel('Reset', {
+    this.resetButton = createCapsuleLabel('Reset Window', {
       fontSize: 48,
       color: 0x882222,
       hoverColor: 0xaa4444,
