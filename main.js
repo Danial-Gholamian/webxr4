@@ -1546,6 +1546,9 @@ if (inVR && xrFrame) {
           timelineManager.setWindowSize(timelineManager.windowSize + deltaResize);
           resized = true;
         }
+        if (resized) {
+          updateTimeWindow(true); // Force visual and GPU update every frame while resizing
+        }
       }
     }
 
