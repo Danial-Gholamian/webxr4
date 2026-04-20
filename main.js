@@ -1588,13 +1588,13 @@ if (inVR && xrFrame) {
     });
 
     handleYButtonInput(xrFrame, () => {
-      const modes = ['ALL', 'INTRA_ONLY', 'INTER_ONLY'];
-      const currentIndex = modes.indexOf(graphController.state.edgeMode);
-      const nextMode = modes[(currentIndex + 1) % modes.length];
-      graphController.setEdgeMode(nextMode);
+      // const modes = ['ALL', 'INTRA_ONLY', 'INTER_ONLY'];
+      // const currentIndex = modes.indexOf(graphController.state.edgeMode);
+      // const nextMode = modes[(currentIndex + 1) % modes.length];
+      // graphController.setEdgeMode(nextMode);
       
-      const gp = controller1.userData.inputSource?.gamepad;
-      gp?.hapticActuators?.[0]?.pulse(0.8, 100);
+      // const gp = controller1.userData.inputSource?.gamepad;
+      // gp?.hapticActuators?.[0]?.pulse(0.8, 100);
     });
 
     // 9. Hover Detection

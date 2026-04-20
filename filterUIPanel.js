@@ -312,7 +312,10 @@ export function createCapsuleLabel(text, {
   hoverColor = "#444488",
   textColor = "#ffffff",
   opacity = 0.9,
-  onClick = null
+  onClick = null,
+  dotColor = null,
+  dotRadius = 0,
+  dotGap = 0,
 } = {}) {
 
   const group = new THREE.Group();
@@ -334,7 +337,9 @@ export function createCapsuleLabel(text, {
   const paddingX = 60;
   const paddingY = 40;
 
-  const width = textWidth + paddingX * 2;
+  const extraDotSpace = dotColor ? (dotRadius * 2 + dotGap) : 0;
+
+  const width = textWidth + paddingX * 2 + extraDotSpace;
   const height = 120;
 
   canvas.width = width;
@@ -386,7 +391,33 @@ export function createCapsuleLabel(text, {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    ctx.fillText(labelText, width / 2, height / 2);
+    // =======================================
+    // DOT (ONLY if provided)
+    // =======================================
+    let textX = width / 2;
+
+    if (dotColor) {
+      const cssDot = "#" + new THREE.Color(dotColor).getHexString();
+
+      const dotX = paddingX; // left side
+      const dotY = height / 2;
+
+      ctx.beginPath();
+      ctx.fillStyle = cssDot;
+      ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // shift text right
+      textX = width / 2 + dotRadius + dotGap;
+    }
+
+    // =======================================
+    // TEXT
+    // =======================================
+    ctx.fillStyle = textColor;
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = "left";
+    ctx.fillText(labelText, paddingX + dotRadius * 2 + dotGap, height / 2);
 
     texture.needsUpdate = true;
 

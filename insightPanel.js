@@ -9,7 +9,7 @@ export class InsightPanel {
         this.group.name = "InsightCanvasPanel";
 
         this.canvasWidth = 1024;
-        this.canvasHeight = 1400; 
+        this.canvasHeight = 1400;
         this.canvas = document.createElement('canvas');
         this.canvas.width = this.canvasWidth;
         this.canvas.height = this.canvasHeight;
@@ -19,16 +19,16 @@ export class InsightPanel {
         this.texture.colorSpace = THREE.SRGBColorSpace;
 
         const worldWidth = 1.3;
-        const aspect = this.canvasHeight / this.canvasWidth; 
+        const aspect = this.canvasHeight / this.canvasWidth;
         this.worldWidth = worldWidth;
-        this.worldHeight = worldWidth * aspect; 
-        
+        this.worldHeight = worldWidth * aspect;
+
         this.mesh = new THREE.Mesh(
             new THREE.PlaneGeometry(this.worldWidth, this.worldHeight),
             new THREE.MeshBasicMaterial({
                 map: this.texture,
                 transparent: true,
-                depthTest: false, 
+                depthTest: false,
                 depthWrite: false
             })
         );
@@ -44,13 +44,13 @@ export class InsightPanel {
 
         this.interactionGroup = new THREE.Group();
         this.interactionGroup.name = "InsightInteractionLayer";
-        this.interactionGroup.position.z = 0.01; 
+        this.interactionGroup.position.z = 0.01;
 
         this.group.add(this.hitPlane);
         this.group.add(this.mesh);
         this.group.add(this.interactionGroup);
-        
-        this.group.position.set(2.2, 1.8, -2.1); 
+
+        this.group.position.set(2.2, 1.8, -2.1);
         this.group.rotation.y = -Math.PI / 3.2;
 
         this.selectedGroup = null;
@@ -58,10 +58,10 @@ export class InsightPanel {
         // --- CALIBRATION CONSTANTS ---
         this.RIGHT_COL_CENTER_X = 680;
         this.START_Y_PIXELS = 250;
-        this.ROW_HEIGHT_PIXELS = 82; 
+        this.ROW_HEIGHT_PIXELS = 82;
 
         // Mode Button Pixels (Near bottom)
-        this.MODE_Y_PIXELS = 1240; 
+        this.MODE_Y_PIXELS = 1240;
         this.MODE_X_ALL = 250;
         this.MODE_X_INTRA = 512;
         this.MODE_X_INTER = 774;
@@ -85,7 +85,7 @@ export class InsightPanel {
         this.interactionGroup.clear();
     }
 
-    _drawInteractionElements(stats, edgeMode) {
+    _drawInteractionElements(stats, edgeMode, colorScale) {
         this.clearInteractionLayer();
         const controller = getGraphController();
 
@@ -99,7 +99,12 @@ export class InsightPanel {
                 color: 0x1f2a44,
                 hoverColor: 0x3366ff,
                 selectedColor: 0x00ffcc,
-                fontSize: 38, 
+                fontSize: 80,
+                // DOT HERE
+                dotColor: colorScale(g.name),
+                dotRadius: 30,
+                dotGap: 50,
+
                 onClick: () => {
                     this.selectedGroup = g.name;
                     highlightGroup(g.name);
@@ -107,8 +112,8 @@ export class InsightPanel {
             });
 
             capsule.position.set(btnWorldX, btnWorldY, 0);
-            capsule.scale.set(0.75, 0.75, 0.75);
-            this._applyVRStyles(capsule, this.selectedGroup === g.name);
+            capsule.scale.set(0.65, 0.65, 0.65);
+            this._applyVRStyles(capsule, false);
             this.interactionGroup.add(capsule);
         });
 
@@ -116,7 +121,7 @@ export class InsightPanel {
         const modes = [
             { label: 'ALL', x: this.MODE_X_ALL, color: 0x00ff00 },
             { label: 'INTRA', x: this.MODE_X_INTRA, color: 0x4444ff },
-            { label: 'INTER', x: this.MODE_X_INTER, color: 0xffffff }
+            { label: 'INTER', x: this.MODE_X_INTER, color: 0xaa00ff  }
         ];
 
         modes.forEach(m => {
@@ -128,11 +133,11 @@ export class InsightPanel {
                 color: 0x111827,
                 hoverColor: 0x3366ff,
                 selectedColor: m.color,
-                fontSize: 40,
+                fontSize: 55,
                 onClick: () => {
                     const fullMode = m.label === 'ALL' ? 'ALL' : m.label + '_ONLY';
                     controller.setEdgeMode(fullMode);
-                }
+                },
             });
 
             capsule.position.set(worldX, worldY, 0);
@@ -187,17 +192,21 @@ export class InsightPanel {
 
         stats.topGroups.slice(0, 12).forEach((g, i) => {
             const yPos = this.START_Y_PIXELS + (i * this.ROW_HEIGHT_PIXELS);
-            ctx.fillStyle = colorScale(g.name);
-            ctx.beginPath();
-            ctx.arc(585, yPos - 12, 12, 0, Math.PI * 2);
-            ctx.fill();
+            // ctx.fillStyle = colorScale(g.name);
+            // ctx.beginPath();
+            // const DOT_OFFSET = -60; // tweak this
+            // const dotX = this.RIGHT_COL_CENTER_X + DOT_OFFSET;
+
+            // ctx.beginPath();
+            // ctx.arc(dotX, yPos - 12, 16, 0, Math.PI * 2);
+            // ctx.fill();
             ctx.fillStyle = '#ffffff';
-            ctx.font = '32px Arial';
-            ctx.fillText(`(${g.count})`, 820, yPos);
+            ctx.font = '48px Arial';
+            ctx.fillText(`(${g.count})`, this.RIGHT_COL_CENTER_X + 120, yPos + 8);
         });
 
         this._drawNodeList(ctx, stats, colorScale, nodeSelected);
-        
+
         // Footer & Mode Labels
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 45px Arial';
@@ -211,7 +220,7 @@ export class InsightPanel {
         }
 
         this.texture.needsUpdate = true;
-        this._drawInteractionElements(stats, edgeMode);
+        this._drawInteractionElements(stats, edgeMode, colorScale);
     }
 
     _drawNodeList(ctx, stats, colorScale, nodeSelected) {
