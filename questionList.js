@@ -1,5 +1,5 @@
 export const QUESTIONS = [
-        {
+    {
         question: "Set the temporal window size to approximately 150 units and move it to the interval [4300–4450]. Set the interaction mode to Inter-group. Which group has the highest number of interactions in this interval?",
         answers: [
             "Teachers", // Correct
@@ -31,7 +31,7 @@ export const QUESTIONS = [
         answers: [
             "Groups 1B, 3B, 3A", // Correct Answer
             "Groups 4B, Teachers, 5A",
-            "Groups 1B, 2B, 3A", 
+            "Groups 1B, 2B, 3A",
             "Groups 5B, 2A, 1B"
 
         ]
@@ -57,8 +57,8 @@ export const QUESTIONS = [
     {
         question: "Reset the graph and set the interaction filter to inter-group. Reduce the temporal window to a single timestamp and explore the timeline. During which interval does interaction between teachers and students drop significantly (indicating lunch break)?",
         answers: [
-            "Interval 580 - 900",
-            "Interval 5000 - 5300",
+            "Interval 593 - 900",
+            "Interval 4910 - 5290",
             "Both intervals", // Correct Answer
             "No clear interval"
         ]
@@ -71,6 +71,15 @@ export const QUESTIONS = [
             "Interval B",
             "Both intervals show similar activity",
             "Cannot determine"
+        ]
+    },
+    {
+        question: "Take a moment to freely explore the dataset using the system. You may adjust the temporal window, apply filters, and inspect different groups or nodes. Describe any patterns, trends, or behaviors you observe in the data. If you do not notice any clear patterns, you may simply state that.",
+        answers: [
+            "Open ended question",
+            "",
+            "",
+            ""
         ]
     }
 ];
