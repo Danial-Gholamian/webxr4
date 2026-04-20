@@ -35,15 +35,20 @@ function setupController(controller, index, renderer, cameraGroup) {
   const laser = new THREE.Line(laserGeometry, laserMaterial);
   laser.name = 'laser';
   laser.scale.z = laserDistance;
-  console.log(`Laser length ${laserDistance}`)
   laser.userData.isLaser = true;
-  laser.renderOrder = 2000; // higher than panel
-  // comment
+  laser.renderOrder = 2000; 
+
   controller.add(laser);
   controller.userData.laser = laser;
   cameraGroup.add(controller);
 
+  controller.addEventListener('squeezestart', () => {
+    controller.userData.isSqueezing = true;
+  });
 
+  controller.addEventListener('squeezeend', () => {
+    controller.userData.isSqueezing = false;
+  });
 }
 
 // // --- 1.2 Changing time slices ---
