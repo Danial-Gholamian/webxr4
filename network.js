@@ -7,12 +7,14 @@ import { myUsername, getActivePeriods } from './main.js';
 import { handleUserList } from './voice.js';
 
 
+
 let injectedHandlers = null;
 
 export function registerNetworkHandlers(handlers) {
   injectedHandlers = handlers;
 }
 
+const lastWindowSeq = {};
 
 
 const ROTATION_COMPRESSION_FACTOR = 1000;
@@ -407,4 +409,19 @@ export function broadcastDatasetChange(datasetKey) {
     datasetKey
   });
 }
+
+socket.on('window-update', ({ id, start, end, seq }) => {
+  if (id === socket.id) return;
+
+  // Ignore stale packets (Version Control)
+  if (lastWindowSeq[id] !== undefined && seq <= lastWindowSeq[id]) {
+    return;
+  }
+
+  lastWindowSeq[id] = seq;
+
+  if (window.histogramRef) {
+    window.histogramRef.updateRemoteWindow(id, start, end);
+  }
+});
 

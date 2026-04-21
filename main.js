@@ -82,6 +82,9 @@ let draggingController = null;
 
 // This allows hover.js to check the state globally
 window.isDraggingTimeline = false;
+let windowSeq = 0;
+let lastWindowSend = 0;
+const WINDOW_SEND_INTERVAL = 50; // Sync at 20Hz
 
 
 // Graph data variables
@@ -1130,26 +1133,34 @@ let lastSentEnd = -1;
 
 function updateTimeWindow(force = false) {
   const newBucket = timelineManager.getCurrentBucket();
+  const now = performance.now()
+
 
   // 1. ALWAYS update the GPU Edges (Immediate visual feedback)
   graphController.updateEdgeUniforms(newBucket.start, newBucket.end);
-
+  if (histogram) histogram.onTimeChange(newBucket);
   // 2. NETWORK SYNC: Use the 'force' flag to bypass the "same value" check
-  if (force || newBucket.start !== lastSentStart || newBucket.end !== lastSentEnd) {
+  if (
+      force ||
+      (now - lastWindowSend > WINDOW_SEND_INTERVAL &&
+      (newBucket.start !== lastSentStart || newBucket.end !== lastSentEnd))
+    ) {
       socket.emit('window-update', { 
         id: socket.id,
-        start: newBucket.start, 
-        end: newBucket.end 
+        start: newBucket.start,
+        end: newBucket.end,
+        seq: windowSeq++
       });
+
       lastSentStart = newBucket.start;
       lastSentEnd = newBucket.end;
-  }
+      lastWindowSend = now;
+    }
 
   // 3. THROTTLE the CPU Node/Selection logic (Keep VR at 90FPS)
   frameSkip++;
   if (frameSkip % 5 === 0) {
     graphController.highlightBucket(newBucket);
-    if (histogram) histogram.onTimeChange(newBucket);
     frameSkip = 0;
   }
 }
