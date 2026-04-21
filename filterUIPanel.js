@@ -306,6 +306,154 @@ console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeStrin
 const DEBUG = true;
 
 export function createCapsuleLabel(text, {
+  fontSize = 72,
+  color = "#222244",
+  hoverColor = "#444488",
+  textColor = "#ffffff",
+  opacity = 0.9,
+  onClick = null
+} = {}) {
+
+  const group = new THREE.Group();
+
+  // ----------------------------
+  // Canvas setup
+  // ----------------------------
+
+  const canvas = document.createElement("canvas");
+
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
+  ctx.font = `bold ${fontSize}px Arial`;
+  const metrics = ctx.measureText(text);
+  const textWidth = metrics.width;
+
+  const paddingX = 60;
+  const paddingY = 40;
+
+  const width = textWidth + paddingX * 2;
+  const height = 120;
+
+  canvas.width = width;
+  canvas.height = height;
+
+  // ----------------------------
+  // Texture
+  // ----------------------------
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+
+  let labelText = text;
+  function drawCapsule(bgColor) {
+
+
+    ctx.globalAlpha = 1;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const radius = height / 2;
+
+    const cssColor = "#" + new THREE.Color(bgColor).getHexString();
+    ctx.fillStyle = cssColor;
+    ctx.globalAlpha = opacity;
+
+    ctx.beginPath();
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(width - radius, 0);
+    ctx.quadraticCurveTo(width, 0, width, radius);
+    ctx.lineTo(width, height - radius);
+    ctx.quadraticCurveTo(width, height, width - radius, height);
+    ctx.lineTo(radius, height);
+    ctx.quadraticCurveTo(0, height, 0, height - radius);
+    ctx.lineTo(0, radius);
+    ctx.quadraticCurveTo(0, 0, radius, 0);
+    ctx.closePath();
+
+    ctx.fill();
+
+    // ----------------------------
+    // Text
+    // ----------------------------
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = textColor;
+
+    ctx.font = `bold ${fontSize}px Arial`;   // fixed pixel size
+    const metrics = ctx.measureText(labelText);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(labelText, width / 2, height / 2);
+
+    texture.needsUpdate = true;
+
+    group.userData.setText = (newText) => {
+      labelText = newText;
+
+      ctx.clearRect(0, 0, width, height);
+      drawCapsule(mesh.userData.defaultColor);
+    };
+  }
+
+  drawCapsule(color);
+
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    toneMapped: false
+  });
+
+  const aspect = canvas.width / canvas.height;
+
+  const geometry = new THREE.PlaneGeometry(
+    0.1 * aspect,
+    0.14
+  );
+
+  const mesh = new THREE.Mesh(geometry, material);
+
+  mesh.userData.defaultColor = color;
+  mesh.userData.hoverColor = hoverColor;
+  mesh.userData.selectedColor = "#3366ff";
+  mesh.userData.isSelected = false;
+  mesh.userData.redraw = drawCapsule;
+
+  group.add(mesh);
+
+  // ----------------------------
+  // Hitbox for interaction
+  // ----------------------------
+  const hitbox = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.35, 0.14),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+
+  hitbox.name = "capsuleHitbox";
+  hitbox.position.z = 0.01;
+
+  hitbox.userData = {
+    interactive: true,
+    label: text,
+    onClick,
+    target: mesh,
+    redraw: drawCapsule,
+    texture
+  };
+
+  group.userData.hitbox = hitbox;
+
+  group.add(hitbox);
+
+  return group;
+}
+
+
+
+export function createCapsuleLabelWithDot(text, {
   selectedColor = "#3366ff",
   fontSize = 72,
   color = "#222244",

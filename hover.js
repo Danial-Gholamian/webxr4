@@ -284,61 +284,7 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       }
       return;
     }
-
-    // CASE C: GRAPH NODE HIT
-    if (hit.__data?.id) {
-      const nodeId = String(hit.__data.id);
-      const groupNum = String(hit.__data.group);
-      const now = performance.now();
-
-      // Reset UI if looking at graph
-      if (controller.userData.lastHoveredButton) {
-        const btn = controller.userData.lastHoveredButton;
-        const col = btn.userData.isSelected ? btn.userData.selectedColor : btn.userData.defaultColor;
-        if (btn.userData.redraw) btn.userData.redraw(col);
-        controller.userData.lastHoveredButton = null;
-      }
-
-      // Restore previous node material if moving between nodes
-      const prev = controller.userData.lastHoveredObject;
-      if (prev && prev !== hit && prev.material?.__originalEmissive !== undefined) {
-        prev.material.emissive.copy(prev.material.__originalEmissive);
-        prev.material.emissiveIntensity = prev.material.__originalEmissiveIntensity;
-        delete prev.material.__originalEmissive;
-        delete prev.material.__originalEmissiveIntensity;
-      }
-
-      // Setup Highlight
-      if (!hit.userData.wasClonedForHover) {
-        hit.userData.originalMaterial = hit.material;
-        hit.material = hit.material.clone();
-        hit.userData.wasClonedForHover = true;
-      }
-      if (!hit.material.__originalEmissive) {
-        hit.material.__originalEmissive = hit.material.emissive.clone();
-        hit.material.__originalEmissiveIntensity = hit.material.emissiveIntensity;
-        hit.material.emissive = hit.material.color.clone();
-        hit.material.emissiveIntensity = 0.8;
-      }
-
-      // Feedback
-      if (nodeId !== controller.userData.lastHoveredNodeId) {
-        if (now - controller.userData.lastPulseTime > 500) {
-          triggerHaptic();
-          controller.userData.lastPulseTime = now;
-        }
-
-        // Extract the exact hex color of the 3D node you are pointing at
-        const colorHex = '#' + hit.material.color.getHexString();
-
-        // Pass the colorHex into our updated function!
-        initLabels(nodeId, groupNum, colorHex, camera, cameraGroup);
-      }
-
-      controller.userData.lastHoveredObject = hit;
-      controller.userData.lastHoveredNodeId = nodeId;
-    }
-
+    
     // CASE D HISTOGRAM BAR HIT
     // ============================
     if (hit.userData?.type === "histogramBar") {
@@ -398,6 +344,63 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
       const histogram = cameraGroup.userData.histogram;
       if (histogram?.highlightWindow) histogram.highlightWindow.material.opacity = 0.3;
     }
+
+    
+    // CASE C: GRAPH NODE HIT
+    if (hit.__data?.id) {
+      const nodeId = String(hit.__data.id);
+      const groupNum = String(hit.__data.group);
+      const now = performance.now();
+
+      // Reset UI if looking at graph
+      if (controller.userData.lastHoveredButton) {
+        const btn = controller.userData.lastHoveredButton;
+        const col = btn.userData.isSelected ? btn.userData.selectedColor : btn.userData.defaultColor;
+        if (btn.userData.redraw) btn.userData.redraw(col);
+        controller.userData.lastHoveredButton = null;
+      }
+
+      // Restore previous node material if moving between nodes
+      const prev = controller.userData.lastHoveredObject;
+      if (prev && prev !== hit && prev.material?.__originalEmissive !== undefined) {
+        prev.material.emissive.copy(prev.material.__originalEmissive);
+        prev.material.emissiveIntensity = prev.material.__originalEmissiveIntensity;
+        delete prev.material.__originalEmissive;
+        delete prev.material.__originalEmissiveIntensity;
+      }
+
+      // Setup Highlight
+      if (!hit.userData.wasClonedForHover) {
+        hit.userData.originalMaterial = hit.material;
+        hit.material = hit.material.clone();
+        hit.userData.wasClonedForHover = true;
+      }
+      if (!hit.material.__originalEmissive) {
+        hit.material.__originalEmissive = hit.material.emissive.clone();
+        hit.material.__originalEmissiveIntensity = hit.material.emissiveIntensity;
+        hit.material.emissive = hit.material.color.clone();
+        hit.material.emissiveIntensity = 0.8;
+      }
+
+      // Feedback
+      if (nodeId !== controller.userData.lastHoveredNodeId) {
+        if (now - controller.userData.lastPulseTime > 500) {
+          triggerHaptic();
+          controller.userData.lastPulseTime = now;
+        }
+
+        // Extract the exact hex color of the 3D node you are pointing at
+        const colorHex = '#' + hit.material.color.getHexString();
+
+        // Pass the colorHex into our updated function!
+        initLabels(nodeId, groupNum, colorHex, camera, cameraGroup);
+      }
+
+      controller.userData.lastHoveredObject = hit;
+      controller.userData.lastHoveredNodeId = nodeId;
+    }
+
+
   } else {
     // --- CASE E: NO HIT (Reset Everything) ---
     if (line) line.scale.z = LASER_DEFAULT_LENGTH;

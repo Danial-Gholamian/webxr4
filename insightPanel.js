@@ -1,6 +1,6 @@
 //insightPanel.js
 import * as THREE from 'three';
-import { createCapsuleLabel } from './filterUIPanel.js';
+import { createCapsuleLabel, createCapsuleLabelWithDot } from './filterUIPanel.js';
 import { highlightGroup, getGraphController } from './main.js'; // Added controller import
 
 export class InsightPanel {
@@ -95,7 +95,7 @@ export class InsightPanel {
             const currentYPixel = this.START_Y_PIXELS + (i * this.ROW_HEIGHT_PIXELS);
             const btnWorldY = this._pixelToWorldY(currentYPixel);
 
-            const capsule = createCapsuleLabel(`${g.name}`, {
+            const capsule = createCapsuleLabelWithDot(`${g.name}`, {
                 color: 0x1f2a44,
                 hoverColor: 0x3366ff,
                 selectedColor: 0x00ffcc,
