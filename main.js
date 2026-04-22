@@ -30,7 +30,7 @@ import {
 import { createUserGuidePanel, nextGuidePage, prevGuidePage } from './userGuidePanel.js';
 import { detectHover } from './hover.js';
 // We only keep the label and period helpers
-import { updatePeroidLabel, createCapsuleLabel } from './filterUIPanel.js';
+import { updatePeroidLabel, createCapsuleLabel, createCapsuleLabelWithDot } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUsername, broadcastNodeSelection, socket } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
 import { createPeriodStack } from './periodStack.js';
@@ -734,7 +734,7 @@ window.histogramRef = histogram
 // VR GUIDE / QUESTION BUTTONS
 // ========================
 
-const guideVRBtn = createCapsuleLabel("Guide", {
+const guideVRBtn = createCapsuleLabelWithDot("Guide", {
   selectedColor: "#C41E3A",
   fontSize: 40,
   color: 0x1f3a5f,
@@ -758,7 +758,7 @@ const guideVRBtn = createCapsuleLabel("Guide", {
   }
 });
 
-const questionVRBtn = createCapsuleLabel("Questions", {
+const questionVRBtn = createCapsuleLabelWithDot("Questions", {
   selectedColor: "#C41E3A",
   fontSize: 40,
   color: 0x1f3a5f,

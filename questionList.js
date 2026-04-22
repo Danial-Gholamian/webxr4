@@ -18,7 +18,7 @@ export const QUESTIONS = [
         ]
     },
     {
-        question: "Reset the graph. Reduce the temporal window size to a single timestamp and move it to the interval [1554–1556]. How many active nodes are visible in the graph?",
+        question: "Reset the graph. Reduce the temporal window size to a timestamp of 2 units and move it to the interval [1554–1556]. How many active nodes are visible in the graph?",
         answers: [
             "22", // Correct
             "18",

@@ -129,7 +129,7 @@ export class InsightPanel {
             const worldY = this._pixelToWorldY(this.MODE_Y_PIXELS);
             const isActive = edgeMode.startsWith(m.label); // Matches 'ALL', 'INTRA_ONLY', etc.
 
-            const capsule = createCapsuleLabel(m.label, {
+            const capsule = createCapsuleLabelWithDot(m.label, {
                 color: 0x111827,
                 hoverColor: 0x3366ff,
                 selectedColor: m.color,
