@@ -56,7 +56,8 @@ export class GraphVisualController {
             group: {
                 active: false,
                 nodeIds: new Set(),
-                edgeIds: new Set()
+                edgeIds: new Set(),
+                externalNeighbors: new Set()
             },
             edgeMode: 'ALL' // Modes: 'ALL', 'INTRA_ONLY', 'INTER_ONLY'
         };
@@ -207,20 +208,18 @@ export class GraphVisualController {
         this._onSelectionChange?.(null);
     }
 
+
     highlightGroup(groupId) {
-        // // Clear any node selection that might be in place as well TODO
         if (this.state.selection.active) {
-            this._clearNodeSelectionState()
+            this._clearNodeSelectionState();
         }
         const normalized = String(groupId).toLowerCase();
 
         this.state.group.active = true;
         this.state.group.nodeIds.clear();
-        this.state.group.edgeIds.clear();
+        this.state.group.edgeIds.clear(); // We won't strictly need edgeIds with the new visibility logic
 
-
-
-        // Collect nodes
+        // Collect nodes belonging to the group
         this.graph.graphData().nodes.forEach(node => {
             const nodeGroup = String(this.adapter.getNodeGroup(node)).toLowerCase();
             if (nodeGroup === normalized) {
@@ -228,19 +227,8 @@ export class GraphVisualController {
             }
         });
 
-        // Collect edges
-        this.graph.graphData().links.forEach(link => {
-            const src = this.adapter.getEdgeSource(link);
-            const tgt = this.adapter.getEdgeTarget(link);
-            const key = this._getEdgeKey(src, tgt);
-
-            if (
-                this.state.group.nodeIds.has(src) &&
-                this.state.group.nodeIds.has(tgt)
-            ) {
-                this.state.group.edgeIds.add(key);
-            }
-        });
+        // We skip collecting edges here because _isEdgeVisible now 
+        // calculates visibility dynamically based on nodeIds.
 
         this.update();
     }
@@ -318,6 +306,35 @@ export class GraphVisualController {
         });
     }
 
+    _updateGroupNeighborCache() {
+        if (!this.state.group.active) {
+            this.state.group.externalNeighbors.clear();
+            return;
+        }
+
+        const neighbors = new Set();
+        const bucket = this.state.activeBucket;
+        const groupNodeIds = this.state.group.nodeIds;
+
+        // We only iterate the links list ONCE ($L$)
+        this.graph.graphData().links.forEach(link => {
+            // Only consider links active in the current time window
+            if (!this._edgeInBucket(link, bucket)) return;
+
+            const src = this.adapter.getEdgeSource(link);
+            const tgt = this.adapter.getEdgeTarget(link);
+
+            const srcInGroup = groupNodeIds.has(src);
+            const tgtInGroup = groupNodeIds.has(tgt);
+
+            // Check for "Inter" connections (one end in group, one end out)
+            if (srcInGroup && !tgtInGroup) neighbors.add(tgt);
+            else if (!srcInGroup && tgtInGroup) neighbors.add(src);
+        });
+
+        this.state.group.externalNeighbors = neighbors;
+    }
+
 
     clearBucketFilter() {
         this.state.activeBucket = null;
@@ -353,6 +370,11 @@ export class GraphVisualController {
     update() {
         if (this.state.selection.active && this.state.activeBucket) {
             this._updateSelectionForBucket(this.state.activeBucket);
+        }
+
+        // Calculate neighbors once per update cycle
+        if (this.state.group.active) {
+            this._updateGroupNeighborCache();
         }
 
         const ctx = this._buildVisibilityContext();
@@ -418,30 +440,33 @@ export class GraphVisualController {
     }
 
 
+
+
     _isNodeVisible(nodeId, ctx) {
-        // 1. SELECTION LOGIC: If selection is active, only show the node or active neighbors
+        // 1. SELECTION LOGIC (Node specific)
         if (ctx.selection.active) {
             const isSelected = nodeId === ctx.selection.selectedNodeId;
             const isConnectedNeighbor = ctx.selection.neighbors.has(nodeId);
-
-            // Even if it's a neighbor, if we are in a bucket, 
-            // it MUST be active in this specific time window
-            if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) {
-                return false;
-            }
-
+            if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) return false;
             return isSelected || isConnectedNeighbor;
         }
 
         // 2. GROUP LOGIC
-        if (ctx.group.active && !ctx.group.nodeIds.has(nodeId)) return false;
+        if (ctx.group.active) {
+            // Is it in the group?
+            if (ctx.group.nodeIds.has(nodeId)) return true;
+            
+            // Is it an external node connected to the group? (Using our cache)
+            if (this.state.group.externalNeighbors.has(nodeId)) return true;
+            
+            return false;
+        }
 
         // 3. TEMPORAL LOGIC (General View)
         if (ctx.activeBucket && !ctx.bucketNodes?.has(nodeId)) return false;
 
         return true;
     }
-
 
 
 
@@ -469,7 +494,9 @@ export class GraphVisualController {
         }
 
         if (ctx.group.active) {
-            return ctx.group.edgeIds.has(this._getEdgeKey(srcId, tgtId));
+            // CHANGED: Instead of checking ctx.group.edgeIds (which only contains intra-edges),
+            // we check if EITHER the source OR the target node is part of the selected group.
+            return ctx.group.nodeIds.has(srcId) || ctx.group.nodeIds.has(tgtId);
         }
 
         return true;
