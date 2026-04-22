@@ -291,12 +291,12 @@ export function detectHover(controller, graphScene, camera, cameraGroup) {
 
       const histogram = hit.userData.parent;
 
-      // 🧠 CLAIM OWNERSHIP
+      // CLAIM OWNERSHIP
       if (!activeTooltipController) {
         activeTooltipController = controller;
       }
 
-      // ❌ If another controller owns it → ignore
+      // If another controller owns it → ignore
       if (activeTooltipController !== controller) {
         return;
       }
