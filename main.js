@@ -134,21 +134,7 @@ const roomCenter = new THREE.Vector3(0, 0, 0);
 // Scene, Camera, Renderer
 // ========================
 const scene = new THREE.Scene();
-// const loader0 = new THREE.TextureLoader();
-
-// loader0.load('public/models/background.jpeg', (texture) => {
-//   texture.mapping = THREE.EquirectangularReflectionMapping;
-//   texture.colorSpace = THREE.SRGBColorSpace;
-
-//   scene.environment = texture;
-//   scene.background = texture;
-// });
-
-// scene.background = new THREE.Color(0x111827);
-
 scene.background = new THREE.Color(0x1a2638);
-// scene.fog = new THREE.FogExp2(0x1a2638, 0.004);
-// scene.fog = new THREE.FogExp2(0x020617, 0.0025);
 scene.fog = new THREE.FogExp2(0x0f2238, 0.0015);
 
 const sky = createSky();
@@ -165,44 +151,6 @@ const loader = new GLTFLoader();
 let labRoom;
 let roomHalfSize = new THREE.Vector2(500, 500); // XZ half size we allow the user to move in
 
-// loader.load('/webxr4/models/neoclassical_vr_room.glb', (gltf) => {
-//   labRoom = gltf.scene;
-
-//   labRoom.scale.set(35, 35, 35);
-//   labRoom.position.set(0, -40, 0);
-
-//   labRoom.traverse((child) => {
-//     if (child.isMesh) {
-//       child.castShadow = true;
-//       child.receiveShadow = true;
-//       if (child.material) {
-//         child.material.roughness = 0.8;
-//         child.material.metalness = 0.1;
-//       }
-//     }
-//   });
-
-//   scene.add(labRoom);
-//   console.log("Lab room loaded.");
-
-//   // Compute world-space bounding box
-//   const box = new THREE.Box3().setFromObject(labRoom);
-//   box.getCenter(roomCenter);
-
-//   const size = new THREE.Vector3();
-//   box.getSize(size);
-
-//   // Define how close to the walls the player is allowed to get (in meters)
-//   const margin = 2.0;
-
-//   // "Half size" of the allowed walk area in XZ
-//   const shrinkFactor = 0.80;   // 80% of original size = tighter room
-
-//   roomHalfSize.set(
-//     (size.x * 0.5) * shrinkFactor,
-//     (size.z * 0.5) * shrinkFactor
-//   );
-// });
 
 
 function clampCameraToRoom() {
@@ -317,9 +265,6 @@ function enableGraphRotation(controller) {
     }
   });
 }
-
-// enableGraphRotation(controller1)
-// enableGraphRotation(controller2)
 
 // THIS CHNAGED
 
@@ -586,11 +531,6 @@ export async function switchDataset(datasetKey) {
   console.log("LOADED DATA AND PERIODS AS WELL AS KEY", dataset, periods, currentDatasetKey)
   // 3️ Apply to graph
   applyDataset(dataset, periods);
-
-  // Update the rest of the visuals as well
-  // Update Filter Panel using the created uiPanel at initialization
-  // updateGroupList(uiPanel, buildGroupColorList(Graph.graphData()))
-
   console.log(`Dataset switched to: ${currentDatasetKey}`);
 }
 
