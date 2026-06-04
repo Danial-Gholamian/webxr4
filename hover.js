@@ -13,6 +13,7 @@ let activeTooltipController = null;
 const FONT_SIZE = 0.05;        // 5cm in VR units
 const LASER_DEFAULT_LENGTH = 50; // Default length when hitting nothing (adjust as needed)
 
+
 // ============================================================
 // HELPER: Reset Node and UI visual states
 // ============================================================
