@@ -1,9 +1,7 @@
 // filterUIPanel.js
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
-// import { broadcastDatasetChange } from './network.js';
 import { buildGroupColorList, highlightGroup, switchDataset } from './main.js'
-// import { broadcastGroupSelection } from './network.js';
 import { getGraphController } from './main.js';
 
 
@@ -133,23 +131,12 @@ export function updateGroupList(uiPanel, groupColors) {
   let y = uiPanel.userData.nodeGroupListCursorY;
 
   sortedGroups.forEach(group => {
-    // const dot = new THREE.Mesh(
-    //   new THREE.SphereGeometry(0.02),
-    //   new THREE.MeshBasicMaterial({
-    //     color: group.color,
-    //     depthTest: false,
-    //     depthWrite: false
-    //   })
-    // );
 
     const dot = createColorDot(group.color);
 
     dot.material.depthTest = false;
     dot.material.depthWrite = false;
     dot.renderOrder = 1000;
-
-    // dot.position.set(-0.4, y, 0.01);
-    // nodeGroupList.add(dot);
 
     const capsule = createCapsuleLabel(group.name, {
       color: 0x222244,
@@ -171,20 +158,8 @@ export function updateGroupList(uiPanel, groupColors) {
 
     nodeGroupList.add(row);
 
-    // capsule.position.set(-0.05, y, 0.01);
-    // dot.position.set(-0.42, y, 0.01);
-    // capsule.position.set(-0.04, y, 0.01);
-    // dot.position.set(-0.28, y, 0);
-    // capsule.position.set(0.08, y, 0);
-    // nodeGroupList.add(capsule);
-
     layoutVertical(nodeGroupList, uiPanel.userData.nodeGroupListCursorY, ROW_SPACING);
 
-    // // Center the groups in panel
-    // const rowCount = nodeGroupList.children.length;
-    // const totalHeight = rowCount * ROW_SPACING;
-
-    // nodeGroupList.position.y = totalHeight / 2;
 
     uiPanel.userData.nodeGroupButtons.push(capsule);
     y -= 0.17;
@@ -192,12 +167,8 @@ export function updateGroupList(uiPanel, groupColors) {
 }
 
 
-
-
-
 // filterUIPanel.js
 
-// ... (keep all the code above this function the same)
 
 export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, controller, scene, inVR }) {
   if (!uiPanel) return;
@@ -301,9 +272,6 @@ export function updatePanelPosition({ uiPanel, panelState, camera, cameraGroup, 
 
 
 console.log(`FilterUI panel system initialized at ${new Date().toLocaleTimeString()}`);
-
-// --------------------Sake of Test--------------------
-const DEBUG = true;
 
 export function createCapsuleLabel(text, {
   fontSize = 72,

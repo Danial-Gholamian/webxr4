@@ -18,7 +18,7 @@ def parse_group_file(filename):
 def main():
     edge_file = "dataset/primarySchool/primarySchool.dat"
     group_file = "dataset/primarySchool/student.dat"
-    output_file = "graph-data-times.js"
+    output_file = "dataset/primarySchool/graph-data-times-test.js"
 
     nodes_set = set()
     edge_to_times = defaultdict(list)
