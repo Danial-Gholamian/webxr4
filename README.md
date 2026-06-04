@@ -1,92 +1,214 @@
-# WebXR4 – Interactive 3D Force Graph in VR
+# TempoNetVR
 
-This project integrates a 3D force-directed graph into a custom WebXR + THREE.js scene. It uses the `3d-force-graph` library to enable dynamic, interactive node-link visualizations that can be experienced in immersive VR.
+## Interactive Temporal Windowing in Virtual Reality
+
+TempoNetVR is an immersive WebXR-based visualization system for exploring temporal graph data in virtual reality. The system allows users to directly manipulate a temporal window in 3D space, enabling continuous exploration of evolving graph structures without relying on predefined time slices.
+
+
+---
+
+## Overview
+
+Traditional temporal graph visualization techniques often rely on animations, sliders, or fixed time slices. These approaches can make it difficult to investigate arbitrary temporal intervals and identify patterns in datasets with uneven activity distributions.
+
+TempoNetVR addresses this challenge by representing time as a directly manipulable dimension. Users can adjust a temporal window to dynamically filter graph data while receiving immediate visual feedback through an embedded histogram and real-time graph updates.
+
+The system supports both individual and collaborative exploration within a shared virtual environment.
+
+---
+
+## Main Interface
+
+![TempoNetVR Interface](public/system-overview.png)
+
+---
 
 ## Features
 
-- Force-directed graph visualization with node groups, links, and labels
-- Mouse interaction: hover, click, and drag nodes
-- Clickable nodes that can trigger subgraph highlighting or navigation
-- VR-ready scene with controller-based interactions, built using THREE.js + WebXR
-- Optional UI panel to filter by group (visible in VR)
-- Future support planned: controller-based node grabbing and physics interaction
+### Interactive Temporal Windowing
 
-## Tech Stack
+- Direct manipulation of temporal intervals
+- Continuous temporal filtering
+- Real-time graph updates
+- Exploration of arbitrary time ranges
 
-- [THREE.js](https://threejs.org/)
-- [3d-force-graph](https://github.com/vasturiano/3d-force-graph)
-- [WebXR](https://immersive-web.github.io/webxr/)
-- [D3.js](https://d3js.org/)
+### Embedded Histogram Visualization
 
-## Setup & Usage
+- Overview of temporal activity across the dataset
+- Feedforward interaction support
+- Identification of high-activity periods before filtering
 
-### 1. Clone the repo
+### Graph Exploration
+
+- 3D force-directed graph layout
+- Node selection and inspection
+- Neighborhood highlighting
+- Group-based filtering
+- Intra-group and inter-group analysis modes
+
+### Live Insights Panel
+
+Displays contextual information for the currently selected temporal interval:
+
+- Most active nodes
+- Group activity summaries
+- Interaction statistics
+- Temporal activity rankings
+
+### Collaborative Analysis
+
+- Multi-user VR sessions
+- Shared temporal context
+- Avatar representation
+- Synchronized interaction cues
+- Real-time voice communication
+
+---
+
+## Technology Stack
+
+### Frontend
+
+- JavaScript (ES Modules)
+- Vite
+- Three.js
+- WebXR
+
+### Visualization
+
+- 3d-force-graph
+- d3-force
+- d3-scale
+- d3-scale-chromatic
+- Chart.js
+
+### Collaboration
+
+- Socket.IO
+- Real-time avatar synchronization
+- Spatial voice communication
+
+### Hardware
+
+- Meta Quest 2
+- WebXR-compatible browsers
+
+---
+
+## Datasets
+
+TempoNetVR includes two publicly available temporal graph datasets commonly used in network analysis research.
+
+### Hospital Ward Dynamic Contact Network
+
+This dataset captures face-to-face interactions between patients and healthcare workers in a hospital ward using wearable proximity sensors.
+
+**Source:**
+
+Vanhems, P., Barrat, A., Cattuto, C., Pinton, J.-F., Khanafer, N., Régis, C., Kim, B.-H., Comte, B., & Voirin, N. (2013). *Estimating potential infection transmission routes in hospital wards using wearable proximity sensors*. PLoS ONE, 8(9), e73970.
+
+### Primary School Temporal Network
+
+This dataset captures high-resolution face-to-face interactions between students and teachers in a primary school environment.
+
+**Sources:**
+
+Stehlé, J., Voirin, N., Barrat, A., Cattuto, C., Isella, L., Pinton, J.-F., Quaggiotto, M., Van den Broeck, W., Régis, C., Lina, B., & Vanhems, P. (2011). *High-resolution measurements of face-to-face contact patterns in a primary school*. PLoS ONE, 6(8), e23176.
+
+Gemmetto, V., Barrat, A., & Cattuto, C. (2014). *Mitigation of infectious disease at school: targeted class closure vs school closure*. BMC Infectious Diseases, 14, 695.
+
+> **Note:** The datasets are not original contributions of this project. Credit belongs to the original authors listed above.
+
+---
+
+## Installation
+
+### Clone Repository
 
 ```bash
 git clone https://github.com/Danial-Gholamian/webxr4.git
 cd webxr4
 ```
 
-### 2. Install dependencies (if you're using a bundler like Vite or Webpack)
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-If you're using vanilla JS + modules (e.g., with Vite), make sure the following packages are installed:
+### Run Development Server
 
 ```bash
-npm install three 3d-force-graph
+npm run dev
 ```
 
-### 3. Run the project (Vite dev server)
+### Build Production Version
 
 ```bash
-npx vite
+npm run build
 ```
 
-Or open `index.html` directly in a local dev server (e.g., using Live Server in VS Code).
+### Preview Production Build
 
-### 4. Enter VR Mode
-
-Click the **"Enter VR"** button (enabled via `VRButton.js`) when using a compatible headset like **Meta Quest 2/3**.
-
-## File Structure
-
-```
-webxr4/
-├── index.html                # Main HTML file
-├── main.js                   # Entry point: initializes scene, renderer, graph, and VR loop
-├── vrSetup.js                # Sets up controllers, teleport, joystick movement, selection, haptics
-├── graph-data.js             # Static graph data (nodes + links)
-├── graphData.js              # (Possibly older or alternate dataset)
-├── filterUIPanel.js          # 3D VR panel for filtering nodes by group
-├── hover.js                  # Hover detection logic for desktop and VR
-├── student.dat               # Raw data for graph generation
-├── primarySchool.dat         # Another input dataset
-├── vite.config.js            # Vite config for dev/build
-├── package.json              # NPM config with dependencies
-├── package-lock.json         # Locked versions of installed packages
-├── node_modules/             # Installed dependencies
-├── docs/                     # GitHub Pages build output
-├── README.md
-└── static-pages/             # Additional static HTML content
+```bash
+npm run preview
 ```
 
-## Todo (Coming Next)
+---
 
-- [ ] Controller-based node grabbing in VR
-- [ ] Highlight links and nodes when hovering in VR
-- [ ] Support dynamic graph updates from external data
-- [ ] Add animations or physics on drag events
+## Controls
 
-## Credits
+### VR Interaction
 
-- [3d-force-graph](https://github.com/vasturiano/3d-force-graph) by @vasturiano
-- [THREE.js](https://threejs.org/)
-- [WebXR](https://immersive-web.github.io/webxr/)
+- Trigger: Select nodes and UI elements
+- Ray Pointer: Graph interaction
+- Controller Movement: Manipulate temporal window
+- Navigation: Explore graph from different viewpoints
 
-## Build & Deploy (e.g., GitHub Pages)
+### Graph Interaction
+
+- Select nodes
+- Highlight neighbors
+- Filter by group
+- Switch between:
+  - All edges
+  - Intra-group edges
+  - Inter-group edges
+
+---
+
+## Project Structure
+
+```text
+TempoNetVR
+│
+├── WebXR / Three.js Rendering
+├── Temporal Window Controller
+├── Histogram Visualization
+├── Graph Visualization Layer
+├── Insight System
+├── Collaboration Layer (Socket.IO)
+├── Voice Communication
+└── Dataset Adapters
+```
+
+### Main Modules
+
+| File | Responsibility |
+|------|---------------|
+| `main.js` | Application entry point |
+| `graphVisualController.js` | Graph filtering and visualization logic |
+| `histogram.js` | Temporal histogram and window interaction |
+| `insightPanel.js` | Live analytics dashboard |
+| `insightSystem.js` | Insight calculations |
+| `network.js` | Multi-user synchronization |
+| `voice.js` | Voice communication |
+| `vrSetup.js` | VR interaction handling |
+| `dataset.js` | Dataset management |
+
+---
+
+## Build & Deploy
 
 ### Build
 
@@ -94,40 +216,25 @@ webxr4/
 npm run build
 ```
 
-This will output the production-ready files to the `dist/` folder.
+This will generate a production-ready build in the `dist/` directory.
 
-### Deploy to GitHub Pages (using `docs/` folder)
+### GitHub Pages
 
-If your repo is set up to serve GitHub Pages from the `docs/` folder:
-
-1. Copy the build output to `docs/`:
+If GitHub Pages is configured to serve from the `docs/` folder:
 
 ```bash
 cp -r dist docs
-```
-
-2. Add and commit the `docs` folder forcefully:
-
-```bash
 git add docs -f
 git commit -m "Deploy build to GitHub Pages"
 git push
 ```
 
-### GitHub Settings
+Then configure:
 
-Go to your GitHub repo → **Settings** → **Pages**, and set the **Source** to:
-
-```
-Branch: main / Folder: /docs
-```
-
-Then your site will be live at:
-
-```
-https://your-username.github.io/webxr4(or any other project name)/
+```text
+Settings → Pages
+Branch: main
+Folder: /docs
 ```
 
-
-
-<!-- A label must be readable in front of me, instead of far away inside the node. -->
+---
