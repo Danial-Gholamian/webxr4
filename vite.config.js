@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 
 export default {
-  base: '/webxr4/',
+  base: '/TempoNetVR/',
   build: {
     outDir: 'docs',
     target: 'esnext',

@@ -5,8 +5,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const loader = new GLTFLoader();
 
-const HEADSET_MODEL = '/webxr4/models/meta_quest_3.glb';
-const CONTROLLER_MODEL = '/webxr4/models/vr_controller.glb';
+const HEADSET_MODEL = `${import.meta.env.BASE_URL}/models/meta_quest_3.glb`;
+const CONTROLLER_MODEL = `${import.meta.env.BASE_URL}/models/vr_controller.glb`;
 
 export async function createAvatar(name = '') {
   const avatarRoot = new THREE.Group();

@@ -5,12 +5,12 @@ import { createCapsuleLabel } from './filterUIPanel';
 // Load all the images
 const loader = new THREE.TextureLoader();
 const guideImages = {
-    "movement.jpeg": loader.load(' /webxr4/guide-images/movement.jpeg'),
-    "move-window.jpeg": loader.load(' /webxr4/guide-images/move-window.jpeg'),
-    "reset-filter.jpeg": loader.load(' /webxr4/guide-images/reset-filter.jpeg'),
-    "rotate.jpeg": loader.load(' /webxr4/guide-images/rotate.jpeg'),
-    "trigger.jpeg": loader.load(' /webxr4/guide-images/trigger.jpeg'),
-    "trigger-select.jpeg": loader.load(' /webxr4/guide-images/trigger-select.jpeg')
+    "movement.jpeg": loader.load(`${import.meta.env.BASE_URL}guide-images/movement.jpeg`),
+    "move-window.jpeg": loader.load(`${import.meta.env.BASE_URL}guide-images/move-window.jpeg`),
+    "reset-filter.jpeg": loader.load(`${import.meta.env.BASE_URL}guide-images/reset-filter.jpeg`),
+    "rotate.jpeg": loader.load(`${import.meta.env.BASE_URL}guide-images/rotate.jpeg`),
+    "trigger.jpeg": loader.load(`${import.meta.env.BASE_URL}guide-images/trigger.jpeg`),
+    "trigger-select.jpeg": loader.load(`${import.meta.env.BASE_URL}guide-images/trigger-select.jpeg`)
 };
 
 
