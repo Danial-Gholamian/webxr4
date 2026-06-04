@@ -33,7 +33,6 @@ import { detectHover } from './hover.js';
 import { updatePeroidLabel, createCapsuleLabel, createCapsuleLabelWithDot } from './filterUIPanel.js';
 import { registerNetworkHandlers, broadcastAvatar, setScene, userAvatars, avatarInterpolation, setUsername, broadcastNodeSelection, socket } from './network.js';
 import { calculateHistogram, HistogramGauge } from './histogram.js';
-import { createPeriodStack } from './periodStack.js';
 import { initVoice } from './voice.js';
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -43,7 +42,6 @@ import {
   buildTemporalTree,
   createTemporalNavigator
 } from './temporalHierarchy.js';
-import { createTemporalDrillPanel } from './temporalDrillPanel.js';
 import { createSky, gridGeo, gridMaterial } from './skybox.js';
 import { calculateInsights } from './insightSystem.js';
 import { InsightPanel } from './insightPanel.js';
@@ -524,7 +522,6 @@ function applyDataset(dataset, periods) {
   }
 
   // // 8 Update Filter Panel using the created uiPanel at initialization
-  // updateGroupList(uiPanel, buildGroupColorList())
   // FORCE INITIAL INSIGHTS CALCULATION
   // This ensures the panel is populated the moment you enter VR
   setTimeout(() => {
@@ -539,7 +536,6 @@ function applyDataset(dataset, periods) {
 }
 
 
-// colorScale.domain([...new Set(graphData.nodes.map(n => n.group))]);
 
 const Graph = ForceGraph3D()(document.body)
 Graph.nodeColor(d => colorScale(d.group))
@@ -557,7 +553,6 @@ async function loadDataset(datasetKey) {
 
   // 1️ Load modules
   const dataModule = await entry.data();
-  const periodModule = await entry.periods();
 
   // 2️ Extract actual values
   dataset = dataModule.default ?? dataModule;
@@ -574,19 +569,8 @@ async function loadDataset(datasetKey) {
     throw new Error("Invalid dataset shape");
   }
 
-  // console.log(
-  //   `Loaded dataset "${entry.label}"`,
-  //   dataset.nodes.length,
-  //   dataset.links.length
-  // );
-  // console.log(
-  //   `-----Loaded periods----- "${periods}"`
-  // )
-
   return { datasetValues: dataset, periodLabelsValues: periods, key: datasetKey };
 
-  // // 4️ Apply to graph
-  // applyDataset(dataset, periods);
 }
 
 
@@ -675,13 +659,6 @@ timelineManager.setWindowSize(initialWindow);
 graphController.updateEdgeUniforms(0, globalDuration);
 
 applyDataset(dataset, periods);
-// We will update the inside of this panel in the next step!
-const temporalPanel = createTemporalDrillPanel({
-  cameraGroup: cameraGroup,
-  camera: camera,
-  timelineManager: timelineManager,
-  graphController: graphController
-});
 
 // --- NEW: REBUILD TREE FUNCTION ---
 export function updateDeltaMin(amount) {
@@ -696,10 +673,7 @@ export function updateDeltaMin(amount) {
   // 3. Re-initialize the navigator
   navigator = createTemporalNavigator(root);
 
-  // 4. Give the updated navigator to the drill panel
-  temporalPanel.setNavigator(navigator);
-
-  // 5. Reset the view to the new Root bucket
+  // 4. Reset the view to the new Root bucket
   dispatchTemporalUpdate();
 }
 
@@ -851,32 +825,6 @@ graphController.setSelectionBroadcaster((nodeId) => {
 
 // Initialize the highlight of the histogram
 graphController.highlightBucket(null);
-
-// // Create 60 bars across the timeline
-// const histogramData = calculateHistogram(dataset.__allTimes, globalStart, globalDuration, 60);
-
-// export const timeGauge = createHistogramGauge(
-//   histogramData,
-//   new THREE.Vector3(0, 1.4, -1.2),
-//   1.5, // Width of the whole gauge
-//   0.2  // Max height of the tallest bar
-// );
-
-
-// // Subscribe the histogram to the graphController
-// graphController.subscribeToTimeChanges((bucket) => {
-//   const globalStart = 0;
-//   const globalDuration = T - globalStart;
-//   updateBarGaugeForBucket(timeGauge, bucket, globalStart, globalDuration);
-// })
-
-
-// // Add the histogram to the VR space 
-// cameraGroup.add(timeGauge);
-
-
-
-// await switchDataset('school')
 
 
 // shrink the graph by 50%
@@ -1074,14 +1022,6 @@ export function buildGroupColorList(dataset) {
   return [...map.entries()].map(([name, color]) => ({ name, color }));
 }
 
-// export const uiPanel = await createFilterPanel({ groupColors: groups, camera, datasets: Object.values(DATASETS) });
-// cameraGroup.add(uiPanel); // ui panel buttom center
-// uiPanel.position.copy(PANEL_HIDDEN_POS);
-// initLabels(cameraGroup, camera); // info label for hover
-//panel for insight 
-
-// const insightPanel = new InsightPanel();
-// cameraGroup.add(insightPanel.getObject3D());
 
 // Add the insight panel to the controller subscribers
 // This allows them to listen to any selection done in the graph and update
@@ -1089,27 +1029,6 @@ graphController.subscribeToSelection((stats, nodeSelected, edgeMode) => {
   insightPanel.update(stats, colorScale, nodeSelected, edgeMode);
 });
 
-// // Hook it into the controller's update loop
-// const originalUpdate = graphController.update.bind(graphController);
-// graphController.update = () => {
-//   // 1. Run original visual updates
-//   originalUpdate();
-
-//   // 2. Calculate new insights
-//   const { nodes, links } = graphController.getFilteredData();
-//   const selection = {
-//     type: graphController.state.selection.active ? 'NODE' : 'NONE',
-//     id: graphController.state.selection.selectedNodeId
-//   };
-//   const currentBucket = graphController.state.activeBucket;
-//   const globalBucketLinks = dataset.links.filter(l =>
-//     graphController._edgeInBucket(l, currentBucket)
-//   );
-//   const stats = calculateInsights(nodes, links, selection, globalBucketLinks);
-
-//   // 3. Update the Panel
-//   insightPanel.update(stats, colorScale);
-// };
 
 // ========================
 // Graph Interaction + Reset
@@ -1119,11 +1038,6 @@ function requestGraphUpdate(mode, nodeId) {
   graphUpdateNodeId = nodeId;
   graphUpdateNeeded = true;
 }
-
-// graphController.setSelectionListener((nodeId) => {
-//   uiPanel.userData.updateSelectedNodeLabel?.(nodeId);
-// });
-
 
 let frameSkip = 0;
 
@@ -1165,71 +1079,6 @@ function updateTimeWindow(force = false) {
   }
 }
 
-// function handleTimelineDragging(xrFrame) {
-//   if (!inVR || !timelineManager || !histogram) return;
-
-//   for (const source of xrFrame.session.inputSources) {
-//     const controller = source.handedness === 'left' ? controller1 : controller2;
-//     const gamepad = source.gamepad;
-//     if (!gamepad) continue;
-
-//     // Use Trigger (button 0) for the grab
-//     const trigger = gamepad.buttons[0]; 
-
-//     // 1. START DRAGGING
-//     if (trigger.pressed && !isDraggingTimeline) {
-//       const raycaster = new THREE.Raycaster();
-//       const tempMatrix = new THREE.Matrix4();
-//       tempMatrix.identity().extractRotation(controller.matrixWorld);
-//       raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-//       raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-
-//       const intersections = raycaster.intersectObject(histogram.highlightWindow);
-      
-//       if (intersections.length > 0) {
-//         isDraggingTimeline = true;
-//         window.isDraggingTimeline = true;
-//         draggingController = controller;
-        
-//         // The "Secret Sauce": Store the offset so it doesn't jump to center
-//         const localHit = histogram.group.worldToLocal(intersections[0].point.clone());
-//         timelineDragOffset = localHit.x - histogram.highlightWindow.position.x;
-        
-//         gamepad.hapticActuators?.[0]?.pulse(0.6, 30);
-//       }
-//     }
-
-//     // 2. WHILE DRAGGING
-//     if (isDraggingTimeline && draggingController === controller) {
-//       if (trigger.pressed) {
-//         // Project hand position into histogram local space
-//         const controllerPos = histogram.group.worldToLocal(controller.position.clone());
-//         let targetX = controllerPos.x - timelineDragOffset;
-
-//         // Map local X to time
-//         const halfWidth = histogram.width / 2;
-//         const normalizedX = (targetX + halfWidth) / histogram.width;
-        
-//         const newStart = (normalizedX * globalDuration) - (timelineManager.windowSize / 2);
-        
-//         timelineManager.currentStart = THREE.MathUtils.clamp(
-//           newStart, 
-//           0, 
-//           globalDuration - timelineManager.windowSize
-//         );
-
-//         // Force immediate update for that "silky smooth" feel
-//         updateTimeWindow(true); 
-//       } else {
-//         // 3. STOP DRAGGING
-//         isDraggingTimeline = false;
-//         window.isDraggingTimeline = false;
-//         draggingController = null;
-//       }
-//     }
-//   }
-// }
-
 
 export function highlightSubgraph(nodeId) {
   graphController.highlightNode(nodeId)
@@ -1243,7 +1092,6 @@ function getEdgeKey(a, b) {
 export function highlightGroup(groupName) {
   graphController.highlightGroup(groupName)
 }
-
 
 
 const resetBtn = document.createElement('button');
@@ -1351,13 +1199,6 @@ renderer.xr.addEventListener('sessionend', () => {
 });
 
 
-
-// setInterval(() => {
-//   if (inVR && timelineManager) {
-//     broadcastAvatar(camera, controller1, controller2, timelineManager);
-//   }
-// }, 100);
-
 function togglePanel() {
   console.log("console.log from togglePanel");
   if (panelState === 'shown' || panelState === 'showing') {
@@ -1366,8 +1207,6 @@ function togglePanel() {
     panelState = 'showing';
   }
 }
-
-
 
 
 // ========================
@@ -1465,16 +1304,6 @@ renderer.setAnimationLoop((timestamp, xrFrame) => {
     graphUpdateMode = null;
     graphUpdateNodeId = null;
   }
-
-
-
-
-  // <--- NEW: FIX FOR "GOING BEHIND" (Snap Logic)
-  // ============================================================
-  temporalPanel.update();
-  // ============================================================
-
-
 
 
   const hoverPanel = cameraGroup.getObjectByName('NodeIDBillboard');
@@ -1599,13 +1428,7 @@ if (inVR && xrFrame) {
     });
 
     handleYButtonInput(xrFrame, () => {
-      // const modes = ['ALL', 'INTRA_ONLY', 'INTER_ONLY'];
-      // const currentIndex = modes.indexOf(graphController.state.edgeMode);
-      // const nextMode = modes[(currentIndex + 1) % modes.length];
-      // graphController.setEdgeMode(nextMode);
-      
-      // const gp = controller1.userData.inputSource?.gamepad;
-      // gp?.hapticActuators?.[0]?.pulse(0.8, 100);
+      console.log("Y-BUTTON PRESSED")
     });
 
     // 9. Hover Detection

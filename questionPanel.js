@@ -57,60 +57,8 @@ export class QuestionPanel {
 
         this._drawQuestion()
 
-
-        // // -------------------------
-        // // BACK BUTTON
-        // // -------------------------
-        // this.backButton = createCapsuleLabel("Back", {
-        //     fontSize: 40,
-        //     color: 0x884444,
-        //     onClick: () => this._onBack()
-        // });
-
-        // this.backButton.position.set(-0.2, -0.45, 0);
-        // this.group.add(this.backButton);
-
-        // // -------------------------
-        // // SUBMIT BUTTON
-        // // -------------------------
-        // this.submitButton = createCapsuleLabel("Submit", {
-        //     fontSize: 40,
-        //     color: 0x448844,
-        //     onClick: () => this._onSubmit()
-        // });
-
-        // this.submitButton.position.set(0.2, -0.45, 0);
-        // this.group.add(this.submitButton);
     }
 
-    // -------------------------
-    // LOGIC
-    // -------------------------
-
-    // _selectAnswer(index) {
-    //     this.selectedAnswer = index;
-
-    //     console.log("Selected:", this.answers[index]);
-
-    //     // visual feedback
-    //     this.answerButtons.forEach((btn, i) => {
-    //         const mesh = btn.children[0];
-    //         mesh.userData.isSelected = (i === index);
-
-    //         mesh.userData.redraw(
-    //             i === index ? "#3366ff" : mesh.userData.defaultColor
-    //         );
-    //     });
-    // }
-
-    // _onSubmit() {
-    //     if (this.selectedAnswer === null) {
-    //         console.log("No answer selected");
-    //         return;
-    //     }
-
-    //     console.log("Submitted answer:", this.answers[this.selectedAnswer]);
-    // }
 
     _drawQuestion() {
         const { ctx, canvas, texture } = this.questionPanel;
@@ -222,14 +170,6 @@ export class QuestionPanel {
         }
     }
 
-    // _refreshUI() {
-    //     // remove old buttons
-    //     this.answerButtons.forEach(btn => this.group.remove(btn));
-    //     this.group.remove(this.questionLabel);
-
-    //     // rebuild UI
-    //     this._buildUI();
-    // }
 
     handleTriggerSelect() {
         if (this.hoverIndex !== null) {

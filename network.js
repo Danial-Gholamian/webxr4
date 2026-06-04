@@ -281,9 +281,6 @@ socket.on('group-select', ({ groupName }) => {
     console.log('[network] using injected handler');
     injectedHandlers.onGroupSelect(groupName);
   }
-  // else {
-  //   highlightGroup(groupName);
-  // }
 });
 
 
@@ -315,9 +312,6 @@ export function setCurrentPeriodIndex(index, broadcast = true) {
   }
 }
 
-
-// export let squeezeRightNextPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() + 1, true);
-// export let squeezeLefttPrevPeriod = () => setCurrentPeriodIndex(getCurrentPeriodIndex() - 1, true);
 
 socket.on('period-change', (period) => {
   console.log("Received period change:", period);

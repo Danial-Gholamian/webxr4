@@ -5,14 +5,12 @@ export const DATASETS = {
     id: 'School',
     label: 'School Temporal Graph',
     data: () => import('./dataset/primarySchool/graph-data-times.js'),
-    periods: () => import('./dataset/primarySchool/periodDefs.js'),
   },
   hospital: {
     key: 'hospital',
     id: 'Hospital',
     label: 'Hospital Temporal Graph',
     data: () => import('./dataset/hospital/graph-data-times.js'),
-    periods: () => import('./dataset/hospital/hospitalDefs.js'),
   },
 };
 
